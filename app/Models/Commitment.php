@@ -46,4 +46,9 @@ class Commitment extends Model
     }
 
     // Add other relationships or methods as needed
+    public function sector()
+    {
+        return $this->belongsTo(Sector::class);
+    }
+
 }

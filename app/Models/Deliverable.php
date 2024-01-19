@@ -21,9 +21,10 @@ class Deliverable extends Model
     // Define relationships or additional methods as needed
 
 
+
     public function kpis()
     {
-        return $this->hasMany(DeliveryKpi::class);
+        return $this->hasMany(Kpi::class);
     }
 
     public function __kpis()
@@ -37,4 +38,11 @@ class Deliverable extends Model
         if(!$characterCount) return $this->deliverable_title;
         return strlen($this->deliverable_title)>$characterCount?substr($this->deliverable_title,0,$characterCount)." ...":$this->deliverable_title;
     }
+
+    public function commitment()
+    {
+        return $this->belongsTo(Commitment::class);
+    }
+
+
 }

@@ -22,6 +22,7 @@ class AuthLoginController extends Controller
 
     public function login(Request $request)
     {
+//        return bcrypt(123456);
         $this->validateLogin($request);
 
         if ($this->attemptLogin($request)) {
@@ -34,14 +35,14 @@ class AuthLoginController extends Controller
     protected function validateLogin(Request $request)
     {
         $request->validate([
-            'username' => 'required|string',
+            'email' => 'required|string',
             'password' => 'required|string',
         ]);
     }
 
     public function credentials(Request $request)
     {
-        return ['username'=>$request->username,'password'=>$request->password];
+        return ['email'=>$request->email,'password'=>$request->password];
     }
 
     protected function attemptLogin(Request $request)
@@ -67,9 +68,9 @@ class AuthLoginController extends Controller
     protected function sendFailedLoginResponse(Request $request)
     {
         return redirect()->route('login')
-            ->withInput($request->only('username', 'remember'))
+            ->withInput($request->only('email', 'remember'))
             ->withErrors([
-                'username' => __('auth.failed'),
+                'email' => __('auth.failed'),
             ]);
     }
 

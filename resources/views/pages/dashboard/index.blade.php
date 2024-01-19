@@ -2,11 +2,11 @@
 @section('content')
     @php
         $user = auth()->user();
-        $year = \App\Models\StateBudget::currentYear();
-        $stateBudget = \App\Models\StateBudget::activeBudget();
-        $releasedAmount = \App\Models\StateBudget::releases();
-        $releasedIncomplete = \App\Models\StateBudget::releaseCount();
-        $deliverablesSoFar = \App\Models\StateBudget::deliveredIn();
+        $year = 2024;//\App\Models\StateBudget::currentYear();
+        $stateBudget = 300000;//\App\Models\StateBudget::activeBudget();
+        $releasedAmount = 40000;//\App\Models\StateBudget::releases();
+        $releasedIncomplete = 8;//\App\Models\StateBudget::releaseCount();
+        $deliverablesSoFar = 3;//\App\Models\StateBudget::deliveredIn();
 
     @endphp
     <div class="relative">
@@ -28,7 +28,7 @@
                         <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
                             <div class="text-slate-500 text-xs">TOTAL Budget</div>
                             <div class="mt-1.5 flex items-center">
-                                <div class="text-base">{{ $stateBudget?number_format($stateBudget->amount):"No Budget Yet" }}</div>
+                                <div class="text-base">{{ $stateBudget?number_format($stateBudget):"No Budget Yet" }}</div>
                             </div>
                             <div class="text-slate-500 text-xs mt-5">Total Release</div>
                             <div class="mt-1.5 flex items-center">
@@ -72,7 +72,7 @@
                                     <div class="w-2 h-2 bg-primary rounded-full mr-3"></div>
 
                                     <span class="truncate">{{$sector->name}}</span>
-                                    <span class="font-medium ml-auto">{{$sector->distribution()}}%</span>
+                                    <span class="font-medium ml-auto">{{5}}%</span>
                                 </div>
                             @endforeach
                         </div>
@@ -121,7 +121,7 @@
                             <div class="mr-auto">
                                 <div class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3"> Total Budget <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle" class="lucide lucide-alert-circle tooltip w-4 h-4 ml-1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> </div>
                                 <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">
-                                    <span class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget->amount):"Budget Not Set" }}</span>
+                                    <span class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget Not Set" }}</span>
 
                                 </div>
                             </div>
@@ -156,7 +156,7 @@
                 datasets: [{
                     data: [
                         @foreach(\App\Models\Sector::all() as $sector)
-                        {{$sector->distribution()}},
+                        {{40}},
                         @endforeach
 
                     ],

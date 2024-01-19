@@ -22,14 +22,9 @@ class Sector extends Model
         return $this->hasMany(Report::class);
     }
 
-    public function __commitments()
+    public function commitments()
     {
         return $this->hasMany(Commitment::class);
-    }
-
-    public function commitments($year)
-    {
-        return $this->__commitments->where('year',$year);
     }
 
     public function head()
