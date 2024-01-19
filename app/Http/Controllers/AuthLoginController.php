@@ -41,7 +41,7 @@ class AuthLoginController extends Controller
 
     public function credentials(Request $request)
     {
-        return ['username'=>$request->username,'password'=>$request->password];
+        return ['email'=>$request->username,'password'=>$request->password];
     }
 
     protected function attemptLogin(Request $request)
