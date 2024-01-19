@@ -23,13 +23,13 @@ class SectorController extends Controller
     public function index(Request $request)
     {
         $sectors = Sector::get();
-        return view('pages.sector.index',compact('sectors'));
+        return view('pages.sector.index', compact('sectors'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|unique:sectors|max:255',
+            'sector_name' => 'required|unique:sectors|max:255',
             'description' => 'required|max:255',
             // Add other validation rules as needed
         ]);
@@ -94,22 +94,22 @@ class SectorController extends Controller
         return back();
     }
 
-    public function view(Request $request,$id,$comm_id=null)
+    public function view(Request $request, $id, $comm_id = null)
     {
         $sector = Sector::find($id);
         $commitments = $sector->__commitments()->get();
-        return view('pages.sector.view', compact('sector','commitments','comm_id'));
+        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id'));
     }
 
-    public function show(Request $request,$id)
+    public function show(Request $request, $id)
     {
         $sector = Sector::find($id);
         $commitments = $sector->__commitments()->get();
         $commitmentsX = Commitment::with('deliverables.kpis')->get();
-        $years = DeliveryKpi::distinct('year')->orderBy('year','ASC')->pluck('year')->toArray();
+        $years = DeliveryKpi::distinct('year')->orderBy('year', 'ASC')->pluck('year')->toArray();
         $lyear = $years[0];
         $head = $sector->head();
-        return view('pages.sector.show', compact('lyear','sector','commitments','head','commitmentsX','years'));
+        return view('pages.sector.show', compact('lyear', 'sector', 'commitments', 'head', 'commitmentsX', 'years'));
     }
 
     public function edit(Sector $sector)
@@ -121,7 +121,7 @@ class SectorController extends Controller
     {
         $sector = Sector::find($request->id);
         $request->validate([
-            'name' => 'required|unique:sectors,name,' . $sector->id . '|max:255',
+            'sector_name' => 'required|unique:sectors,sector_name,' . $sector->id . '|max:255',
             'description' => 'required|max:255',
             // Add other validation rules as needed
         ]);
@@ -143,13 +143,13 @@ class SectorController extends Controller
         $sector_id = $request->sector_id;
         $year = $request->year;
 
-        $budgets = CommitmentBudget::leftJoin('commitments',function ($join) use($year){
-            $join->on('commitments.id','=','commitment_budgets.commitment_id')
-                ->on('commitment_budgets.year','=',DB::raw($year));
+        $budgets = CommitmentBudget::leftJoin('commitments', function ($join) use ($year) {
+            $join->on('commitments.id', '=', 'commitment_budgets.commitment_id')
+                ->on('commitment_budgets.year', '=', DB::raw($year));
         })
-            ->where(['year'=>$year,'sector_id'=>$sector_id])
+            ->where(['year' => $year, 'sector_id' => $sector_id])
             ->get();
 
-        return view("pages.sector.commitent_budget",compact('budgets','year'));
+        return view("pages.sector.commitent_budget", compact('budgets', 'year'));
     }
 }
