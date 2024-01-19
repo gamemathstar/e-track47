@@ -8,7 +8,8 @@
     <div class="grid grid-cols-12 gap-6 mt-5">
         <div class="intro-y col-span-12 flex flex-wrap sm:flex-nowrap items-center mt-2">
             <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#addUserModal">Add New User</button>
+                    data-tw-target="#addUserModal">Add New User
+            </button>
 
             <div id="addUserModal" class="modal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg">
@@ -16,7 +17,7 @@
                         <div class="modal-body">
                             <form action="{{route('users.add')}}" method="post">
                                 <h2>Add User</h2>
-                                <hr>    @csrf
+                                <hr> @csrf
                                 <div class="text-warning mt-2" id="addKpiMsg">
 
                                 </div>
@@ -43,15 +44,18 @@
                                     <label>User Role</label>
                                     <div class="flex flex-col sm:flex-row mt-2">
                                         <div class="form-check mr-2">
-                                            <input id="radio-switch-4" class="form-check-input role" type="radio" name="role" value="1">
+                                            <input id="radio-switch-4" class="form-check-input role" type="radio"
+                                                   name="role" value="1">
                                             <label class="form-check-label" for="radio-switch-4">Governor</label>
                                         </div>
                                         <div class="form-check mr-2 mt-2 sm:mt-0">
-                                            <input id="radio-switch-5" class="form-check-input role" type="radio" name="role" value="0">
+                                            <input id="radio-switch-5" class="form-check-input role" type="radio"
+                                                   name="role" value="0">
                                             <label class="form-check-label" for="radio-switch-5">System Admin</label>
                                         </div>
                                         <div class="form-check mr-2 mt-2 sm:mt-0">
-                                            <input id="radio-switch-6" class="form-check-input role" type="radio" name="role" value="2">
+                                            <input id="radio-switch-6" class="form-check-input role" type="radio"
+                                                   name="role" value="2">
                                             <label class="form-check-label" for="radio-switch-6">Sector Head</label>
                                         </div>
                                     </div>
@@ -83,7 +87,9 @@
                                 <hr>
                                 <div class="mt-3 text-center">
                                     <button class="btn btn-primary" id="addEditDeliverableBtn">Save</button>
-                                    <button type="button"  data-tw-dismiss="modal" class="btn btn-secondary" id="">Close</button>
+                                    <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">
+                                        Close
+                                    </button>
                                 </div>
 
                             </form>
@@ -105,16 +111,19 @@
                 <div class="box">
                     <div class="flex flex-col lg:flex-row items-center p-5">
                         <div class="w-24 h-24 lg:w-12 lg:h-12 image-fit lg:mr-1">
-                            <img alt="Midone - HTML Admin Template" class="rounded-full" src="dist/images/profile-1.jpg">
+                            <img alt="Midone - HTML Admin Template" class="rounded-full"
+                                 src="{{ asset('dist/images/profile-1.jpg') }}">
                         </div>
                         <div class="lg:ml-2 lg:mr-auto text-center lg:text-left mt-3 lg:mt-0">
-                            <a href="" class="font-medium">{{$user->full_name}}</a>
+                            <a href="" class="font-medium">{{ $user->full_name }}</a>
                             <div class="text-slate-500 text-xs mt-0.5">
-                                {{$user->role()}} {{$sector?" | ".$sector->name:""}}
+                                {{ $user->role() }} {{ $sector? " | " . $sector->name: ""}}
                             </div>
                         </div>
                         <div class="flex mt-4 lg:mt-0">
-                            <a class="btn btn-primary py-1 px-2 mr-2" href="{{route('users.view',[$user->id])}}">View User</a>
+                            <a class="btn btn-primary py-1 px-2 mr-2" href="{{route('users.view',[$user->id])}}">
+                                View User
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -129,14 +138,14 @@
 @section('js')
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
-        $(function (){
+        $(function () {
             const addUserModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addUserModal"));
 
-            $(".role").on('change',function (){
+            $(".role").on('change', function () {
                 console.log($(this).val());
-                if($(this).val()=='2'){
+                if ($(this).val() == '2') {
                     $("#sectorArea").show();
-                }else{
+                } else {
                     $("#sectorArea").hide();
                 }
             });
