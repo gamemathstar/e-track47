@@ -3,13 +3,13 @@
 @section('content')
     <div class="intro-y flex items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            Sector: {{ $sector->name }}
+            Sector: {{ $sector->sector_name }}
         </h2>
     </div>
     @php
 
         @endphp
-    <!-- BEGIN: Profile Info -->
+        <!-- BEGIN: Profile Info -->
     <div class="intro-y box px-5 pt-5 mt-5">
         <div class="flex flex-col lg:flex-row border-b border-slate-200/60 dark:border-darkmode-400 pb-5 -mx-5">
             <div class="flex flex-1 px-5 items-center justify-center lg:justify-start">
@@ -215,7 +215,8 @@
                                 <div class="flex items-center">
 
                                     {{$loop->iteration}}.
-                                    <a href="javascript:;" class="underline ml-1 commitments" com-id="{{$commitment->id}}">
+                                    <a href="javascript:;" class="underline ml-1 commitments"
+                                       com-id="{{$commitment->id}}">
                                         {{$commitment->title(48)}}
                                     </a>
                                 </div>
@@ -359,7 +360,7 @@
 
                     </div>
                     <div class="modal-footer">
-                        <button  class="btn btn-primary" id="">Upload</button>
+                        <button class="btn btn-primary" id="">Upload</button>
                         <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">Close</button>
                     </div>
                 </form>
@@ -371,10 +372,10 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
 
-{{--                <h1><strong>Add Budget</strong></h1>--}}
-{{--                <hr>--}}
-{{--                <br>--}}
-{{--                <br>--}}
+                {{--                <h1><strong>Add Budget</strong></h1>--}}
+                {{--                <hr>--}}
+                {{--                <br>--}}
+                {{--                <br>--}}
                 <form action="{{ route("sectors.budget.save") }}" method="post" enctype="multipart/form-data">
                     <div class="modal-body">
                         @csrf
@@ -395,7 +396,7 @@
 
                     </div>
                     <div class="modal-footer">
-                        <button  class="btn btn-primary" id="">Add Budget</button>
+                        <button class="btn btn-primary" id="">Add Budget</button>
                         <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">Close</button>
                     </div>
                 </form>
@@ -441,7 +442,9 @@
                     <hr>
                     <div class="mt-3 text-center">
                         <button class="btn btn-primary btn-sm btn-rounded" id="addEditDeliverableBtn">Save KPI</button>
-                        <button type="button" data-tw-dismiss="modal" class="btn btn-secondary  btn-sm btn-rounded" id="">Close</button>
+                        <button type="button" data-tw-dismiss="modal" class="btn btn-secondary  btn-sm btn-rounded"
+                                id="">Close
+                        </button>
                     </div>
 
 
@@ -457,7 +460,7 @@
                     <form action="{{ route('commitments.budget.save') }}" method="post">
                         @csrf
                         <h2>Add Budget to Commitment <strong class="font-bold" id="del-title"></strong></h2>
-{{--                        <input type="hidden" name="commitment_id" value="" id="commitment_budget_id">--}}
+                        {{--                        <input type="hidden" name="commitment_id" value="" id="commitment_budget_id">--}}
                         <input type="hidden" name="year" value="" id="year_budget">
                         <hr>
                         <div class="mt-3">
@@ -471,12 +474,16 @@
                         </div>
                         <div class="mt-3">
                             <label for="regular-form-2" class="form-label">Amount</label>
-                            <input id="target" type="text" class="form-control form-control-rounded" placeholder="Target"
+                            <input id="target" type="text" class="form-control form-control-rounded"
+                                   placeholder="Target"
                                    name="amount">
                         </div>
                         <div class="mt-3 text-center">
-                            <button class="btn btn-primary btn-sm btn-rounded" id="addEditDeliverableBtn">Save Amount</button>
-                            <button type="button" data-tw-dismiss="modal" class="btn btn-secondary  btn-sm btn-rounded" id="">Close</button>
+                            <button class="btn btn-primary btn-sm btn-rounded" id="addEditDeliverableBtn">Save Amount
+                            </button>
+                            <button type="button" data-tw-dismiss="modal" class="btn btn-secondary  btn-sm btn-rounded"
+                                    id="">Close
+                            </button>
                         </div>
                     </form>
 
@@ -685,7 +692,7 @@
             const commitmentBudgetModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#commitmentBudgetModal"));
 
 
-            $("body").on('click','.commitmentBudgetBtn', function () {
+            $("body").on('click', '.commitmentBudgetBtn', function () {
                 year_budget = $(this).attr('year')
                 $("#year_budget").val(year_budget);
                 commitmentBudgetModal.show();
@@ -705,7 +712,6 @@
                 });
 
             });
-
 
 
             $(".commitments").on('click', function (e) {

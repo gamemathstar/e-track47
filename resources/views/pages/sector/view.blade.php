@@ -3,11 +3,12 @@
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            Sector : {{$sector->name}}
+            Sector : {{$sector->sector_name}}
         </h2>
         <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
             <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#sectorHeadModal">Sector Head</button>
+                    data-tw-target="#sectorHeadModal">Sector Head
+            </button>
             <div class="dropdown ml-auto sm:ml-0">
                 <button class="dropdown-toggle btn px-2 box" aria-expanded="false" data-tw-toggle="dropdown">
                     <span class="w-5 h-5 flex items-center justify-center">
@@ -212,9 +213,9 @@
                                             <thead>
                                             <tr>
                                                 <th class="whitespace-nowrap">#</th>
-                                                <th class="whitespace-nowrap">First Name</th>
-                                                <th class="whitespace-nowrap">Last Name</th>
-                                                <th class="whitespace-nowrap">Username</th>
+                                                <th class="whitespace-nowrap">Full Name</th>
+                                                <th class="whitespace-nowrap">Email Address</th>
+                                                <th class="whitespace-nowrap">Phone Number</th>
                                             </tr>
                                             </thead>
                                             <tbody>
