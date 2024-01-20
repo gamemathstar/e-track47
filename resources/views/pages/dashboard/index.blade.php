@@ -200,6 +200,34 @@
             });
 
             doKpiPerformance(2024)
+            doKpiPerformanceRatio()
+
+
+
+            function doKpiPerformanceRatio(){
+                // chart.sector.kpi.performance.ratio/
+                $.ajax({
+                    type:'get',
+                    url:"{{route('chart.sector.kpi.performance.ratio')}}",
+                    success:function (data) {
+                        // Extract data from the response
+                        console.log(data);
+                        // const sectorNames = data.map(sector => sector.sector_name);
+                        // const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
+                        //
+                        //
+                        // console.log(confirmedKpiCounts);
+                        // // Access the chart and update its data
+                        // const chart = myChart; // Access your chart instance (make sure it's in the global scope)
+                        // chart.data.labels = sectorNames;
+                        // chart.data.datasets[0].data = confirmedKpiCounts;
+                        // chart.update(); // Update the chart to reflect the new data
+
+                    }
+                });
+
+
+            }
 
             function doKpiPerformance(year){
 
@@ -210,24 +238,14 @@
                     success:function (data) {
                         // Extract data from the response
                         const sectorNames = data.map(sector => sector.sector_name);
-                        const kpiCounts = data.map(sector => {
-                            // Count KPIs with confirmed performance tracking for each sector
-                            return sector.commitments.reduce((count, commitment) => {
-                                return count + commitment.deliverables.reduce((deliverableCount, deliverable) => {
-                                    return deliverableCount + deliverable.kpis.reduce((kpiCount, kpi) => {
-                                        // Check if there is at least one confirmed performance tracking for the KPI
-                                        console.log(kpi.performance_tracking.length);
-                                        return kpiCount + kpi.performance_tracking.length;
-                                    }, 0);
-                                }, 0);
-                            }, 0);
-                        });
+                        const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
 
-                        console.log(kpiCounts);
+
+                        console.log(confirmedKpiCounts);
                         // Access the chart and update its data
                         const chart = myChart; // Access your chart instance (make sure it's in the global scope)
                         chart.data.labels = sectorNames;
-                        chart.data.datasets[0].data = kpiCounts;
+                        chart.data.datasets[0].data = confirmedKpiCounts;
                         chart.update(); // Update the chart to reflect the new data
 
                     }
