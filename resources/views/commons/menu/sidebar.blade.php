@@ -28,7 +28,7 @@
                 <li>
                     <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">
                         <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>
-                        <div class="side-menu__title"> {{$sector->name}} </div>
+                        <div class="side-menu__title"> {{$sector->sector_name}} </div>
                     </a>
                 </li>
                 @endforeach

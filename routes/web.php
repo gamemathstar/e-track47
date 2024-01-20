@@ -43,6 +43,7 @@ Route::post('sectors/documents/save', [SectorController::class, 'storeDoc'])->na
 Route::post('sectors/budget/save', [SectorController::class, 'storeBudget'])->name('sectors.budget.save');
 Route::get('sectors/show/{id}/', [SectorController::class, 'show'])->name('sectors.show');
 Route::get('sectors/budget/', [SectorController::class, 'budget'])->name('sectors.budget');
+Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
 Route::get('sectors/{id}/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
 // Sector Resource

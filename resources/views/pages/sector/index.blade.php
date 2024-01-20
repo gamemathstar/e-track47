@@ -183,7 +183,8 @@
                                                 <button type="button" data-tw-dismiss="modal"
                                                         class="btn btn-outline-secondary w-24 mr-1">Cancel
                                                 </button>
-                                                <button type="button" class="btn btn-danger w-24">Delete</button>
+                                                <a href="{{ route('sectors.delete',[$sector->id]) }}"
+                                                   class="btn btn-danger w-24">Delete</a>
                                             </div>
                                         </div>
                                     </div>
