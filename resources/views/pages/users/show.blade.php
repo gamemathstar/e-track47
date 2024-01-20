@@ -16,9 +16,11 @@
                          src="{{ asset('dist/images/profile-5.jpg') }}">
                 </div>
                 <div class="ml-5">
+                    @php $sector = $user->sector(); @endphp
                     <div
                             class="w-24 sm:w-40 truncate sm:whitespace-normal font-medium text-lg">{{ $user->full_name }}</div>
-                    <div class="text-slate-500">{{ $user->role() }}</div>
+                    <div
+                            class="text-slate-500">{{ $user->role()->role }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
                 </div>
             </div>
             <div
@@ -59,7 +61,7 @@
         </div>
         <ul class="nav nav-link-tabs flex-col sm:flex-row justify-center lg:justify-start text-center" role="tablist">
             <li id="profile-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center active" data-tw-target="#profile"
+                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#profile"
                    aria-controls="profile" aria-selected="true" role="tab"> <i class="w-4 h-4 mr-2"
                                                                                data-lucide="user"></i> Profile </a>
             </li>
@@ -73,7 +75,7 @@
                 </a>
             </li>
             <li id="edit-profile-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#edit-profile"
+                <a href="javascript:;" class="nav-link py-4 flex items-center active" data-tw-target="#edit-profile"
                    aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="pencil"></i> Edit Profile
                 </a>
             </li>
@@ -86,7 +88,7 @@
     <!-- END: Profile Info -->
 
     <div class="tab-content mt-5">
-        <div id="profile" class="tab-pane active" role="tabpanel" aria-labelledby="profile-tab">
+        <div id="profile" class="tab-pane" role="tabpanel" aria-labelledby="profile-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- BEGIN: Latest Uploads -->
                 <div class="intro-y box col-span-12 lg:col-span-6">
@@ -161,93 +163,71 @@
             </div>
         </div>
 
-        <div id="edit-profile" class="tab-pane" role="tabpanel" aria-labelledby="edit-profile-tab">
+        <div id="edit-profile" class="tab-pane active" role="tabpanel" aria-labelledby="edit-profile-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- BEGIN: Latest Uploads -->
-                <div class="intro-y box col-span-12 lg:col-span-6">
+                <div class="intro-y box col-span-12 lg:col-span-12">
                     <div class="p-8">
                         <form action="{{route('users.add')}}" method="post">
                             @csrf
                             <input type="hidden" name="id" value="{{ $user->id }}">
-                            <div class="">
-                                <label for="full_name" class="form-label">Full Name</label>
-                                <input type="text" id="full_name" class="form-control" name="full_name"
-                                       placeholder="Full Name" value="{{ $user->full_name }}" required>
-                            </div>
                             <div class="grid grid-cols-12 mt-4">
-                                <div class="col-span-12 lg:col-span-6 mr-1">
+                                <div class="col-span-12 lg:col-span-4">
+                                    <label for="full_name" class="form-label">Full Name</label>
+                                    <input type="text" id="full_name" class="form-control" name="full_name"
+                                           placeholder="Full Name" value="{{ $user->full_name }}" required>
+                                </div>
+                                <div class="col-span-12 lg:col-span-4 mr-2  ml-2">
                                     <label for="email" class="form-label">Email</label>
                                     <input type="email" id="email" class="form-control" name="email" placeholder="Email"
                                            value="{{ $user->email }}" required>
                                 </div>
 
-                                <div class="col-span-12 lg:col-span-6 ml-1">
+                                <div class="col-span-12 lg:col-span-4">
                                     <label for="phone_number" class="form-label">Phone No</label>
                                     <input type="tel" id="phone_number" class="form-control" name="phone_number"
                                            value="{{ $user->phone_number }}" placeholder="Phone No" required>
                                 </div>
                             </div>
-                            <div class="mt-5">
-                                <label>User Role</label>
-                                <div class="flex flex-col sm:flex-row mt-2">
-                                    <div class="form-check mr-2">
-                                        <input id="radio-switch-4" class="form-check-input role" type="radio"
-                                               {{ $user->role=='1'?'checked':'' }} name="role" value="1">
-                                        <label class="form-check-label" for="radio-switch-4">Governor</label>
-                                    </div>
-                                    <div class="form-check mr-2 mt-2 sm:mt-0">
-                                        <input id="radio-switch-5" class="form-check-input role" type="radio"
-                                               {{ $user->role=='0'?'checked':'' }} name="role" value="0">
-                                        <label class="form-check-label" for="radio-switch-5">System Admin</label>
-                                    </div>
-                                    <div class="form-check mr-2 mt-2 sm:mt-0">
-                                        <input id="radio-switch-6" class="form-check-input role" type="radio"
-                                               {{ $user->role=='2'?'checked':'' }} name="role" value="2">
-                                        <label class="form-check-label" for="radio-switch-6">Sector Head</label>
-                                    </div>
-                                    <div class="form-check mr-2 mt-2 sm:mt-0">
-                                        <input id="radio-switch-7" class="form-check-input role" type="radio"
-                                               {{ $user->role=='3'?'checked':'' }} name="role" value="3">
-                                        <label class="form-check-label" for="radio-switch-7">Sector Admin</label>
-                                    </div>
-                                </div>
-                            </div>
+
                             @php
                                 $sector = $user->sector();
                             @endphp
-                            <div id="sectorArea" class="hidden">
-                                @if(!is_null($sector))
-                                    <div class="mt-3">
-                                        <label for="regular-form-2" class="form-label">Sector</label>
-                                        <select name="sector_id" id="" class="form-control">
-                                            <option value="">Select</option>
-                                            @foreach($sectors as $sektor)
-                                                <option {{ $sector->id===$sektor->id? 'selected':'' }}
-                                                        value="{{$sektor->id}}">{{$sektor->name}}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="grid grid-cols-12 mt-4">
-                                        <div class="col-span-12 lg:col-span-6 mr-1">
-                                            <label for="date-from" class="form-label">Date From</label>
-                                            <input type="date"
-                                                   value="{{ !is_null($sector->date_from)?$sector->date_from->format('dd/mm/yyyy'):'' }}"
-                                                   id="date-from"
-                                                   class="form-control" name="date_from">
-                                        </div>
-                                        <div class="col-span-12 lg:col-span-6 mr-1">
-                                            <label for="date-to" class="form-label">Date To</label>
-                                            <input type="date"
-                                                   value="{{ !is_null($sector->date_to)?$sector->date_to->format('dd/mm/yyyy'):'' }}"
-                                                   id="date-to"
-                                                   class="form-control" name="date_to">
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
+                            <div class="grid grid-cols-12 mt-4">
+                                <div class="col-span-12 lg:col-span-4 mr-">
+                                    <label for="regular-form-2" class="form-label">Sector</label>
+                                    <select name="role" id="" class="form-control">
+                                        <option value="">Select</option>
+                                        <option
+                                                {{ $user->role()->role == 'Governor'? 'selected' : '' }}
+                                                value="Governor"> Governor
+                                        </option>
+                                        <option
+                                                {{ $user->role()->role == 'System Admin'? 'selected' : '' }}
+                                                value="System Admin"> System Admin
+                                        </option>
+                                        <option
+                                                {{ $user->role()->role == 'Sector Head'? 'selected' : '' }}
+                                                value="Sector Head"> Sector Head
+                                        </option>
+                                        <option {{ $user->role()->role == 'Sector Admin'? 'selected' : '' }}
+                                                value="Sector Admin">Sector Admin
+                                        </option>
+                                    </select>
+                                </div>
 
-                            <br>
+                                <div class="col-span-12 lg:col-span-4 ml-1">
+                                    <label for="regular-form-2" class="form-label">Sector</label>
+                                    <select name="sector_id" id="" class="form-control">
+                                        <option value="">Select</option>
+                                        @foreach($sectors as $sektor)
+                                            <option {{ $sector->id===$sektor->id? 'selected':'' }}
+                                                    value="{{$sektor->id}}">{{$sektor->sector_name}}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
                             <br>
                             <br>
                             <div class="mt-3 text-center">
@@ -256,7 +236,6 @@
                                     Close
                                 </button>
                             </div>
-
                         </form>
                     </div>
                 </div>

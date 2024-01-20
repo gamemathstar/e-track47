@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Sector;
 use App\Models\SectorHead;
 use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Http\Request;
 use function Laravel\Prompts\password;
 
@@ -34,17 +35,20 @@ class UserController extends Controller
         $user->full_name = $request->full_name;
         $user->email = $request->email;
         $user->phone_number = $request->phone_number;
-        $user->role = $request->role;
         if (!isset($request->id))
             $user->password = bcrypt('JSUSER321');
 
-        if ($user->save() && $user->role == 2) {
-            $sectorHead = new SectorHead();
-            $sectorHead->sector_id = $request->sector_id;
-            $sectorHead->user_id = $user->id;
-            $sectorHead->date_from = $request->date_from;
-            $sectorHead->date_to = $request->date_to;
-            $sectorHead->save();
+        if ($user->save()) {
+            $userRole = UserRole::where(['user_id' => $user->id])->first();
+            if (is_null($userRole))
+                $userRole = new UserRole();
+
+            $userRole->user_id = $user->id;
+            $userRole->role = $request->role;
+            $userRole->target_entity = 'Sector';
+            $userRole->entity_id = $request->sector_id;
+            $userRole->role_status = 'Active';
+            $userRole->save();
         }
         return back();
     }
