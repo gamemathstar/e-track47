@@ -39,7 +39,7 @@
                 <form method="POST" action="{{ route('login') }}">
                     <div class="intro-x mt-8">
                         @csrf
-                        <input type="text" name="username" class="intro-x login__input form-control py-3 px-4 block" placeholder="Username"  value="{{ old('email') }}" required autofocus>
+                        <input type="email" name="email" class="intro-x login__input form-control py-3 px-4 block" placeholder="Email"  value="{{ old('email') }}" required autofocus>
                         @error('email')
                         <span>{{ $message }}</span>
                         @enderror

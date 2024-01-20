@@ -41,9 +41,14 @@ class Commitment extends Model
 
     public function title($characterCount=null)
     {
-        if(!$characterCount) return $this->commitment_title;
-        return strlen($this->commitment_title)>$characterCount?substr($this->commitment_title,0,$characterCount)." ...":$this->commitment_title;
+        if(!$characterCount) return $this->name;
+        return strlen($this->name)>$characterCount?substr($this->name,0,$characterCount)." ...":$this->name;
     }
 
     // Add other relationships or methods as needed
+    public function sector()
+    {
+        return $this->belongsTo(Sector::class);
+    }
+
 }

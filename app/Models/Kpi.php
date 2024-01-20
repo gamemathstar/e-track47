@@ -16,4 +16,14 @@ class Kpi extends Model
         'actual_value',
         'status',
     ];
+
+    public function deliverable()
+    {
+        return $this->belongsTo(Deliverable::class);
+    }
+
+    public function performanceTracking()
+    {
+        return $this->hasMany(PerformanceTracking::class);
+    }
 }

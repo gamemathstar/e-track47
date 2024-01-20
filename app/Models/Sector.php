@@ -22,14 +22,14 @@ class Sector extends Model
         return $this->hasMany(Report::class);
     }
 
-    public function __commitments()
+    public function commitments()
     {
         return $this->hasMany(Commitment::class);
     }
 
-    public function commitments($year)
+    public function __commitments()
     {
-        return $this->__commitments->where('year', $year);
+        return $this->commitments();
     }
 
     public function head()
@@ -44,7 +44,7 @@ class Sector extends Model
 
     public function files()
     {
-        return SectorFile::where('sector_id', $this->id)->get();
+        return [];//SectorFile::where('sector_id', $this->id)->get();
     }
 
     public function budgets()

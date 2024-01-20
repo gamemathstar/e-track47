@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthLoginController;
+use App\Http\Controllers\ChartController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliverableController;
@@ -35,6 +36,7 @@ Route::post('users/store', [UserController::class, 'store'])->name("users.add");
 Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
 Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");
 
+Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
 // Sector Resource
 Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
 Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
