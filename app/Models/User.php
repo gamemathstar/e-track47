@@ -89,7 +89,7 @@ class User extends Authenticatable
 
     public function commitmentStatus()
     {
-        return  DB::table('commitments')
+        return DB::table('commitments')
             ->select('status', DB::raw('COUNT(*) as status_count'))
             ->groupBy('status')
             ->get();
@@ -155,6 +155,11 @@ class User extends Authenticatable
             ->select('sectors.sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
             ->groupBy('sectors.id')
             ->get();
+
+    }
+
+    public function canEditUser()
+    {
 
     }
 }

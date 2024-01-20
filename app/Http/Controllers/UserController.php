@@ -27,12 +27,16 @@ class UserController extends Controller
     {
         // Validate and store user data
 //        return $request;
-        $user = new User();
+        if (isset($request->id))
+            $user = User::find($request->id);
+        else
+            $user = new User();
         $user->full_name = $request->full_name;
         $user->email = $request->email;
         $user->phone_number = $request->phone_number;
         $user->role = $request->role;
-        $user->password = bcrypt('JSUSER321');
+        if (!isset($request->id))
+            $user->password = bcrypt('JSUSER321');
 
         if ($user->save() && $user->role == 2) {
             $sectorHead = new SectorHead();
@@ -47,7 +51,8 @@ class UserController extends Controller
 
     public function view(User $user)
     {
-        return view('pages.users.show', compact('user'));
+        $sectors = Sector::all();
+        return view('pages.users.show', compact('user', 'sectors'));
     }
 
     public function edit(User $user)
