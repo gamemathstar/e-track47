@@ -302,7 +302,7 @@
                                                     @endif
 
                                                     <td>
-                                                        {{ \App\Models\Kpi::find($kpi->kpi_id)->kpi }}
+{{--                                                        {{ \App\Models\Kpi::find($kpi->kpi_id)->kpi }}--}}
                                                     </td>
                                                     <td>{{ $kpi->target }}</td>
                                                     <td>{{ $kpi->actual_value }}</td>

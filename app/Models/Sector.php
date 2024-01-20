@@ -27,6 +27,11 @@ class Sector extends Model
         return $this->hasMany(Commitment::class);
     }
 
+    public function __commitments()
+    {
+        return $this->commitments();
+    }
+
     public function head()
     {
         return SectorHead::join('users', 'sector_heads.user_id', '=', 'users.id')
@@ -39,7 +44,7 @@ class Sector extends Model
 
     public function files()
     {
-        return SectorFile::where('sector_id', $this->id)->get();
+        return [];//SectorFile::where('sector_id', $this->id)->get();
     }
 
     public function budgets()

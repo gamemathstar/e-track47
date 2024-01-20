@@ -80,7 +80,7 @@
                                     <!-- BEGIN: Modal Header -->
                                     <div class="modal-header">
                                         <h2 class="font-medium text-base mr-auto">Add Commitment
-                                            to {{$sector->name}}</h2>
+                                            to {{$sector->sector_name}}</h2>
 
                                     </div> <!-- END: Modal Header -->
                                     <!-- BEGIN: Modal Body -->

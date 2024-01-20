@@ -58,7 +58,7 @@
                                 <td>{{$loop->iteration}}</td>
                                 <td>{{$kpi->kpi}}</td>
                                 <td>{{$kpi->unit_of_measurement}}</td>
-                                <td>{{$kpi->target}}</td>
+                                <td>{{$kpi->target_value}}</td>
                                 <td>{{$kpi->actual_value}}</td>
                                 <td>
 

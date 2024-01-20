@@ -106,8 +106,8 @@ class SectorController extends Controller
         $sector = Sector::find($id);
         $commitments = $sector->__commitments()->get();
         $commitmentsX = Commitment::with('deliverables.kpis')->get();
-        $years = DeliveryKpi::distinct('year')->orderBy('year', 'ASC')->pluck('year')->toArray();
-        $lyear = $years[0];
+        $years = [2023,2024];//DeliveryKpi::distinct('year')->orderBy('year', 'ASC')->pluck('year')->toArray();
+        $lyear = 2024;//$years[0];
         $head = $sector->head();
         return view('pages.sector.show', compact('lyear', 'sector', 'commitments', 'head', 'commitmentsX', 'years'));
     }

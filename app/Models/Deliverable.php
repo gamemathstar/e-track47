@@ -29,14 +29,17 @@ class Deliverable extends Model
 
     public function __kpis()
     {
-        return DB::table('delivery_kpis')->join('kpis','kpis.id','=','delivery_kpis.kpi_id')->where('delivery_kpis.deliverable_id',$this->id)->get();
+        return DB::table('deliverables')
+            ->join('kpis','deliverables.id','=','kpis.deliverable_id')
+            ->join('performance_trackings','kpis.id','=','performance_trackings.kpi_id')
+            ->where('deliverables.id',$this->id)->get();
     }
 
 
     public function title($characterCount=null)
     {
-        if(!$characterCount) return $this->deliverable_title;
-        return strlen($this->deliverable_title)>$characterCount?substr($this->deliverable_title,0,$characterCount)." ...":$this->deliverable_title;
+        if(!$characterCount) return $this->deliverable;
+        return strlen($this->deliverable)>$characterCount?substr($this->deliverable,0,$characterCount)." ...":$this->deliverable;
     }
 
     public function commitment()

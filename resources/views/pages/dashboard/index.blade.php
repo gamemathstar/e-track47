@@ -22,7 +22,7 @@
                     <div class="box sm:flex">
                         <div class="px-8 py-12 flex flex-col justify-center flex-1">
                             <div class="h-[290px]">
-                                <canvas id="report-bar-chart-1" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
+                                <canvas id="sectorPerformanceChart" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
                             </div>
                         </div>
                         <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
@@ -173,7 +173,68 @@
                 type: 'pie',
                 data: data
             });
+
+
+            // Creating a bar chart (initial setup)
+            const ctx2 = document.getElementById('sectorPerformanceChart').getContext('2d');
+            const myChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: [], // Initially empty
+                    datasets: [{
+                        label: 'KPI Delivery',
+                        data: [],
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10 // Adjust the max value for better visualization
+                        }
+                    }
+                }
+            });
+
+            doKpiPerformance(2024)
+
+            function doKpiPerformance(year){
+
+                $.ajax({
+                    type:'get',
+                    data:{year:year},
+                    url:"{{route('chart.sector.kpi.performance')}}",
+                    success:function (data) {
+                        // Extract data from the response
+                        const sectorNames = data.map(sector => sector.sector_name);
+                        const kpiCounts = data.map(sector => {
+                            // Count KPIs with confirmed performance tracking for each sector
+                            return sector.commitments.reduce((count, commitment) => {
+                                return count + commitment.deliverables.reduce((deliverableCount, deliverable) => {
+                                    return deliverableCount + deliverable.kpis.reduce((kpiCount, kpi) => {
+                                        // Check if there is at least one confirmed performance tracking for the KPI
+                                        console.log(kpi.performance_tracking.length);
+                                        return kpiCount + kpi.performance_tracking.length;
+                                    }, 0);
+                                }, 0);
+                            }, 0);
+                        });
+
+                        console.log(kpiCounts);
+                        // Access the chart and update its data
+                        const chart = myChart; // Access your chart instance (make sure it's in the global scope)
+                        chart.data.labels = sectorNames;
+                        chart.data.datasets[0].data = kpiCounts;
+                        chart.update(); // Update the chart to reflect the new data
+
+                    }
+                });
+            }
         });
+
     </script>
 
 @endsection

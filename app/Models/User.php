@@ -131,14 +131,30 @@ class User extends Authenticatable
             ->get();
     }
 
-    public function sectorPerformanceKpi()
+    public function sectorPerformanceKpi($year)
     {
-        $year = 2024;
-        return $sectors = Sector::with(['commitments.deliverables.kpis.performanceTracking' => function ($query) use ($year) {
-            $query->whereYear('tracking_date', '=', $year)
-//                ->where('actual_value', '=', DB::raw('target_value'))
-                ->where('delivery_department_value', '=', DB::raw('target_value'))
-                ->where('confirmation_status', '=', 'Confirmed');
-        }])->get();
+//        $year = 2024; // Replace this with the desired year
+
+//        return $sectors = Sector::with(['commitments.deliverables.kpis.performanceTracking' => function ($query) use ($year) {
+//            $query->whereHas('kpi', function ($kpiQuery) use ($year) {
+//                $kpiQuery->whereYear('tracking_date', '=', $year)
+//                    ->where('actual_value', '=', DB::raw('`target_value`'))
+//                    ->where('delivery_department_value', '=', DB::raw('`target_value`'))
+//                    ->where('confirmation_status', '=', 'Confirmed');
+//            });
+//        }])->get();
+
+        return Sector::join('commitments', 'sectors.id', '=', 'commitments.sector_id')
+            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->whereYear('performance_trackings.tracking_date', '=', $year)
+//            ->where('performance_trackings.actual_value', '=', DB::raw('kpis.target_value'))
+//            ->where('performance_trackings.delivery_department_value', '=', DB::raw('kpis.target_value'))
+            ->where('performance_trackings.confirmation_status', '=', 'Confirmed')
+            ->select('sectors.sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
+            ->groupBy('sectors.id')
+            ->get();
+
     }
 }
