@@ -144,6 +144,7 @@ class User extends Authenticatable
 //            });
 //        }])->get();
 
+
         return Sector::join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
@@ -156,5 +157,25 @@ class User extends Authenticatable
             ->groupBy('sectors.id')
             ->get();
 
+    }
+
+    public function kpiPerformanceRatio()
+    {
+        $sectors = Sector::select('sectors.sector_name')
+            ->addSelect(DB::raw('COUNT(DISTINCT kpis.id) as total_kpi_count'))
+            ->addSelect(DB::raw('COUNT(DISTINCT CASE WHEN performance_trackings.confirmation_status = "Confirmed" THEN kpis.id END) as confirmed_kpi_count'))
+            ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
+            ->leftJoin('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->leftJoin('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->leftJoin('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->groupBy('sectors.id')
+            ->get();
+
+// Calculate the confirmed KPI ratio
+        return $sectors->each(function ($sector) {
+            $sector->confirmed_kpi_ratio = $sector->total_kpi_count > 0
+                ? $sector->confirmed_kpi_count / $sector->total_kpi_count
+                : 0;
+        });
     }
 }

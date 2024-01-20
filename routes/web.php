@@ -37,6 +37,7 @@ Route::post('users/user/change-password', [UserController::class, 'changePasswor
 Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");
 
 Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
+Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');
 // Sector Resource
 Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
 Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
