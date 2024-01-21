@@ -31,7 +31,8 @@ class KpiController extends Controller
 
     public function tracking(Kpi $kpi)
     {
-        return $kpi->performanceTracking()->get();
+        $tracking = $kpi->performanceTracking()->get();
+        return view('pages.sector.performance', compact('kpi', 'tracking'));
     }
 
 }
