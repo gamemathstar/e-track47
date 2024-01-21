@@ -46,19 +46,13 @@ class User extends Authenticatable
 
     public function role()
     {
-        $roles = ['0' => 'System Admin', '1' => 'Governor', '2' => 'Sector Head', '3' => 'Sector Admin'];
-        return $roles[$this->role];
-    }
-
-    public function sectorHead()
-    {
-        return SectorHead::where(['user_id' => $this->id])->orderBy('date_to', 'DESC')->first();
+        return UserRole::where(['user_id' => $this->id])->orderBy('id', 'DESC')->first();
     }
 
     public function sector()
     {
-        $sectorHead = $this->sectorHead();
-        return $sectorHead ? Sector::find($sectorHead->sector_id) : null;
+        $role = $this->role();
+        return $role ? Sector::find($role->entity_id) : null;
     }
 
 
@@ -89,7 +83,7 @@ class User extends Authenticatable
 
     public function commitmentStatus()
     {
-        return  DB::table('commitments')
+        return DB::table('commitments')
             ->select('status', DB::raw('COUNT(*) as status_count'))
             ->groupBy('status')
             ->get();
@@ -177,5 +171,10 @@ class User extends Authenticatable
                 ? $sector->confirmed_kpi_count / $sector->total_kpi_count
                 : 0;
         });
+    }
+
+    public function canEditUser()
+    {
+
     }
 }

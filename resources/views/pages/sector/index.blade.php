@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('content')
     @php
-        $user = Auth::user();
+        $user = auth()->user();
     @endphp
     <h2 class="intro-y text-lg font-medium mt-10">
         Manage Sectors
@@ -67,9 +67,9 @@
                             {{$loop->iteration}}
                         </td>
                         <td>
-                            <a
-                                href="{{ $user->role==0?route("sectors.view",[$sector->id]):route("sectors.show",[$sector->id]) }}"
-                                class="font-medium whitespace-nowrap">{{$sector->sector_name}}</a>
+                            <a href="{{ $user->role()->role=='System Admin'?route("sectors.view",[$sector->id]):route("sectors.show",[$sector->id]) }}"
+                               class="font-medium whitespace-nowrap">{{$sector->sector_name}}
+                            </a>
                             <div class="text-slate-500 text-xs whitespace-nowrap mt-0.5"></div>
                         </td>
                         <td class="text">
@@ -77,7 +77,7 @@
                         </td>
                         <td class="text">
                             @php
-                                $head =  $sector->head();
+                                $head = null;// $sector->head();
                             @endphp
                             @if($head)
                                 <a href="{{route('users.view',[$head->user_id])}}" class="text-primary/80">
@@ -120,7 +120,7 @@
                                          class="lucide lucide-trash-2 w-4 h-4 mr-1">
                                         <polyline points="3 6 5 6 21 6"></polyline>
                                         <path
-                                            d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                                d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                                         <line x1="10" y1="11" x2="10" y2="17"></line>
                                         <line x1="14" y1="11" x2="14" y2="17"></line>
                                     </svg>

@@ -12,88 +12,62 @@
             </button>
 
             <div id="addUserModal" class="modal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
+                <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-body">
                             <form action="{{route('users.add')}}" method="post">
                                 <h2>Add User</h2>
                                 <hr> @csrf
-                                <div class="text-warning mt-2" id="addKpiMsg">
+                                <div class="grid grid-cols-12 mt-4">
+                                    <div class="col-span-12 lg:col-span-4">
+                                        <label for="full_name" class="form-label">Full Name</label>
+                                        <input type="text" id="full_name" class="form-control" name="full_name"
+                                               placeholder="Full Name" required>
+                                    </div>
+                                    <div class="col-span-12 lg:col-span-4 mr-2  ml-2">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input type="email" id="email" class="form-control" name="email"
+                                               placeholder="Email" required>
+                                    </div>
 
-                                </div>
-                                <div class="mt-2">
-                                    <label for="regular-form-2" class="form-label">Full Name</label>
-                                    <input type="text" class="form-control" name="full_name" placeholder="Full Name">
-
-                                </div>
-                                <div class="mt-2">
-                                    <label for="regular-form-2" class="form-label">Username</label>
-                                    <input type="text" class="form-control" name="username" placeholder="Username">
-
-                                </div>
-                                <div class="mt-3">
-                                    <label for="regular-form-2" class="form-label">Email</label>
-                                    <input type="email" class="form-control" name="email" placeholder="Email">
-
-                                </div>
-                                <div class="mt-3">
-                                    <label for="regular-form-2" class="form-label">Phone No</label>
-                                    <input type="text" class="form-control" name="phone_number" placeholder="Phone No">
-                                </div>
-                                <div class="mt-3">
-                                    <label>User Role</label>
-                                    <div class="flex flex-col sm:flex-row mt-2">
-                                        <div class="form-check mr-2">
-                                            <input id="radio-switch-4" class="form-check-input role" type="radio"
-                                                   name="role" value="1">
-                                            <label class="form-check-label" for="radio-switch-4">Governor</label>
-                                        </div>
-                                        <div class="form-check mr-2 mt-2 sm:mt-0">
-                                            <input id="radio-switch-5" class="form-check-input role" type="radio"
-                                                   name="role" value="0">
-                                            <label class="form-check-label" for="radio-switch-5">System Admin</label>
-                                        </div>
-                                        <div class="form-check mr-2 mt-2 sm:mt-0">
-                                            <input id="radio-switch-6" class="form-check-input role" type="radio"
-                                                   name="role" value="2">
-                                            <label class="form-check-label" for="radio-switch-6">Sector Head</label>
-                                        </div>
+                                    <div class="col-span-12 lg:col-span-4">
+                                        <label for="phone_number" class="form-label">Phone No</label>
+                                        <input type="tel" id="phone_number" class="form-control" name="phone_number"
+                                               placeholder="Phone No" required>
                                     </div>
                                 </div>
-                                <hr>
-                                <div id="sectorArea" class="hidden">
 
-                                    <div class="mt-3">
+                                <div class="grid grid-cols-12 mt-4">
+                                    <div class="col-span-12 lg:col-span-4 mr-">
+                                        <label for="regular-form-2" class="form-label">Sector</label>
+                                        <select name="role" id="" class="form-control">
+                                            <option value="">Select</option>
+                                            <option value="Governor"> Governor</option>
+                                            <option value="System Admin"> System Admin</option>
+                                            <option value="Sector Head"> Sector Head</option>
+                                            <option value="Sector Admin">Sector Admin</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-span-12 lg:col-span-4 ml-1">
                                         <label for="regular-form-2" class="form-label">Sector</label>
                                         <select name="sector_id" id="" class="form-control">
                                             <option value="">Select</option>
-                                            @foreach($sectors as $sector)
-                                                <option value="{{$sector->id}}">{{$sector->name}}</option>
+                                            @foreach($sectors as $sektor)
+                                                <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
                                             @endforeach
                                         </select>
                                     </div>
-                                    <div class="mt-3">
-                                        <label for="regular-form-2" class="form-label">Date From</label>
-                                        <input type="date" class="form-control" name="date_from">
-                                    </div>
-                                    <div class="mt-3">
-                                        <label for="regular-form-2" class="form-label">Date To</label>
-                                        <input type="date" class="form-control" name="date_to">
-                                    </div>
                                 </div>
-
                                 <br>
                                 <br>
-                                <hr>
                                 <div class="mt-3 text-center">
                                     <button class="btn btn-primary" id="addEditDeliverableBtn">Save</button>
                                     <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">
                                         Close
                                     </button>
                                 </div>
-
                             </form>
-
                         </div>
                     </div>
                 </div>
@@ -103,7 +77,6 @@
         <!-- BEGIN: Users Layout -->
         @foreach($users as $user)
             @php
-                $sectorHead = $user->sectorHead();
                 $sector = $user->sector();
             @endphp
 
@@ -117,7 +90,7 @@
                         <div class="lg:ml-2 lg:mr-auto text-center lg:text-left mt-3 lg:mt-0">
                             <a href="" class="font-medium">{{ $user->full_name }}</a>
                             <div class="text-slate-500 text-xs mt-0.5">
-                                {{ $user->role() }} {{ $sector? " | " . $sector->name: ""}}
+                                {{ $user->role()? $user->role()->role : ''}} {{ $sector? " | " . $sector->sector_name: ""}}
                             </div>
                         </div>
                         <div class="flex mt-4 lg:mt-0">
@@ -143,7 +116,7 @@
 
             $(".role").on('change', function () {
                 console.log($(this).val());
-                if ($(this).val() == '2') {
+                if ($(this).val() === 'Sector Head') {
                     $("#sectorArea").show();
                 } else {
                     $("#sectorArea").hide();

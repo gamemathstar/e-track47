@@ -12,12 +12,14 @@ class Commitment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'commitment_title',
+        'name',
+        'type',
+        'start_date',
         'description',
-        'deadline',
+        'end_date',
         'status',
-        'date_created',
-        'year',
+        'budget',
+        'duration_in_days',
         'sector_id',
     ];
 
@@ -39,10 +41,10 @@ class Commitment extends Model
         return $this->hasMany(Activity::class);
     }
 
-    public function title($characterCount=null)
+    public function title($characterCount = null)
     {
-        if(!$characterCount) return $this->name;
-        return strlen($this->name)>$characterCount?substr($this->name,0,$characterCount)." ...":$this->name;
+        if (!$characterCount) return $this->name;
+        return strlen($this->name) > $characterCount ? substr($this->name, 0, $characterCount) . " ..." : $this->name;
     }
 
     // Add other relationships or methods as needed

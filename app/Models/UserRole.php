@@ -8,4 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 class UserRole extends Model
 {
     use HasFactory;
+
+    public function sector()
+    {
+        return Sector::where(['id' => $this->entity_id])->get();
+    }
 }
