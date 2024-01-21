@@ -12,14 +12,14 @@ class Deliverable extends Model
 
     protected $fillable = [
         'commitment_id',
-        'deliverable_title',
-        'description',
-        'deadline',
+        'deliverable',
+        'budget',
+        'start_date',
+        'end_date',
         'status',
     ];
 
     // Define relationships or additional methods as needed
-
 
 
     public function kpis()
@@ -30,16 +30,16 @@ class Deliverable extends Model
     public function __kpis()
     {
         return DB::table('deliverables')
-            ->join('kpis','deliverables.id','=','kpis.deliverable_id')
-            ->join('performance_trackings','kpis.id','=','performance_trackings.kpi_id')
-            ->where('deliverables.id',$this->id)->get();
+            ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('deliverables.id', $this->id)->get();
     }
 
 
-    public function title($characterCount=null)
+    public function title($characterCount = null)
     {
-        if(!$characterCount) return $this->deliverable;
-        return strlen($this->deliverable)>$characterCount?substr($this->deliverable,0,$characterCount)." ...":$this->deliverable;
+        if (!$characterCount) return $this->deliverable;
+        return strlen($this->deliverable) > $characterCount ? substr($this->deliverable, 0, $characterCount) . " ..." : $this->deliverable;
     }
 
     public function commitment()

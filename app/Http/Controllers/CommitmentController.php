@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Commitment;
 use App\Models\CommitmentBudget;
+use App\Models\Deliverable;
 use App\Models\SectorBudget;
 use Illuminate\Http\Request;
 
@@ -68,10 +69,11 @@ class CommitmentController extends Controller
         return redirect()->back()->with('success', 'Commitment created successfully');
     }
 
-    public function deliverables(Request $request, $id)
+    public function deliverables(Request $request, Commitment $commitment)
     {
-        $commitment = Commitment::find($id);
-        return view('pages.sector.load_deliverables', compact('commitment'));
+
+        $deliverables = $commitment->deliverables()->get();
+        return view('pages.sector.deliverables', compact('commitment', 'deliverables'));
     }
 
     public function update(Request $request)

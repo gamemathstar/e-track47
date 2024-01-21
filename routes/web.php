@@ -54,10 +54,11 @@ Route::get('commitment', [CommitmentController::class, 'index'])->name('commitme
 Route::post('commitment/update', [CommitmentController::class, 'update'])->name('commitments.update');
 Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
 Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
-Route::any('commitment/deliverables/{id}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
+Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
 //Route::get('commitment/{id}/{year?}', [CommitmentController::class,'show'])->name('commitments.view');
 
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
 Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
 Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
