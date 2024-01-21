@@ -1,3 +1,4 @@
+@php use Carbon\Carbon; @endphp
 @extends('layouts.app')
 
 @section('content')
@@ -70,7 +71,7 @@
     </div>
 
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
+        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="rounded-md">
                 <a href="javascript:;" class="btn btn-primary ml-3" data-tw-toggle="modal"
                    data-tw-target="#header-footer-modal-preview">
@@ -88,6 +89,9 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Commitment</th>
+                            <th class="whitespace-nowrap">Budget</th>
+                            <th class="whitespace-nowrap">Start Date</th>
+                            <th class="whitespace-nowrap">Duration</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -100,6 +104,9 @@
                                 <td>
                                     <a href="javascript:;" class="ml-1">{{$commitment->title(48)}}</a>
                                 </td>
+                                <td>&#8358;{{ number_format($commitment->budget) }}</td>
+                                <td>{{ $commitment->start_date?Carbon::parse($commitment->start_date)->format('d M, Y'):'---' }}</td>
+                                <td>{{ $commitment->duration_in_days? $commitment->duration_in_days.' day(s)':'---' }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center mr-3  items-center text-success"
@@ -113,7 +120,6 @@
                                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                                 <circle cx="12" cy="12" r="3"></circle>
                                             </svg>
-                                            View
                                         </a>
                                         <a class="flex items-center text-danger" href="javascript:;"
                                            data-tw-toggle="modal"
@@ -126,11 +132,10 @@
                                                  class="lucide lucide-trash-2 w-4 h-4 mr-1">
                                                 <polyline points="3 6 5 6 21 6"></polyline>
                                                 <path
-                                                        d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                                    d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                                                 <line x1="10" y1="11" x2="10" y2="17"></line>
                                                 <line x1="14" y1="11" x2="14" y2="17"></line>
                                             </svg>
-                                            Delete
                                         </a>
                                     </div>
                                 </td>
@@ -213,8 +218,7 @@
                 {{--TODO: Add First Chart Here--}}
             </div>
         </div>
-    </div>
-    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
+
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
                 {{--TODO: Add Second Chart Here--}}

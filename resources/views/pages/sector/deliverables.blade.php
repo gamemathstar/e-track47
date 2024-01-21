@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
-
+        <h2 class="text-lg font-medium mr-auto ml-3">Commitment</h2>
     </div>
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
@@ -18,7 +18,7 @@
     </div>
 
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
+        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="rounded-md">
                 <a href="javascript:;" class="btn btn-primary ml-3" data-tw-toggle="modal"
                    data-tw-target="#header-footer-modal-preview">
@@ -36,6 +36,8 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Deliverable</th>
+                            <th class="whitespace-nowrap">Budget</th>
+                            <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Status</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
@@ -46,9 +48,9 @@
                                 <td>
                                     {{ $loop->iteration }}
                                 </td>
-                                <td>
-                                    {{ $deliverable->deliverable }}
-                                </td>
+                                <td>{{ $deliverable->deliverable }}</td>
+                                <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
+                                <td>{{ $deliverable->start_date }}</td>
                                 <td>{{ $deliverable->status }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
@@ -151,8 +153,7 @@
                 {{--TODO: Add First Chart Here--}}
             </div>
         </div>
-    </div>
-    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
+
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
                 {{--TODO: Add Second Chart Here--}}

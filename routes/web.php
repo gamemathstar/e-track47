@@ -5,6 +5,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliverableController;
+use App\Http\Controllers\KpiController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -62,5 +63,9 @@ Route::any('commitment/deliverables/{commitment}', [CommitmentController::class,
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
 Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
-Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+//Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
 Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
+
+Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
+Route::get('commitment/deliverable/kpi/{kpi}/performance-tracking', [KpiController::class, 'tracking'])->name('performance.tracking');
+
