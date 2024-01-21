@@ -8,13 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class Kpi extends Model
 {
     use HasFactory;
+
     protected $fillable = [
-        'commitment_id',
-        'kpi_name',
-        'measurement_unit',
-        'target',
-        'actual_value',
-        'status',
+        'deliverable_id',
+        'kpi',
+        'target_value',
+        'start_date',
+        'end_date',
+        'unit_of_measurement',
     ];
 
     public function deliverable()

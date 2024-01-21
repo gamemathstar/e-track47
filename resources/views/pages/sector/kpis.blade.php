@@ -1,3 +1,4 @@
+@php use Carbon\Carbon; @endphp
 @extends('layouts.app')
 
 @section('content')
@@ -10,7 +11,7 @@
                 <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
                     <div class="text-primary text-2xl">{{ $deliverable->deliverable }}</div>
                 </div>
-                {{ $deliverable->budget }}
+                &#8358; {{ $deliverable->budget?number_format($deliverable->budget):'Budget Not Set' }}
                 <button class="btn btn-primary w-24 float-right">Files</button>
                 <br><br>
             </div>
@@ -18,7 +19,7 @@
     </div>
 
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
+        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="rounded-md">
                 <a href="javascript:;" class="btn btn-primary ml-3" data-tw-toggle="modal"
                    data-tw-target="#header-footer-modal-preview">
@@ -37,6 +38,8 @@
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">KPI</th>
                             <th class="whitespace-nowrap">Target</th>
+                            <th class="whitespace-nowrap">Start Date</th>
+                            <th class="whitespace-nowrap">End Date</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -49,11 +52,13 @@
                                 <td>
                                     {{ $kpi->kpi }}
                                 </td>
-                                <td>{{ $kpi->target_value }}</td>
+                                <td>{{ $kpi->target_value }} ({{ $kpi->unit_of_measurement }})</td>
+                                <td>{{ Carbon::parse($kpi->start_date)->format('d M, Y') }}</td>
+                                <td>{{ !is_null($kpi->end_date)?Carbon::parse(null)->format('d M, Y'):'---' }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center mr-3  items-center text-success"
-                                           href="{{ route('deliverable.kpis',[$kpi->id]) }}">
+                                           href="{{ route('performance.tracking', [$kpi->id]) }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
                                                  fill="none" stroke="currentColor" stroke-width="2"
@@ -75,7 +80,7 @@
                                                  class="lucide lucide-trash-2 w-4 h-4 mr-1">
                                                 <polyline points="3 6 5 6 21 6"></polyline>
                                                 <path
-                                                        d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                                    d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                                                 <line x1="10" y1="11" x2="10" y2="17"></line>
                                                 <line x1="14" y1="11" x2="14" y2="17"></line>
                                             </svg>
@@ -95,26 +100,31 @@
                 <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('deliverable.save')}}" method="post">
+                            <form action="{{route('deliverable.add.kpi')}}" method="post">
                                 @csrf
-                                <input type="hidden" name="commitment_id" value="{{$deliverable->id}}">
+                                <input type="hidden" name="deliverable_id" value="{{$deliverable->id}}">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Add Deliverable
+                                    <h2 class="font-medium text-base mr-auto">Add KPI
                                         to {{$deliverable->deliverable}}</h2>
 
                                 </div> <!-- END: Modal Header -->
                                 <!-- BEGIN: Modal Body -->
                                 <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Deliverable</label>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="modal-form-1" class="form-label">KPI</label>
                                         <input id="modal-form-1" type="text" class="form-control"
-                                               name="deliverable" required>
+                                               name="kpi" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Budget</label>
+                                        <label for="modal-form-1" class="form-label">Target Value</label>
                                         <input id="modal-form-1" type="number" class="form-control"
-                                               name="budget" step="any" required>
+                                               name="target_value" step="any" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="modal-form-1" class="form-label">Unit of Measurement</label>
+                                        <input id="modal-form-1" type="text" class="form-control"
+                                               name="unit_of_measurement" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Start Date</label>
@@ -125,11 +135,6 @@
                                         <label for="modal-form-1" class="form-label">End Date</label>
                                         <input id="modal-form-1" type="date" class="form-control"
                                                name="end_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Status</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="status" required>
                                     </div>
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
@@ -151,8 +156,7 @@
                 {{--TODO: Add First Chart Here--}}
             </div>
         </div>
-    </div>
-    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
+
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
                 {{--TODO: Add Second Chart Here--}}

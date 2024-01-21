@@ -9,6 +9,8 @@ class PerformanceTracking extends Model
 {
     use HasFactory;
 
+    protected $table = 'performance_tracking';
+
     public function kpi()
     {
         return $this->belongsTo(Kpi::class);
