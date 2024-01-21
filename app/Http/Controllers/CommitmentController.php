@@ -33,24 +33,45 @@ class CommitmentController extends Controller
         $bdg->save();
         return back();
     }
+
     public function store(Request $request)
     {
 //        return $request;
         $request->validate([
-            'sector_id'=>"required",
-            'commitment_title'=>"required",
-            'description'=>"required",
+            'sector_id' => "required",
+            'name' => "required",
+            'type' => "required",
+            'description' => "required",
+            'start_date' => 'required',
+            'end_date' => 'required',
+            'status' => 'required',
+            'budget' => 'required'
         ]);
 
-        Commitment::create($request->all());
+        $dt_start = new \DateTime($request->start_date);
+        $dt_end = new \DateTime($request->end_date);
+        $diff = $dt_start->diff($dt_end);
+        $duration = $diff->format('%a');
+
+        $commitment = new Commitment();
+        $commitment->sector_id = $request->sector_id;
+        $commitment->name = $request->name;
+        $commitment->type = $request->type;
+        $commitment->description = $request->description;
+        $commitment->duration_in_days = $duration;
+        $commitment->start_date = $request->start_date;
+        $commitment->end_date = $request->end_date;
+        $commitment->status = $request->status;
+        $commitment->budget = $request->budget;
+        $commitment->save();
 
         return redirect()->back()->with('success', 'Commitment created successfully');
     }
 
-    public function deliverables(Request $request,$id)
+    public function deliverables(Request $request, $id)
     {
         $commitment = Commitment::find($id);
-        return view('pages.sector.load_deliverables',compact('commitment'));
+        return view('pages.sector.load_deliverables', compact('commitment'));
     }
 
     public function update(Request $request)
@@ -64,6 +85,6 @@ class CommitmentController extends Controller
 
         $commitment->update($request->all());
 
-        return redirect()->route('sectors.view',[$commitment->sector_id,$commitment->id]);
+        return redirect()->route('sectors.view', [$commitment->sector_id, $commitment->id]);
     }
 }
