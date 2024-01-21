@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
-
+        <h2 class="text-lg font-medium mr-auto ml-3">Commitment</h2>
     </div>
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
