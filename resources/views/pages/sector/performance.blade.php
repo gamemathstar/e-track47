@@ -8,11 +8,16 @@
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="box p-5 rounded-md">
-                <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
+                <div class="flex items-center border-slate-200/60 dark:border-darkmode-400 mb-2">
                     <div class="text-primary text-2xl">{{ $kpi->kpi }}</div>
                 </div>
                 Target: {{ $kpi->target_value }} {{ $kpi->unit_of_measurement }}
-                <button class="btn btn-primary w-24 float-right">Finish</button>
+                @if($tracking->count())
+                    <a class="btn btn-primary w-24 float-right tooltip" data-theme="dark"
+                       title="Mark this submission 'Confirm' or 'Rejected'">
+                        Finish
+                    </a>
+                @endif
                 <br><br>
             </div>
         </div>
@@ -54,33 +59,22 @@
                                     {{ $loop->iteration }}
                                 </td>
                                 <td>
-                                    {{ $track->tracking_date?Carbon::parse($track->tracking_date)->format('d M, Y'):'---' }}
+                                    {{ $track->tracking_date?Carbon::parse($track->tracking_date)->format('d M, Y'):'- - -' }}
                                 </td>
                                 <td>{{ $track->actual_value }} ({{ $kpi->unit_of_measurement }})</td>
-                                <td>{{ $track->remark }}</td>
+                                <td>{{ $track->remarks }}</td>
                                 <td>
-                                    {{ $track->delivery_department_value?$track->delivery_department_value :'---' }}
-                                    ({{ $track->delivery_department_value?$kpi->unit_of_measurement:'' }})
+                                    {{ $track->delivery_department_value?$track->delivery_department_value :'- - -' }}
+                                    {{ $track->delivery_department_value? '(' . $kpi->unit_of_measurement . ')' : '' }}
                                 </td>
-                                <td>{{ $track->delivery_department_remark?$track->delivery_department_remark:'' }}</td>
+                                <td>{{ $track->delivery_department_remark?$track->delivery_department_remark:'- - -' }}</td>
                                 <td>{{ $track->confirmation_status }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
-                                        <a class="flex items-center mr-3  items-center text-success"
-                                           href="{{ route('performance.tracking', [$kpi->id]) }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24"
-                                                 height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor"
-                                                 stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="eye"
-                                                 data-lucide="eye"
-                                                 class="lucide lucide-eye block mx-auto">
-                                                <path
-                                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                <circle cx="12" cy="12" r="3"></circle>
-                                            </svg>
+                                        <a class="flex items-center mr-3  items-center text-success tooltip"
+                                           data-tw-toggle="modal" data-theme="dark" title="Review this submission"
+                                           data-tw-target="#header-footer-modal-preview" href="javascript:;">
+                                            <i data-lucide="check" class="block mx-auto"></i>
                                         </a>
                                     </div>
                                 </td>
@@ -97,42 +91,37 @@
                 <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('deliverable.add.kpi')}}" method="post">
+                            <form action="{{route('deliverable.store.tracking')}}" method="post">
                                 @csrf
-                                <input type="hidden" name="kpi_id" value="{{$kpi->id}}">
+                                <input type="hidden" name="kpi_id" value="{{ $kpi->id }}">
+                                <input type="hidden" name="id" value="{{$tracking->count()? $tracking[0]->id:null }}">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Add Performance Tracking
-                                        to {{$kpi->kpi}}</h2>
+                                    <h2 class="font-medium text-base mr-auto">
+                                        Add Performance Tracking to {{ $kpi->kpi }}
+                                    </h2>
 
                                 </div> <!-- END: Modal Header -->
                                 <!-- BEGIN: Modal Body -->
                                 <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="modal-form-1" class="form-label">KPI</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="kpi" required>
-                                    </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Target Value</label>
+                                        <label for="modal-form-1" class="form-label">Tracking Date</label>
+                                        <input id="modal-form-1" type="date" class="form-control"
+                                               name="tracking_date" required>
+                                    </div>
+
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="modal-form-1" class="form-label">Actual Value</label>
                                         <input id="modal-form-1" type="number" class="form-control"
-                                               name="target_value" step="any" required>
+                                               name="actual_value" step="any"
+                                               placeholder="In {{ $kpi->unit_of_measurement }}" required>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Unit of Measurement</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="unit_of_measurement" required>
+
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="modal-form-1" class="form-label">Remark</label>
+                                        <textarea name="remarks" id="" class="form-control"></textarea>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Start Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="start_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">End Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="end_date" required>
-                                    </div>
+
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
                                 <div class="modal-footer">

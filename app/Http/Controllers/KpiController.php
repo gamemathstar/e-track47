@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kpi;
+use App\Models\PerformanceTracking;
 use Illuminate\Http\Request;
 
 class KpiController extends Controller
@@ -25,6 +26,18 @@ class KpiController extends Controller
         ]);
 
         Kpi::create($request->all());
+
+        return back();
+    }
+
+    public function storeTracking(Request $request)
+    {
+        if (is_null($request->id))
+            $tracking = new PerformanceTracking();
+        else
+            $tracking = PerformanceTracking::find($request->id);
+        $tracking->fill($request->all());
+        $tracking->save();
 
         return back();
     }
