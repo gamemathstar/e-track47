@@ -26,27 +26,10 @@
                             </div>
                         </div>
                         <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
-                            <div class="text-slate-500 text-xs">TOTAL Budget</div>
-                            <div class="mt-1.5 flex items-center">
-                                <div class="text-base">{{ $stateBudget?number_format($stateBudget):"No Budget Yet" }}</div>
+
+                            <div class="h-[290px]">
+                                <canvas id="sectorPerformanceChartRatio" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
                             </div>
-                            <div class="text-slate-500 text-xs mt-5">Total Release</div>
-                            <div class="mt-1.5 flex items-center">
-                                <div class="text-base">{{ number_format($releasedAmount) }}</div>
-                            </div>
-                            <div class="text-slate-500 text-xs mt-5">Incompleted Releases</div>
-                            <div class="mt-1.5 flex items-center">
-                                <div class="text-base">{{$releasedIncomplete}} Sector{{$releasedIncomplete>1?"s":""}}</div>
-                            </div>
-                            <div class="text-slate-500 text-xs mt-5">Deliverables</div>
-                            <div class="mt-1.5 flex items-center">
-                                <div class="text-base">{{$deliverablesSoFar}}</div>
-                            </div>
-{{--                            <div class="text-slate-500 text-xs mt-5">NEW USERS</div>--}}
-{{--                            <div class="mt-1.5 flex items-center">--}}
-{{--                                <div class="text-base">2.500</div>--}}
-{{--                                <div class="text-success flex text-xs font-medium tooltip cursor-pointer ml-2" title="52% Higher than last month"> 52% <i data-lucide="chevron-up" class="w-4 h-4 ml-0.5"></i> </div>--}}
-{{--                            </div>--}}
                         </div>
                     </div>
                 </div>
@@ -199,6 +182,31 @@
                 }
             });
 
+
+            const ctxRatio = document.getElementById('sectorPerformanceChartRatio').getContext('2d');
+            const myChartRatio = new Chart(ctxRatio, {
+                type: 'bar',
+                data: {
+                    labels: [], // Initially empty
+                    datasets: [{
+                        label: 'KPI Completion Ratio',
+                        data: [],
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1 // Since it's a ratio, set the max value to 1
+                        }
+                    }
+                }
+            });
+
+
             doKpiPerformance(2024)
             doKpiPerformanceRatio()
 
@@ -210,18 +218,22 @@
                     type:'get',
                     url:"{{route('chart.sector.kpi.performance.ratio')}}",
                     success:function (data) {
-                        // Extract data from the response
-                        console.log(data);
-                        // const sectorNames = data.map(sector => sector.sector_name);
-                        // const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
-                        //
-                        //
-                        // console.log(confirmedKpiCounts);
-                        // // Access the chart and update its data
-                        // const chart = myChart; // Access your chart instance (make sure it's in the global scope)
-                        // chart.data.labels = sectorNames;
-                        // chart.data.datasets[0].data = confirmedKpiCounts;
-                        // chart.update(); // Update the chart to reflect the new data
+                        // Extract data from the response myChartRatio
+                        const sectorNames = data.map(sector => sector.sector_name);
+                        const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
+                        const totalKpiCounts = data.map(sector => sector.total_kpi_count);
+
+                        // Calculate the confirmed KPI ratio
+                        const confirmedKpiRatio = confirmedKpiCounts.map((confirmedCount, index) => {
+                            const totalKpiCount = totalKpiCounts[index];
+                            return totalKpiCount === 0 ? 0 : confirmedCount / totalKpiCount;
+                        });
+
+                        // Access the chart and update its data
+                        const chart = myChartRatio; // Access your chart instance (make sure it's in the global scope)
+                        chart.data.labels = sectorNames;
+                        chart.data.datasets[0].data = confirmedKpiRatio;
+                        chart.update(); // Update the chart to reflect the new data
 
                     }
                 });
@@ -239,9 +251,6 @@
                         // Extract data from the response
                         const sectorNames = data.map(sector => sector.sector_name);
                         const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
-
-
-                        console.log(confirmedKpiCounts);
                         // Access the chart and update its data
                         const chart = myChart; // Access your chart instance (make sure it's in the global scope)
                         chart.data.labels = sectorNames;
