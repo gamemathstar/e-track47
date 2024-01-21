@@ -177,4 +177,24 @@ class User extends Authenticatable
     {
 
     }
+
+    public function budgetDistribution()
+    {
+        return $sectorsWithBudget = Sector::select('sector_name', DB::raw('SUM(commitments.budget) as total_budget'))
+            ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
+            ->groupBy('sectors.id')
+            ->get();
+    }
+
+    public function pendingCompleted()
+    {
+        $sectorsWithCommitmentStatus = Sector::leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
+            ->select('sectors.id', 'sectors.sector_name')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status = "Completed" THEN commitments.id END) as completed_commitments_count')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status != "Completed" THEN commitments.id END) as pending_commitments_count')
+            ->groupBy('sectors.id', 'sectors.sector_name')
+            ->get();
+
+        return $sectorsWithCommitmentStatus;
+    }
 }

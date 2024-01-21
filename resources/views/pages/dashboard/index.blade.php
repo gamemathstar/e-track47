@@ -2,8 +2,8 @@
 @section('content')
     @php
         $user = auth()->user();
-        $year = 2024;//\App\Models\StateBudget::currentYear();
-        $stateBudget = 300000;//\App\Models\StateBudget::activeBudget();
+        $year = date('Y');//\App\Models\StateBudget::currentYear();
+        $stateBudget = \App\Models\Commitment::sum('budget');//\App\Models\StateBudget::activeBudget();
         $releasedAmount = 40000;//\App\Models\StateBudget::releases();
         $releasedIncomplete = 8;//\App\Models\StateBudget::releaseCount();
         $deliverablesSoFar = 3;//\App\Models\StateBudget::deliveredIn();
@@ -22,7 +22,7 @@
                     <div class="box sm:flex">
                         <div class="px-8 py-12 flex flex-col justify-center flex-1">
                             <div class="h-[290px]">
-                                <canvas id="sectorPerformanceChart" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
+                                <canvas id="sectorPerformanceChart" width="506" height="580" style="display: block; box-sizing: border-box; height: 580px; width: 506px;"></canvas>
                             </div>
                         </div>
                         <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
@@ -33,67 +33,29 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            <!-- END: General Report -->
-            <!-- BEGIN: Sales Report -->
-            <div class="col-span-9 lg:col-span-9 xl:col-span-6 mt-2">
-                <div class="intro-y flex items-center h-10">
-                    <h2 class="text-lg font-medium truncate mr-5">
-                        Budget Distribution
-                    </h2>
-                </div>
-                <div class="report-box-2 before:hidden xl:before:block intro-y mt-5">
-                    <div class="box p-5">
-                        <div class="mt-3">
-                            <div class="h-[240px]">
-                                <canvas id="myPieChart" class="pie-chart"></canvas>
+                <div class="report-box-2 intro-y mt-12 sm:mt-5">
+                    <div class="box sm:flex">
+                        <div class="px-8 py-12 flex flex-col justify-center flex-1">
+                            <div class="h-[290px]">
+                                <h2>Sector-wise Budget Distribution</h2>
+                                <canvas id="budgetDistributionChart" width="640" height="640"></canvas>
+
                             </div>
                         </div>
-                        <div class="w-52 sm:w-auto mx-auto mt-8">
-                            @foreach(\App\Models\Sector::all() as $sector)
-                                <div class="flex items-center mt-4">
-                                    <div class="w-2 h-2 bg-primary rounded-full mr-3"></div>
+                        <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
 
-                                    <span class="truncate">{{$sector->name}}</span>
-                                    <span class="font-medium ml-auto">{{5}}%</span>
-                                </div>
-                            @endforeach
+                            <div class="h-[290px]">
+
+                                <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <!-- END: General Report -->
+            <!-- BEGIN: Sales Report -->
 
-            <div class="col-span-12 xl:col-span-9 2xl:col-span-9 z-10">
 
-{{--                <div class="mt-14 mb-3 grid grid-cols-12 sm:gap-10 intro-y">--}}
-{{--                    <div class="row-start-2 md:row-start-auto col-span-12 md:col-span-12 py-6 border-black border-opacity-10 border-t md:border-t-0 md:border-l md:border-r border-dashed px-10 sm:px-28 md:px-5 -mx-5">--}}
-{{--                        <div class="flex flex-wrap items-center">--}}
-{{--                            <div class="flex items-center w-full sm:w-auto justify-center sm:justify-start mr-auto mb-5 2xl:mb-0">--}}
-{{--                                <div class="w-2 h-2 bg-primary rounded-full -mt-4"></div>--}}
-{{--                                <div class="ml-3.5">--}}
-{{--                                    <div class="relative text-xl 2xl:text-2xl font-medium leading-6 2xl:leading-5 pl-3.5 2xl:pl-4">--}}
-{{--                                        <span class="absolute text-base 2xl:text-xl top-0 left-0 2xl:-mt-1.5">&#8358;</span>--}}
-{{--                                         {{number_format($releasedAmount)}}--}}
-{{--                                    </div>--}}
-{{--                                    <div class="text-slate-500 mt-2">Total Releases</div>--}}
-{{--                                </div>--}}
-{{--                            </div>--}}
-{{--                        </div>--}}
-{{--                        <div class="mt-10 text-slate-600 dark:text-slate-300">--}}
-{{--                            @if($releasedAmount)--}}
-{{--                            You have released 35% of your annual budget for {{$year}}.--}}
-{{--                            @else--}}
-{{--                                You haven't released any amount for the year.--}}
-{{--                            @endif--}}
-{{--                        </div>--}}
-{{--                        <div class="mt-6">--}}
-{{--                            <div class="h-[290px]">--}}
-{{--                                <canvas id="report-bar-chart-1" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>--}}
-{{--                            </div>--}}
-{{--                        </div>--}}
-{{--                    </div>--}}
-{{--                </div>--}}
-            </div>
 
         </div>
         <div class="report-box-4 w-full h-full grid grid-cols-12 gap-6 xl:absolute -mt-8 xl:mt-0 pb-6 xl:pb-0 top-0 right-0 z-30 xl:z-auto">
@@ -130,32 +92,6 @@
 
         $(function (){
             // alert(3);
-            var data = {
-                labels: [
-                    @foreach(\App\Models\Sector::all() as $sector)
-                    '{{$sector->name }}',//distribution
-                    @endforeach
-                ],
-                datasets: [{
-                    data: [
-                        @foreach(\App\Models\Sector::all() as $sector)
-                        {{40}},
-                        @endforeach
-
-                    ],
-                    backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4CAF50", "#9966FF"]
-                }]
-            };
-
-
-            // Get the canvas element
-            var ctx = document.getElementById('myPieChart').getContext('2d');
-
-            // Create a new pie chart using Chart.js
-            var myPieChart = new Chart(ctx, {
-                type: 'pie',
-                data: data
-            });
 
 
             // Creating a bar chart (initial setup)
@@ -206,16 +142,44 @@
                 }
             });
 
+            const ctxBudget = document.getElementById('budgetDistributionChart').getContext('2d');
+            const budgetChart = new Chart(ctxBudget, {
+                type: 'pie',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4CAF50", "#9966FF"]
+                    }]
+                },
+                options: {
+                    tooltips: {
+                        callbacks: {
+                            label: function (tooltipItem, data) {
+                                const dataset = data.datasets[tooltipItem.datasetIndex];
+                                const label = data.labels[tooltipItem.index];
+                                const value = dataset.data[tooltipItem.index];
+                                return label + ': $' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,'); // Format as currency if needed
+                            }
+                        }
+                    }
+                }
+            });
+
+
 
             doKpiPerformance(2024)
             doKpiPerformanceRatio()
+            distribution()
+            pendingCompleted()
 
 
 
-            function doKpiPerformanceRatio(){
+            function doKpiPerformanceRatio(year){
                 // chart.sector.kpi.performance.ratio/
                 $.ajax({
                     type:'get',
+                    data:{year:year},
                     url:"{{route('chart.sector.kpi.performance.ratio')}}",
                     success:function (data) {
                         // Extract data from the response myChartRatio
@@ -241,8 +205,26 @@
 
             }
 
-            function doKpiPerformance(year){
+            function distribution(year){
 
+                $.ajax({
+                    type:'get',
+                    url:"{{route('chart.sector.budget.distribution')}}",
+                    success:function (data) {
+                        // Extract data from the response
+                        const sectorNamesBudget = data.map(sector => sector.sector_name);
+                        const totalBudgets = data.map(sector => sector.total_budget);
+                        // Access the chart and update its data
+                        const chartBGT = budgetChart; // Access your chart instance (make sure it's in the global scope)
+                        chartBGT.data.labels = sectorNamesBudget;
+                        chartBGT.data.datasets[0].data = totalBudgets;
+                        chartBGT.update(); // Update the chart to reflect the new data
+
+                    }
+                });
+            }
+
+            function doKpiPerformance (year){
                 $.ajax({
                     type:'get',
                     data:{year:year},
@@ -259,6 +241,52 @@
 
                     }
                 });
+            }
+
+            function pendingCompleted(){
+
+                $.ajax({
+                    type:'get',
+                    url:"{{route('chart.sector.pending.completed')}}",
+                    success:function (data) {
+                        // Extracting sector names and commitment counts for the chart
+                        const sectorNames = data.map(sector => sector.sector_name);
+                        const completedCounts = data.map(sector => sector.completed_commitments_count);
+                        const pendingCounts = data.map(sector => sector.pending_commitments_count);
+
+// Creating a side-by-side bar chart
+                        const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
+                        const myChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: sectorNames,
+                                datasets: [{
+                                    label: 'Completed Commitments',
+                                    data: completedCounts,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1
+                                }, {
+                                    label: 'Pending Commitments',
+                                    data: pendingCounts,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: Math.max(...completedCounts, ...pendingCounts) + 1 // Adjust the max value for better visualization
+                                    }
+                                }
+                            }
+                        });
+
+                    }
+                });
+
             }
         });
 

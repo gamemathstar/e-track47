@@ -19,4 +19,16 @@ class ChartController extends Controller
         $user = Auth::user();
         return response()->json($user->kpiPerformanceRatio());
     }
+
+    public function budgetDistribution(Request $request)
+    {
+        $user = Auth::user();
+        return response()->json($user->budgetDistribution());
+    }
+
+    public function pendingCompleted(Request $request)
+    {
+        $user = Auth::user();
+        return response()->json($user->pendingCompleted());
+    }
 }

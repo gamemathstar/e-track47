@@ -38,6 +38,8 @@ Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.vi
 
 Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
 Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');
+Route::get('chart/sector/budget/distribution', [ChartController::class, 'budgetDistribution'])->name('chart.sector.budget.distribution');
+Route::get('chart/sector/budget/pending', [ChartController::class, 'pendingCompleted'])->name('chart.sector.pending.completed');
 // Sector Resource
 Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
 Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
