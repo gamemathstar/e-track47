@@ -3,7 +3,7 @@
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            {{--            Sector : {{$sector->sector_name}}--}}
+            Sector : {{$sector->sector_name}}
         </h2>
         <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
             <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
@@ -56,13 +56,15 @@
             </div>
         </div>
     </div>
-    <div class="intro-y grid grid-cols-11 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-4 2xl:col-span-12">
+    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
+        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="box p-5 rounded-md">
                 <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
                     <div class="text-primary text-2xl">{{ $sector->sector_name }}</div>
                 </div>
                 {{ $sector->description }}
+                <button class="btn btn-primary w-24 float-right">Files</button>
+                <br><br>
             </div>
         </div>
     </div>
@@ -222,51 +224,6 @@
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
                 {{--TODO: Add Third Chart Here--}}
-            </div>
-        </div>
-    </div>
-    <div id="next-overlapping-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-body">
-                    <h2>Add KPI for <strong class="font-bold" id="del-title"></strong></h2>
-                    <input type="hidden" name="deliverable_id" value="" id="deliverable_id">
-                    <hr>
-                    <div class="text-warning mt-2" id="addKpiMsg">
-
-                    </div>
-                    <div class="mt-3">
-                        <label for="regular-form-2" class="form-label">KPI</label>
-                        <select name="" class="form-control form-control-rounded" id="kpi_id">
-                            <option value="">Select KPI</option>
-                            @foreach(\App\Models\Kpi::get() as $kpi)
-                                <option value="{{$kpi->id}}">{{$kpi->kpi}} - {{$kpi->unit_of_measurement}}</option>
-                            @endforeach
-                        </select>
-
-                    </div>
-                    <div class="mt-3">
-                        <label for="regular-form-2" class="form-label">Year</label>
-                        <input id="year" type="number" class="form-control form-control-rounded" placeholder="Year"
-                               name="year">
-                    </div>
-                    <div class="mt-3">
-                        <label for="regular-form-2" class="form-label">Target</label>
-                        <input id="target" type="text" class="form-control form-control-rounded" placeholder="Target"
-                               name="target">
-                    </div>
-                    <div class="mt-3">
-                        <label for="regular-form-2" class="form-label">Actual Value</label>
-                        <input id="actual_value" type="text" class="form-control form-control-rounded"
-                               placeholder="Actual Value" name="actual_value">
-                    </div>
-                    <hr>
-                    <div class="mt-3 text-center">
-                        <button class="btn btn-primary btn-sm btn-rounded" id="addEditDeliverableBtn">Save KPI</button>
-                    </div>
-
-
-                </div>
             </div>
         </div>
     </div>
