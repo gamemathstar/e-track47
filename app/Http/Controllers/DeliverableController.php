@@ -43,7 +43,8 @@ class DeliverableController extends Controller
 
     public function kpis(Deliverable $deliverable)
     {
-        return $deliverable;
+        $kpis = $deliverable->kpis()->get();
+        return view('pages.sector.kpis', compact('deliverable', 'kpis'));
     }
 
     public function addKPI(Request $request)
