@@ -13,4 +13,10 @@ class ChartController extends Controller
         $user = Auth::user();
         return response()->json($user->sectorPerformanceKpi($request->year));
     }
+
+    public function kpiPerformanceRatio(Request $request)
+    {
+        $user = Auth::user();
+        return response()->json($user->kpiPerformanceRatio());
+    }
 }
