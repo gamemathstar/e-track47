@@ -49,13 +49,6 @@ class Deliverable extends Model
 
     public function progress()
     {
-        $exploded = explode('/', $this->fraction());
-        $progress = intval($exploded[0]) / intval($exploded[1]) * 100;
-        return number_format($progress, 0, '.', '');
-    }
-
-    public function fraction()
-    {
         $confirmed = 0;
         $kpis = $this->kpis()->get();
         $total = count($kpis);
@@ -63,17 +56,7 @@ class Deliverable extends Model
         foreach ($kpis as $kpi)
             if ($kpi->status() == 'Confirmed') $confirmed++;
 
-        return "$confirmed/$total";
-    }
-
-    private function findGCD($a, $b)
-    {
-        while ($b != 0) {
-            $remainder = $a % $b;
-            $a = $b;
-            $b = $remainder;
-        }
-        return $a;
+        return "$confirmed of $total";
     }
 
 }
