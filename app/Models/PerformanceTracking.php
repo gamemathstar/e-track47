@@ -25,4 +25,9 @@ class PerformanceTracking extends Model
     {
         return $this->belongsTo(Kpi::class);
     }
+
+    public function status()
+    {
+        return $this->confirmation_status;
+    }
 }

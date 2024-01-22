@@ -27,4 +27,10 @@ class Kpi extends Model
     {
         return $this->hasMany(PerformanceTracking::class);
     }
+
+    public function status()
+    {
+        $track = $this->performanceTracking()->first();
+        return $track ? $track->status() : '';
+    }
 }

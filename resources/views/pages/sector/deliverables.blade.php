@@ -39,6 +39,7 @@
                             <th class="whitespace-nowrap">Budget</th>
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Status</th>
+                            <th class="whitespace-nowrap">Progress</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -52,6 +53,13 @@
                                 <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
                                 <td>{{ $deliverable->start_date }}</td>
                                 <td>{{ $deliverable->status }}</td>
+                                <td>
+                                    @if($deliverable->status != 'Not Started')
+                                        {{ $deliverable->progress() }}
+                                    @else
+                                        - - -
+                                    @endif
+                                </td>
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center mr-3  items-center text-success"

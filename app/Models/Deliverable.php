@@ -47,5 +47,16 @@ class Deliverable extends Model
         return $this->belongsTo(Commitment::class);
     }
 
+    public function progress()
+    {
+        $confirmed = 0;
+        $kpis = $this->kpis()->get();
+        $total = count($kpis);
+
+        foreach ($kpis as $kpi)
+            if ($kpi->status() == 'Confirmed') $confirmed++;
+
+        return "$confirmed of $total";
+    }
 
 }
