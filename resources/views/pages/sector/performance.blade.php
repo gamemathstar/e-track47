@@ -74,7 +74,7 @@
                                         <a class="flex items-center mr-3  items-center text-success tooltip"
                                            data-tw-toggle="modal" data-theme="dark" title="Review this submission"
                                            data-tw-target="#header-footer-modal-preview" href="javascript:;">
-                                            <i data-lucide="check" class="block mx-auto"></i>
+                                            <i data-lucide="edit" class="block mx-auto"></i>
                                         </a>
                                     </div>
                                 </td>
@@ -91,6 +91,7 @@
                 <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
+                            @php $track =  $tracking->first(); @endphp
                             <form action="{{route('deliverable.store.tracking')}}" method="post">
                                 @csrf
                                 <input type="hidden" name="kpi_id" value="{{ $kpi->id }}">
@@ -107,6 +108,7 @@
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Tracking Date</label>
                                         <input id="modal-form-1" type="date" class="form-control"
+                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"
                                                name="tracking_date" required>
                                     </div>
 
@@ -114,12 +116,14 @@
                                         <label for="modal-form-1" class="form-label">Actual Value</label>
                                         <input id="modal-form-1" type="number" class="form-control"
                                                name="actual_value" step="any"
+                                               value="{{ $track?$track->actual_value:'' }}"
                                                placeholder="In {{ $kpi->unit_of_measurement }}" required>
                                     </div>
 
                                     <div class="col-span-12 sm:col-span-12">
                                         <label for="modal-form-1" class="form-label">Remark</label>
-                                        <textarea name="remarks" id="" class="form-control"></textarea>
+                                        <textarea name="remarks" id=""
+                                                  class="form-control">{{ $track?$track->remarks:'' }}                                        </textarea>
                                     </div>
 
                                 </div> <!-- END: Modal Body -->
