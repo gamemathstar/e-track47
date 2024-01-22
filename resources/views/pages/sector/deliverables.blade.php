@@ -39,6 +39,7 @@
                             <th class="whitespace-nowrap">Budget</th>
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Status</th>
+                            <th class="whitespace-nowrap">Progress</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -52,6 +53,18 @@
                                 <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
                                 <td>{{ $deliverable->start_date }}</td>
                                 <td>{{ $deliverable->status }}</td>
+                                <td>
+                                    @if($deliverable->status != 'Not Started')
+                                        <div class="progress h-4">
+                                            <div class="progress-bar w-{{ str_starts_with($deliverable->fraction(), '0')? '0' : $deliverable->fraction() }}"
+                                                 role="progressbar" aria-valuenow="0"
+                                                 aria-valuemin="0" aria-valuemax="100">{{ $deliverable->progress() }}%
+                                            </div>
+                                        </div>
+                                    @else
+                                        - - -
+                                    @endif
+                                </td>
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center mr-3  items-center text-success"
@@ -77,7 +90,7 @@
                                                  class="lucide lucide-trash-2 w-4 h-4 mr-1">
                                                 <polyline points="3 6 5 6 21 6"></polyline>
                                                 <path
-                                                    d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                                        d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                                                 <line x1="10" y1="11" x2="10" y2="17"></line>
                                                 <line x1="14" y1="11" x2="14" y2="17"></line>
                                             </svg>
