@@ -33,6 +33,8 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 
 // User Resource
 Route::get('users', [UserController::class, 'index'])->name("users.index");
+Route::get('delivery/tracking/awaiting/verification', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
+Route::post('performance/update', [UserController::class, 'updatePerformance'])->name("update.performance");
 Route::post('users/store', [UserController::class, 'store'])->name("users.add");
 Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
 Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");

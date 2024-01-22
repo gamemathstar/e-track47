@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\SectorHead;
 use App\Models\User;
@@ -19,11 +20,47 @@ class UserController extends Controller
         return view('pages.users.index', compact('users', 'sectors'));
     }
 
+    public function awaitingVerification(Request $request)
+    {
+        $performanceTrackings = PerformanceTracking::with(['kpi.deliverable.commitment.sector'])
+            ->where(function ($query) {
+                $query->whereNull('confirmation_status')
+                    ->orWhere('confirmation_status', '')
+                    ->orWhere('confirmation_status', 'Not Confirmed');
+            })
+            ->get();
+
+        return view('pages.users.awaiting',compact('performanceTrackings'));
+    }
     public function create()
     {
         return view('users.create');
     }
 
+
+    public function updatePerformance(Request $request)
+    {
+        // Validate the request data
+        $request->validate([
+            'delivery_department_value' => 'required',
+            'delivery_department_remark' => 'nullable',
+            'confirmation_status' => 'required|in:Confirmed,Not Confirmed',
+            'performance_id' => 'required|exists:performance_trackings,id',
+        ]);
+
+        // Find the performance tracking record
+        $performance = PerformanceTracking::findOrFail($request->input('performance_id'));
+
+        // Update the performance tracking record
+        $performance->update([
+            'delivery_department_value' => $request->input('delivery_department_value'),
+            'delivery_department_remark' => $request->input('delivery_department_remark'),
+            'confirmation_status' => $request->input('confirmation_status'),
+        ]);
+
+        // You can return a response if needed
+        return response()->json(['message' => 'Performance tracking updated successfully']);
+    }
     public function store(Request $request)
     {
         // Validate and store user data
