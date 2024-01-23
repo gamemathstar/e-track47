@@ -186,13 +186,18 @@ class User extends Authenticatable
             ->get();
     }
 
-    public function pendingCompleted()
+    public function pendingCompleted($sector_id=0)
     {
+        $where = [];
+        if($sector_id){
+            $where[] = ['sectors.id','=',$sector_id];
+        }
         $sectorsWithCommitmentStatus = Sector::leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->select('sectors.id', 'sectors.sector_name')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status = "Completed" THEN commitments.id END) as completed_commitments_count')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status != "Completed" THEN commitments.id END) as pending_commitments_count')
             ->groupBy('sectors.id', 'sectors.sector_name')
+            ->where($where)
             ->get();
 
         return $sectorsWithCommitmentStatus;

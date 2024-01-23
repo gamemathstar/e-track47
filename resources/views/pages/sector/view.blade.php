@@ -215,7 +215,10 @@
 
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
-                {{--TODO: Add First Chart Here--}}
+                <div class="h-[480px]">
+
+                    <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
+                </div>
             </div>
         </div>
 
@@ -234,84 +237,67 @@
 
 @endsection
 @section('js')
-    <script src="{{asset('dist/js/jquery.min.js')}}"></script>
-
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         $(function () {
             url = "{{route('sectors.view',['id'=>$sector->id])}}/";
-            const editCommitmentModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#editCommitmentModal"));
-            const addDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addDeliverablesModal"));
-            const viewDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#viewDeliverablesModal"));
-            const addKPIModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#next-overlapping-modal-preview"));
+            // const editCommitmentModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#editCommitmentModal"));
+            // const addDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addDeliverablesModal"));
+            // const viewDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#viewDeliverablesModal"));
+            // const addKPIModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#next-overlapping-modal-preview"));
 
             // $("#year").on('change', function (e) {
             //     document.location = url + $(this).val();
             // });
 
-            @if($comm_id)
-            loadCommitments({{$comm_id}});
-            @endif
+            pendingCompleted()
+            function pendingCompleted(){
 
-
-            $(".commitments").on('click', function (e) {
-                // $("#loadArea").load("commitments.deliverables");
-                loadCommitments($(this).attr('com-id'));
-            });
-
-            $('body').on('click', '#editCommitmentBtn', function () {
-                com_id = $(this).attr('com-id');
-                com_title = $(this).attr('com-title');
-                com_description = $(this).attr('com-description');
-                $("#comm-title").val(com_title);
-                $("#comm-desc").text(com_description);
-                $("#comm-id").val(com_id);
-                editCommitmentModal.show();
-            });
-
-            $('body').on('click', '#addDeliverableBtn', function () {
-                com_id = $(this).attr('com-id');
-                $("#addDeliverableBtnComId").val(com_id);
-                addDeliverablesModal.show();
-            });
-
-            $('body').on('click', '.viewDeliverable', function () {
-                // viewDeliverableLoadAre
-                $("#viewDeliverableLoadAre").load("{{route('deliverable.view')}}?id=" + $(this).attr('del-id'));
-                viewDeliverablesModal.show();
-            });
-
-            $('body').on('click', '#addEditDeliverableBtn', function () {
-
-                $('#deliverable_id').val($('#addKpiModalBtn').attr('del-id'));
-                year = $('#year').val();
-                actual_value = $('#actual_value').val();
-                target = $('#target').val();
-                measurement_unit = $('#measurement_unit').val();
-                kpi_id = $('#kpi_id').val();
-                deliverable_id = $('body').find('#addKpiModalBtn').attr('del-id');
                 $.ajax({
-                    type: 'get',
-                    url: '{{route('deliverable.add.kpi')}}',
-                    data: {
-                        deliverable_id: deliverable_id,
-                        kpi_id: kpi_id,
-                        target: target,
-                        actual_value: actual_value,
-                        year: year
-                    },
-                    success: function (data) {
-                        console.log(data);
-                        if (data.status == 1) {
-                            addKPIModal.hide();
-                            $("#viewDeliverableLoadAre").load("{{route('deliverable.view')}}?id=" + deliverable_id);
-                        } else {
-                            $("#addKpiMsg").html(data.message);
-                        }
+                    type:'get',
+                    data:{sector_id:'{{$sector->id}}'},
+                    url:"{{route('chart.sector.pending.completed')}}",
+                    success:function (data) {
+                        // Extracting sector names and commitment counts for the chart
+                        const sectorNames = data.map(sector => sector.sector_name);
+                        const completedCounts = data.map(sector => sector.completed_commitments_count);
+                        const pendingCounts = data.map(sector => sector.pending_commitments_count);
+
+// Creating a side-by-side bar chart
+                        const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
+                        const myChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: sectorNames,
+                                datasets: [{
+                                    label: 'Completed Commitments',
+                                    data: completedCounts,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1
+                                }, {
+                                    label: 'Pending Commitments',
+                                    data: pendingCounts,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: Math.max(...completedCounts, ...pendingCounts) + 1 // Adjust the max value for better visualization
+                                    }
+                                }
+                            }
+                        });
+
                     }
                 });
-            });
 
-
+            }
         });
 
         function loadCommitments(id) {

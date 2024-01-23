@@ -29,6 +29,6 @@ class ChartController extends Controller
     public function pendingCompleted(Request $request)
     {
         $user = Auth::user();
-        return response()->json($user->pendingCompleted());
+        return response()->json($user->pendingCompleted($request->sector_id));
     }
 }

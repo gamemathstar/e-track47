@@ -158,7 +158,10 @@
 
         <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
             <div class="box p-5 rounded-md">
-                {{--TODO: Add First Chart Here--}}
+                <div class="h-[290px]">
+
+                    <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
+                </div>
             </div>
         </div>
 
@@ -180,6 +183,55 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
+
+
+
+            pendingCompleted()
+            function pendingCompleted(){
+
+                $.ajax({
+                    type:'get',
+                    url:"{{route('chart.sector.pending.completed')}}",
+                    success:function (data) {
+                        // Extracting sector names and commitment counts for the chart
+                        const sectorNames = data.map(sector => sector.sector_name);
+                        const completedCounts = data.map(sector => sector.completed_commitments_count);
+                        const pendingCounts = data.map(sector => sector.pending_commitments_count);
+
+// Creating a side-by-side bar chart
+                        const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
+                        const myChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: sectorNames,
+                                datasets: [{
+                                    label: 'Completed Commitments',
+                                    data: completedCounts,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1
+                                }, {
+                                    label: 'Pending Commitments',
+                                    data: pendingCounts,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: Math.max(...completedCounts, ...pendingCounts) + 1 // Adjust the max value for better visualization
+                                    }
+                                }
+                            }
+                        });
+
+                    }
+                });
+
+            }
         })
     </script>
 @endsection
