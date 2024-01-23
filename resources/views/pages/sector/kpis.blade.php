@@ -57,7 +57,8 @@
                                 <td>{{ !is_null($kpi->end_date)?Carbon::parse(null)->format('d M, Y'):'---' }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
-                                        <a class="flex items-center mr-3  items-center text-success"
+                                        <a class="flex items-center mr-3  items-center text-success tooltip"
+                                           data-theme="dark" title="View KPI"
                                            href="{{ route('performance.tracking', [$kpi->id]) }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
@@ -69,8 +70,8 @@
                                                 <circle cx="12" cy="12" r="3"></circle>
                                             </svg>
                                         </a>
-                                        <a class="flex items-center text-danger" href="javascript:;"
-                                           data-tw-toggle="modal"
+                                        <a class="flex items-center text-danger tooltip" data-theme="dark"
+                                           title="Delete KPI" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#delete-modal-preview{{ $kpi->id }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
