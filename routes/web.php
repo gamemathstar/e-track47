@@ -65,6 +65,6 @@ Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('de
 Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
 Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
-Route::get('commitment/deliverable/kpi/{kpi}/performance-tracking', [KpiController::class, 'tracking'])->name('performance.tracking');
+Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
 

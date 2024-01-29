@@ -42,10 +42,10 @@ class KpiController extends Controller
         return back();
     }
 
-    public function tracking(Kpi $kpi)
+    public function tracking(Kpi $kpi, $track_id)
     {
-        $tracking = $kpi->performanceTracking()->get();
-        return view('pages.sector.performance', compact('kpi', 'tracking'));
+        $track = $kpi->performanceTracking()->where(['id' => $track_id])->first();
+        return view('pages.sector.performance', compact('kpi', 'track'));
     }
 
 }
