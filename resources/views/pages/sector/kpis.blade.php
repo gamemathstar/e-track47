@@ -32,19 +32,23 @@
                     Add New
                 </a>
                 @if($kpis->count())
-                    <table class="table table-report mt-2">
+                    <table class="table table-bordered table-report mt-2">
                         <thead>
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">KPI</th>
                             <th class="whitespace-nowrap">Target</th>
                             <th class="whitespace-nowrap">Start Date</th>
-                            <th class="whitespace-nowrap">End Date</th>
+                            <th class="whitespace-nowrap">1<sup>st</sup> QPT</th>
+                            <th class="whitespace-nowrap">2<sup>nd</sup> QPT</th>
+                            <th class="whitespace-nowrap">3<sup>rd</sup> QPT</th>
+                            <th class="whitespace-nowrap">4<sup>th</sup> QPT</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach($kpis as $kpi)
+                            @php $tracks = $kpi->performanceTracking()->get(); @endphp
                             <tr>
                                 <td>
                                     {{ $loop->iteration }}
@@ -54,23 +58,77 @@
                                 </td>
                                 <td>{{ $kpi->target_value }} ({{ $kpi->unit_of_measurement }})</td>
                                 <td>{{ Carbon::parse($kpi->start_date)->format('d M, Y') }}</td>
-                                <td>{{ !is_null($kpi->end_date)?Carbon::parse(null)->format('d M, Y'):'---' }}</td>
+                                <td>
+                                    @if(count($tracks)>0)
+                                        @php $track = $tracks[0]; @endphp
+                                        <a href="javascript:;" data-tw-toggle="modal" data-tw-target="#view-performance"
+                                           data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}"
+                                           data-kpi-id="{{$kpi->id}}" data-qt="1st QT"
+                                           class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
+                                            {{ $track->actual_value }}
+                                        </a>
+                                    @else
+                                        <a href="javascript:" class="add" data-tw-toggle="modal"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-tw-target="#add-performance">
+                                            <i data-lucide="plus-square" class="block mx-auto"></i>
+                                        </a>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(count($tracks)>1)
+                                        @php $track = $tracks[1]; @endphp
+                                        <a href="javascript:;" data-tw-toggle="modal" data-tw-target="#view-performance"
+                                           data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}"
+                                           data-kpi-id="{{$kpi->id}}" data-qt="2nd QT"
+                                           class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
+                                            {{ $track->actual_value }}
+                                        </a>
+                                    @elseif(count($tracks)>0)
+                                        <a href="javascript:" class="add" data-tw-toggle="modal"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-tw-target="#add-performance">
+                                            <i data-lucide="plus-square" class="block mx-auto"></i>
+                                        </a>
+                                    @endif
+                                </td>
+                                <td> @if(count($tracks)>2)
+                                        @php $track = $tracks[2]; @endphp
+                                        <a href="javascript:;" data-tw-toggle="modal" data-tw-target="#view-performance"
+                                           data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}"
+                                           data-kpi-id="{{$kpi->id}}" data-qt="3rd QT"
+                                           class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
+                                            {{ $track->actual_value }}
+                                        </a>
+                                    @elseif(count($tracks)>1)
+                                        <a href="javascript:" class="add" data-tw-toggle="modal"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-tw-target="#add-performance">
+                                            <i data-lucide="plus-square" class="block mx-auto"></i>
+                                        </a>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(count($tracks)>3)
+                                        @php $track = $tracks[3]; @endphp
+                                        <a href="javascript:;" data-tw-toggle="modal" data-tw-target="#view-performance"
+                                           data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}"
+                                           data-kpi-id="{{$kpi->id}}" data-qt="4th QT"
+                                           class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
+                                            {{ $track->actual_value }}
+                                        </a>
+                                    @elseif(count($tracks)>2)
+                                        <a href="javascript:" class="add" data-tw-toggle="modal"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-tw-target="#add-performance">
+                                            <i data-lucide="plus-square" class="block mx-auto"></i>
+                                        </a>
+                                    @endif
+                                </td>
                                 <td>
                                     <div class="flex justify-center items-center">
-                                        <a class="flex items-center mr-3  items-center text-success"
-                                           href="{{ route('performance.tracking', [$kpi->id]) }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="eye" data-lucide="eye"
-                                                 class="lucide lucide-eye block mx-auto">
-                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                <circle cx="12" cy="12" r="3"></circle>
-                                            </svg>
-                                        </a>
-                                        <a class="flex items-center text-danger" href="javascript:;"
-                                           data-tw-toggle="modal"
+                                        <a class="flex items-center text-danger tooltip" data-theme="dark"
+                                           title="Delete KPI" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#delete-modal-preview{{ $kpi->id }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
@@ -148,6 +206,78 @@
                         </div>
                     </div>
                 </div> <!-- END: Modal Content -->
+
+                <div id="add-performance" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form action="{{route('deliverable.store.tracking')}}" method="post">
+                                @csrf
+                                <input type="hidden" id="kpi_id" name="kpi_id">
+                                <input type="hidden" id="track_id" name="id">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">
+                                        Add Performance Tracking to <span id="kpi"></span>
+                                    </h2>
+
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="tracking-date" class="form-label">Tracking Date</label>
+                                        <input id="tracking-date" type="date" class="form-control"
+                                               {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
+                                               name="tracking_date" required>
+                                    </div>
+
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="actual-value" class="form-label">Actual Value</label>
+                                        <input id="actual-value" type="number" class="form-control"
+                                               name="actual_value" step="any"
+                                               {{--                                               value="{{ $track?$track->actual_value:'' }}"--}}
+                                               {{--                                               placeholder="In {{ $kpi->unit_of_measurement }}"--}}
+                                               required>
+                                    </div>
+
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="remark" class="form-label">Remark</label>
+                                        <textarea name="remarks" id="remark"
+                                                  class="form-control"></textarea>
+                                    </div>
+
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Save</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div> <!-- END: Modal Content -->
+
+                <div id="view-performance" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 class="font-medium text-base mr-auto">
+                                    Performance Tracking for <span id="kpi_title"></span> (<span id="quarter"></span>)
+                                </h2>
+                            </div>
+                            <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                <div class="col-span-12 sm:col-span-12" id="track-details"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" data-tw-dismiss="modal"
+                                        class="btn btn-outline-secondary w-20 mr-1">Close
+                                </button>
+                                {{--                                <button type="button" class="btn btn-primary w-20">Edit</button>--}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -175,6 +305,23 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
+            $('body .add').on('click', function () {
+                $('#kpi').html($(this).data('kpi'))
+                $('#kpi_id').val($(this).data('id'))
+            })
+
+            $('.view').on('click', function () {
+                $('#quarter').html($(this).data('qt'))
+                $('#kpi_title').html($(this).data('kpi'))
+                let id = $(this).data('id')
+                let kpi = $(this).data('kpi-id')
+
+                $.get('{{ route('performance.tracking', [':kpi',':id']) }}'.replace(':id', id).replace(':kpi', kpi),
+                    function (response) {
+                        $('#track-details').html(response)
+                    }
+                )
+            })
         })
     </script>
 @endsection
