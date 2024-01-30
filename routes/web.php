@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthLoginController;
 use App\Http\Controllers\ChartController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliverableController;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\Route;
 //Route::get('/',[AuthLoginController::class, 'showLoginForm']);
 
 Route::get('/', [AuthLoginController::class, 'showLoginForm']);
-Route::get('/login', [AuthLoginController::class, 'showLoginForm']);
+Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthLoginController::class, 'login'])->name('login');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
 
@@ -71,4 +72,7 @@ Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpi
 Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
 Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
+
+Route::get('projects', [CommentController::class, 'index'])->name('public.projects');
+Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('public.projects.post.comment');
 
