@@ -1,13 +1,4 @@
 <!DOCTYPE html>
-<!--
-Template Name: Enigma - HTML Admin Dashboard Template
-Author: Left4code
-Website: http://www.left4code.com/
-Contact: muhammadrizki@left4code.com
-Purchase: https://themeforest.net/user/left4code/portfolio
-Renew Support: https://themeforest.net/user/left4code/portfolio
-License: You must have a valid license purchased only from themeforest(the above link) in order to legally use the theme for your project.
--->
 <html lang="en" class="light">
 <!-- BEGIN: Head -->
 <head>
@@ -40,9 +31,9 @@ License: You must have a valid license purchased only from themeforest(the above
                                                                class="w-8 h-8 text-white transform -rotate-90"></i> </a>
         <ul class="scrollable__content py-2">
             <li>
-                <a href="{{ route('public.projects') }}" class="menu">
-                    <div class="menu__icon"><i data-lucide="activity"></i></div>
-                    <div class="menu__title"> Projects</div>
+                <a href="{{ route('home') }}" class="menu">
+                    <div class="menu__icon"><i data-lucide="home"></i></div>
+                    <div class="menu__title"> Home</div>
                 </a>
             </li>
             <li>
@@ -72,9 +63,9 @@ License: You must have a valid license purchased only from themeforest(the above
 <nav class="top-nav">
     <ul>
         <li>
-            <a href="{{ route('public.projects') }}" class="top-menu top-menu--active">
-                <div class="top-menu__icon"><i data-lucide="activity"></i></div>
-                <div class="top-menu__title"> Projects</div>
+            <a href="{{ route('home') }}" class="top-menu top-menu--active">
+                <div class="top-menu__icon"><i data-lucide="home"></i></div>
+                <div class="top-menu__title"> Home</div>
             </a>
         </li>
         <li>
@@ -114,7 +105,7 @@ License: You must have a valid license purchased only from themeforest(the above
                     </div>
                     {{--                    <div class="w-full flex items-center mt-3">--}}
                     {{--                        <div class="flex-1 relative text-slate-600">--}}
-                    {{--                            <form action="{{ route('public.projects.post.comment') }}" method="post">--}}
+                    {{--                            <form action="{{ route('home.post.comment') }}" method="post">--}}
                     {{--                                @csrf--}}
                     {{--                                <input type="hidden" name="commitment_id" value="{{ $commitment->id }}">--}}
                     {{--                                <input type="text" name="commenter_name"--}}

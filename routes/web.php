@@ -24,7 +24,8 @@ use Illuminate\Support\Facades\Route;
 
 //Route::get('/',[AuthLoginController::class, 'showLoginForm']);
 
-Route::get('/', [AuthLoginController::class, 'showLoginForm']);
+//Route::get('/', [AuthLoginController::class, 'showLoginForm']);
+Route::get('/', [CommentController::class, 'index'])->name('home');
 Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthLoginController::class, 'login'])->name('login');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
@@ -77,7 +78,6 @@ Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 't
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
 Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
 
-Route::get('projects', [CommentController::class, 'index'])->name('public.projects');
 Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
-Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('public.projects.post.comment');
+Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('home.post.comment');
 
