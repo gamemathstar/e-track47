@@ -89,4 +89,13 @@ class CommitmentController extends Controller
 
         return redirect()->route('sectors.view', [$commitment->sector_id, $commitment->id]);
     }
+
+    public function delete(Commitment $commitment)
+    {
+        if (count($commitment->deliverables()->get()) == 0) {
+            $commitment->delete();
+            return back()->with('success', 'Commitment deleted successfully');
+        } else
+            return back()->with('failure', 'Oops! This commitment cannot be deleted as it has deliverable(s) attached. Remove the deliverable(s) and try again.');
+    }
 }

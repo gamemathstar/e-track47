@@ -57,7 +57,7 @@ Route::post('sectors/budget/save', [SectorController::class, 'storeBudget'])->na
 Route::get('sectors/show/{id}/', [SectorController::class, 'show'])->name('sectors.show');
 Route::get('sectors/budget/', [SectorController::class, 'budget'])->name('sectors.budget');
 Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
-Route::get('sectors/{id}/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
+Route::get('sectors/{id}/details/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
 // Sector Resource
 Route::get('commitment', [CommitmentController::class, 'index'])->name('commitments.index');
@@ -65,7 +65,7 @@ Route::post('commitment/update', [CommitmentController::class, 'update'])->name(
 Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
 Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
 Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
-Route::get('commitment/{id}/delete', [CommitmentController::class,'delete'])->name('commitments.delete');
+Route::get('commitment/{commitment}/delete', [CommitmentController::class,'delete'])->name('commitments.delete');
 
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
