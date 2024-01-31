@@ -65,7 +65,7 @@ Route::post('commitment/update', [CommitmentController::class, 'update'])->name(
 Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
 Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
 Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
-Route::get('commitment/{commitment}/delete', [CommitmentController::class,'delete'])->name('commitments.delete');
+Route::get('commitment/{commitment}/delete', [CommitmentController::class, 'delete'])->name('commitments.delete');
 
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
@@ -78,6 +78,7 @@ Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliv
 Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
 Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
+Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');
 
 Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
 Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('home.post.comment');
