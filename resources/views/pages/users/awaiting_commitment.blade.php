@@ -2,13 +2,13 @@
 
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
-        <h2 class="text-lg font-medium mr-auto ml-3">Commitment</h2>
+        <h2 class="text-lg font-medium mr-auto ml-3">Performance Action</h2>
     </div>
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="box p-5 rounded-md">
                 <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
-                    <div class="text-primary text-2xl">Performance Awaiting Confirmations</div>
+                    <div class="text-primary text-2xl">{{$sector->sector_name}}</div>
                 </div>
                 <br><br>
             </div>
@@ -20,29 +20,29 @@
             <div class="rounded-md">
                 @if($performanceTrackings->count())
                     <table class="table table-report mt-2">
-                            <thead>
+                        <thead>
+                        <tr>
+                            <th>Commitment</th>
+                            <th>KPIs</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($performanceTrackings as $tracking)
                             <tr>
-                                <th>Sector</th>
-                                <th>KPIs</th>
-                                <th>Action</th>
+                                <td>{{ $tracking->name }}</td>
+                                <td>{{ $tracking->count }} awaiting action</td>
+                                <td>
+                                    <a href="{{route('delivery.awaiting.verification.comm.view',[$tracking->id])}}" class="btn btn-primary" >
+                                        View
+                                    </a>
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($performanceTrackings as $tracking)
-                                <tr>
-                                    <td>{{ $tracking->sector_name }}</td>
-                                    <td>{{ $tracking->count }} awaiting action</td>
-                                    <td>
-                                        <a href="{{route('delivery.awaiting.verification.view',[$tracking->id])}}" class="btn btn-primary " >
-                                            View
-                                        </a>
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
+                        @endforeach
+                        </tbody>
+                    </table>
 
-                    @else
+                @else
                     <center>
                         Click <em class="text-success">Add New </em> to add deliverable.
                     </center>

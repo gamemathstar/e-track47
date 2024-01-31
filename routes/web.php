@@ -34,7 +34,10 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 
 // User Resource
 Route::get('users', [UserController::class, 'index'])->name("users.index");
-Route::get('delivery/tracking/awaiting/verification', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
+Route::get('delivery/tracking/awaiting/', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
+Route::get('delivery/tracking/awaiting/comm/{id}/view', [UserController::class, 'awaitingVerificationCommView'])->name("delivery.awaiting.verification.comm.view");
+Route::get('delivery/tracking/awaiting/del/{id}/view', [UserController::class, 'awaitingVerificationDelView'])->name("delivery.awaiting.verification.del.view");
+Route::get('delivery/tracking/awaiting/{id}/view', [UserController::class, 'awaitingVerificationView'])->name("delivery.awaiting.verification.view");
 Route::post('performance/update', [UserController::class, 'updatePerformance'])->name("update.performance");
 Route::post('users/store', [UserController::class, 'store'])->name("users.add");
 Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
@@ -72,6 +75,7 @@ Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpi
 Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
 Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
+Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
 
 Route::get('projects', [CommentController::class, 'index'])->name('public.projects');
 Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');

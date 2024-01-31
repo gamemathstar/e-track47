@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Commitment;
+use App\Models\Deliverable;
+use App\Models\Kpi;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\SectorHead;
 use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use function Laravel\Prompts\password;
 
 class UserController extends Controller
@@ -22,15 +26,57 @@ class UserController extends Controller
 
     public function awaitingVerification(Request $request)
     {
-        $performanceTrackings = PerformanceTracking::with(['kpi.deliverable.commitment.sector'])
-            ->where(function ($query) {
-                $query->whereNull('confirmation_status')
-                    ->orWhere('confirmation_status', '')
-                    ->orWhere('confirmation_status', 'Not Confirmed');
-            })
+        $performanceTrackings = Sector::select('sectors.*',DB::raw("COUNT(sectors.id) as count"))
+            ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
+            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
+            ->groupBy('sectors.id')
             ->get();
 
         return view('pages.users.awaiting',compact('performanceTrackings'));
+    }
+    public function awaitingVerificationView(Request $request,$id)
+    {
+        $sector = Sector::find($id);
+        $performanceTrackings = Commitment::select('commitments.*',DB::raw("COUNT(commitments.id) as count"))
+            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
+            ->where('commitments.sector_id', $id)
+            ->groupBy('commitments.id')
+            ->get();
+
+        return view('pages.users.awaiting_commitment',compact('performanceTrackings','sector'));
+    }
+    public function awaitingVerificationCommView(Request $request,$id)
+    {
+        $commitment = Commitment::find($id);
+        $performanceTrackings = Deliverable::select('deliverables.*',DB::raw("COUNT(deliverables.id) as count"))
+//            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
+            ->where('deliverables.commitment_id', $id)
+            ->groupBy('deliverables.id')
+            ->get();
+
+        return view('pages.users.awaiting_deliverables',compact('performanceTrackings','commitment'));
+    }
+
+    public function awaitingVerificationDelView(Request $request,$id)
+    {
+        $deliverable = Deliverable::find($id);
+        $kpis = Kpi::select('kpis.*',DB::raw("COUNT(kpis.id) as count"))
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
+            ->where('kpis.deliverable_id', $id)
+            ->groupBy('kpis.id')
+            ->get();
+
+        return view('pages.users.awaiting_kpis',compact('kpis','deliverable'));
     }
     public function create()
     {
