@@ -65,7 +65,7 @@ Route::post('commitment/update', [CommitmentController::class, 'update'])->name(
 Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
 Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
 Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
-//Route::get('commitment/{id}/{year?}', [CommitmentController::class,'show'])->name('commitments.view');
+Route::get('commitment/{id}/delete', [CommitmentController::class,'delete'])->name('commitments.delete');
 
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');

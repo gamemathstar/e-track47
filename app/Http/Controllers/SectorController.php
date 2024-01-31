@@ -106,7 +106,7 @@ class SectorController extends Controller
         $sector = Sector::find($id);
         $commitments = $sector->__commitments()->get();
         $commitmentsX = Commitment::with('deliverables.kpis')->get();
-        $years = [2023,2024];//DeliveryKpi::distinct('year')->orderBy('year', 'ASC')->pluck('year')->toArray();
+        $years = [2023, 2024];//DeliveryKpi::distinct('year')->orderBy('year', 'ASC')->pluck('year')->toArray();
         $lyear = 2024;//$years[0];
         $head = $sector->head();
         return view('pages.sector.show', compact('lyear', 'sector', 'commitments', 'head', 'commitmentsX', 'years'));
@@ -133,9 +133,12 @@ class SectorController extends Controller
 
     public function destroy(Sector $sector)
     {
-        $sector->delete();
+        if (count($sector->commitments()->get()) == 0) {
+            $sector->delete();
+            return redirect()->route('sectors.index')->with('success', 'Sector deleted successfully');
+        } else
+            return back()->with('failure', 'This sector cannot be deleted as it has commitment(s) assigned to it. Remove the commitment(s) and try again');
 
-        return redirect()->route('sectors.index')->with('success', 'Sector deleted successfully');
     }
 
     public function budget(Request $request)
