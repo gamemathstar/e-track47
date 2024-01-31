@@ -67,4 +67,14 @@ class DeliverableController extends Controller
 
         return ['status' => 0, 'message' => 'Invalid Deliverable'];
     }
+
+    public function delete(Deliverable $deliverable)
+    {
+        if (count($deliverable->kpis()->get()) == 0) {
+            $deliverable->delete();
+            return back()->with('success', 'Deliverable deleted successfully');
+        } else
+            return back()->with('failure',
+                'Oops! This deliverable cannot be deleted as it has KPI(s) attached. Remove the KPI(s) and try again');
+    }
 }

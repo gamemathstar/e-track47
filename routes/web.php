@@ -70,6 +70,7 @@ Route::get('commitment/{commitment}/delete', [CommitmentController::class,'delet
 
 Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
 Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
+Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');
 //Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
 Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
