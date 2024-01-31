@@ -67,4 +67,9 @@ class Commitment extends Model
     {
         return $this->comments()->orderBy('id', 'desc')->limit(2)->get();
     }
+
+    public function allComments()
+    {
+        return $this->comments()->orderBy('id', 'desc')->get();
+    }
 }

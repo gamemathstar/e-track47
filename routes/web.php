@@ -74,5 +74,6 @@ Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 't
 Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
 
 Route::get('projects', [CommentController::class, 'index'])->name('public.projects');
+Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
 Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('public.projects.post.comment');
 

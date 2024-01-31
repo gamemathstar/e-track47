@@ -11,7 +11,12 @@ class CommentController extends Controller
     public function index()
     {
         $commitments = Commitment::all();
-        return view('pages.comments.index', compact('commitments'));
+        return view('pages.comments.projects', compact('commitments'));
+    }
+
+    public function details(Commitment $commitment)
+    {
+        return view('pages.comments.project-details', compact('commitment'));
     }
 
     public function postComment(Request $request)
