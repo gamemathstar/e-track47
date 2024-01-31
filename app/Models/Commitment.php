@@ -53,4 +53,18 @@ class Commitment extends Model
         return $this->belongsTo(Sector::class);
     }
 
+    private function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function commentsCount()
+    {
+        return count($this->comments()->get());
+    }
+
+    public function recentComments()
+    {
+        return $this->comments()->orderBy('id', 'desc')->limit(2)->get();
+    }
 }
