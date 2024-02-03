@@ -111,6 +111,7 @@ class UserController extends Controller
     {
         // Validate and store user data
 //        return $request;
+        $roles = ['Governor'=>'State','System Admin'=>'System','Sector Head'=>'Sector','Sector Admin'=>'Sector','Delivery Department'=>'Deliverable'];
         if (isset($request->id))
             $user = User::find($request->id);
         else
@@ -126,10 +127,11 @@ class UserController extends Controller
             if (is_null($userRole))
                 $userRole = new UserRole();
 
+
             $userRole->user_id = $user->id;
             $userRole->role = $request->role;
-            $userRole->target_entity = 'Sector';
-            $userRole->entity_id = $request->sector_id;
+            $userRole->target_entity = $roles[$request->role];
+            $userRole->entity_id = $roles[$request->role]=='Sector'?$request->sector_id:1;
             $userRole->role_status = 'Active';
             $userRole->save();
         }
