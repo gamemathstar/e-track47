@@ -202,4 +202,37 @@ class User extends Authenticatable
 
         return $sectorsWithCommitmentStatus;
     }
+
+    public function isSystemAdmin()
+    {
+        $userRole = UserRole::where(['user_id' => $this->id])->first();
+        if($userRole){
+            return  $userRole->target_entity=='System';
+        }
+        return false;
+    }
+    public function isGovernor()
+    {
+        $userRole = UserRole::where(['user_id' => $this->id])->first();
+        if($userRole){
+            return  $userRole->target_entity=='State';
+        }
+        return false;
+    }
+    public function isSectorHead()
+    {
+        $userRole = UserRole::where(['user_id' => $this->id])->first();
+        if($userRole){
+            return  $userRole->target_entity=='Sector'?Sector::find($userRole->entity_id):0;
+        }
+        return false;
+    }
+    public function isDeliveryDepartment()
+    {
+        $userRole = UserRole::where(['user_id' => $this->id])->first();
+        if($userRole){
+            return  $userRole->target_entity=='Deliverable';
+        }
+        return false;
+    }
 }

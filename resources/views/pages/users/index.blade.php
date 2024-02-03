@@ -39,19 +39,20 @@
 
                                 <div class="grid grid-cols-12 mt-4">
                                     <div class="col-span-12 lg:col-span-4 mr-">
-                                        <label for="regular-form-2" class="form-label">Sector</label>
-                                        <select name="role" id="" class="form-control">
+                                        <label for="regular-form-2" class="form-label">User Type</label>
+                                        <select name="role" id="role" class="form-control">
                                             <option value="">Select</option>
                                             <option value="Governor"> Governor</option>
                                             <option value="System Admin"> System Admin</option>
                                             <option value="Sector Head"> Sector Head</option>
                                             <option value="Sector Admin">Sector Admin</option>
+                                            <option value="Delivery Department">Delivery Department</option>
                                         </select>
                                     </div>
 
-                                    <div class="col-span-12 lg:col-span-4 ml-1">
+                                    <div class="col-span-12 lg:col-span-4 ml-1  hidden" id="sectorArea">
                                         <label for="regular-form-2" class="form-label">Sector</label>
-                                        <select name="sector_id" id="" class="form-control">
+                                        <select name="sector_id" id="sector" class="form-control">
                                             <option value="">Select</option>
                                             @foreach($sectors as $sektor)
                                                 <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
@@ -114,9 +115,9 @@
         $(function () {
             const addUserModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addUserModal"));
 
-            $(".role").on('change', function () {
+            $("#role").on('change', function () {
                 console.log($(this).val());
-                if ($(this).val() === 'Sector Head') {
+                if ($(this).val() === 'Sector Head' || $(this).val() === 'Sector Admin') {
                     $("#sectorArea").show();
                 } else {
                     $("#sectorArea").hide();
