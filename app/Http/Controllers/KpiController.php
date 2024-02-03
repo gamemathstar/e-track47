@@ -48,4 +48,10 @@ class KpiController extends Controller
         return view('pages.sector.performance', compact('kpi', 'track'));
     }
 
+    public function delete(Kpi $kpi)
+    {
+        $kpi->delete();
+        return back()->with('success', 'KPI deleted successfully');
+    }
+
 }

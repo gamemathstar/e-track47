@@ -223,8 +223,11 @@
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Status</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="status" required>
+                                        <select id="modal-form-1" class="form-control" name="status" required>
+                                            <option value="">Select</option>
+                                            <option value="Not Started">Not Started</option>
+                                            <option value="In Progress">In Progress</option>
+                                        </select>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Start Date</label>

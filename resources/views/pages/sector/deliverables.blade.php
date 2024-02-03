@@ -30,6 +30,24 @@
                     </svg>
                     Add New
                 </a>
+                @if(session('success'))
+                    <div class="alert alert-success-soft alert-dismissible show flex items-center mb-2 mt-5"
+                         role="alert">
+                        <i data-lucide="alert-triangle" class="w-6 h-6 mr-2"></i> {{ session('success') }}
+                        <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                @endif
+                @if(session('failure'))
+                    <div class="alert alert-danger-soft alert-dismissible show flex items-center mb-2 mt-5"
+                         role="alert"><i
+                            data-lucide="alert-octagon" class="w-6 h-6 mr-2"></i> {{ session('failure') }}
+                        <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                @endif
                 @if($deliverables->count())
                     <table class="table table-report mt-2">
                         <thead>
@@ -92,6 +110,31 @@
                                             </svg>
                                         </a>
                                     </div>
+                                    <div id="delete-modal-preview{{$deliverable->id}}" class="modal" tabindex="-1"
+                                         aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-body p-0">
+                                                    <div class="p-5 text-center"><i data-lucide="x-circle"
+                                                                                    class="w-16 h-16 text-danger mx-auto mt-3"></i>
+                                                        <div class="text-3xl mt-5">Are you sure?</div>
+                                                        <div class="text-slate-500 mt-2">Do you really want to delete
+                                                            this
+                                                            Commitment? <br>
+                                                            <strong>{{$deliverable->deliverable}}</strong>
+                                                        </div>
+                                                    </div>
+                                                    <div class="px-5 pb-8 text-center">
+                                                        <button type="button" data-tw-dismiss="modal"
+                                                                class="btn btn-outline-secondary w-24 mr-1">Cancel
+                                                        </button>
+                                                        <a href="{{ route('deliverables.delete',[$deliverable->id]) }}"
+                                                           class="btn btn-danger w-24">Delete</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -139,8 +182,11 @@
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Status</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="status" required>
+                                        <select id="modal-form-1" class="form-control" name="status" required>
+                                            <option value="">Select</option>
+                                            <option value="Not Started">Not Started</option>
+                                            <option value="In Progress">In Progress</option>
+                                        </select>
                                     </div>
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
@@ -186,14 +232,14 @@
         $(function () {
 
 
-
             pendingCompleted()
-            function pendingCompleted(){
+
+            function pendingCompleted() {
 
                 $.ajax({
-                    type:'get',
-                    url:"{{route('chart.sector.pending.completed')}}",
-                    success:function (data) {
+                    type: 'get',
+                    url: "{{route('chart.sector.pending.completed')}}",
+                    success: function (data) {
                         // Extracting sector names and commitment counts for the chart
                         const sectorNames = data.map(sector => sector.sector_name);
                         const completedCounts = data.map(sector => sector.completed_commitments_count);
