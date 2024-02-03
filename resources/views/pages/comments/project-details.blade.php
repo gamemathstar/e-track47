@@ -174,7 +174,7 @@
                                 <tr>
                                     <th class="whitespace-nowrap">#</th>
                                     <th class="whitespace-nowrap">Deliverable</th>
-                                    <th class="whitespace-nowrap">Budget</th>
+                                    {{--                                    <th class="whitespace-nowrap">Budget</th>--}}
                                     <th class="whitespace-nowrap">Start Date</th>
                                     <th class="whitespace-nowrap">Status</th>
                                     <th class="whitespace-nowrap">Progress</th>
@@ -187,7 +187,7 @@
                                             {{ $loop->iteration }}
                                         </td>
                                         <td>{{ $deliverable->deliverable }}</td>
-                                        <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
+                                        {{--                                        <td>&#8358;{{ number_format($deliverable-> budget)}}</td>--}}
                                         <td>{{ $deliverable->start_date }}</td>
                                         <td>{{ $deliverable->status }}</td>
                                         <td>
