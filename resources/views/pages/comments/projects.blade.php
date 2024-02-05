@@ -85,77 +85,80 @@
     <div class="intro-y grid grid-cols-12 gap-6 mt-5">
         <!-- BEGIN: Blog Layout -->
         @foreach($commitments as $commitment)
-            <div class="intro-y col-span-12 md:col-span-6 xl:col-span-4 box">
-                <a href="{{ route('public.project.details',[$commitment->id]) }}">
-                    <div class="p-5">
-                        <div class="h-40 2xl:h-56 image-fit">
-                            <img alt="Midone - HTML Admin Template" class="rounded-md" src="dist/images/preview-3.jpg">
+            @if($commitment->deliverables->count())
+                <div class="intro-y col-span-12 md:col-span-6 xl:col-span-4 box">
+                    <a href="{{ route('public.project.details',[$commitment->id]) }}">
+                        <div class="p-5">
+                            <div class="h-40 2xl:h-56 image-fit">
+                                <img alt="Midone - HTML Admin Template" class="rounded-md"
+                                     src="dist/images/preview-3.jpg">
+                            </div>
+                            <span class="block font-medium text-base mt-5"> {{ $commitment->name }} </span>
+                            <div class="text-slate-600 dark:text-slate-500 mt-2">
+                                {{ $commitment->description }}
+                            </div>
                         </div>
-                        <span class="block font-medium text-base mt-5"> {{ $commitment->name }} </span>
-                        <div class="text-slate-600 dark:text-slate-500 mt-2">
-                            {{ $commitment->description }}
+                    </a>
+                    <div class="px-5 pt-3 pb-5 border-t border-slate-200/60 dark:border-darkmode-400">
+                        <div class="w-full flex text-slate-500 text-xs sm:text-sm">
+                            <div class="mr-2">
+                                Comments: <span class="font-medium">{{ $commitment->commentsCount() }}</span>
+                            </div>
                         </div>
-                    </div>
-                </a>
-                <div class="px-5 pt-3 pb-5 border-t border-slate-200/60 dark:border-darkmode-400">
-                    <div class="w-full flex text-slate-500 text-xs sm:text-sm">
-                        <div class="mr-2">
-                            Comments: <span class="font-medium">{{ $commitment->commentsCount() }}</span>
-                        </div>
-                    </div>
-                    {{--                    <div class="w-full flex items-center mt-3">--}}
-                    {{--                        <div class="flex-1 relative text-slate-600">--}}
-                    {{--                            <form action="{{ route('home.post.comment') }}" method="post">--}}
-                    {{--                                @csrf--}}
-                    {{--                                <input type="hidden" name="commitment_id" value="{{ $commitment->id }}">--}}
-                    {{--                                <input type="text" name="commenter_name"--}}
-                    {{--                                       class="form-control border-transparent bg-slate-100 pr-10"--}}
-                    {{--                                       placeholder="Your Name" required>--}}
-                    {{--                                <textarea name="comment" cols="30" rows="5" placeholder="Your comment" required--}}
-                    {{--                                          class="form-control border-transparent bg-slate-100 pr-10 mt-2"></textarea>--}}
+                        {{--                    <div class="w-full flex items-center mt-3">--}}
+                        {{--                        <div class="flex-1 relative text-slate-600">--}}
+                        {{--                            <form action="{{ route('home.post.comment') }}" method="post">--}}
+                        {{--                                @csrf--}}
+                        {{--                                <input type="hidden" name="commitment_id" value="{{ $commitment->id }}">--}}
+                        {{--                                <input type="text" name="commenter_name"--}}
+                        {{--                                       class="form-control border-transparent bg-slate-100 pr-10"--}}
+                        {{--                                       placeholder="Your Name" required>--}}
+                        {{--                                <textarea name="comment" cols="30" rows="5" placeholder="Your comment" required--}}
+                        {{--                                          class="form-control border-transparent bg-slate-100 pr-10 mt-2"></textarea>--}}
 
-                    {{--                                <input type="submit" class="btn btn-primary mt-3 float-right" value="Post">--}}
-                    {{--                            </form>--}}
-                    {{--                        </div>--}}
-                    {{--                    </div>--}}
-                </div>
-                <div class="px-5 pt-3 pb-5 border-t border-slate-200/60 dark:border-darkmode-400">
-                    <div class="w-full flex text-slate-500 text-xs sm:text-sm">
-                        <div class="mr-2">
-                            Recent Comments
-                        </div>
+                        {{--                                <input type="submit" class="btn btn-primary mt-3 float-right" value="Post">--}}
+                        {{--                            </form>--}}
+                        {{--                        </div>--}}
+                        {{--                    </div>--}}
                     </div>
-                    @php $comments = $commitment->recentComments(); @endphp
-                    @if(count($comments) > 0)
-                        @foreach($comments as $comment)
-                            <div
-                                class="pt-5 {{ $loop->iteration>1?'mt-5 border-t border-slate-200/60 dark:border-darkmode-400':'' }}">
-                                <div class="flex">
-                                    <div class="w-10 h-10 sm:w-12 sm:h-12 flex-none image-fit">
-                                        <img alt="Midone - HTML Admin Template" class="rounded-full"
-                                             src="dist/images/profile-7.jpg">
-                                    </div>
-                                    <div class="ml-3 flex-1">
-                                        <div class="flex items-center">
+                    <div class="px-5 pt-3 pb-5 border-t border-slate-200/60 dark:border-darkmode-400">
+                        <div class="w-full flex text-slate-500 text-xs sm:text-sm">
+                            <div class="mr-2">
+                                Recent Comments
+                            </div>
+                        </div>
+                        @php $comments = $commitment->recentComments(); @endphp
+                        @if(count($comments) > 0)
+                            @foreach($comments as $comment)
+                                <div
+                                    class="pt-5 {{ $loop->iteration>1?'mt-5 border-t border-slate-200/60 dark:border-darkmode-400':'' }}">
+                                    <div class="flex">
+                                        <div class="w-10 h-10 sm:w-12 sm:h-12 flex-none image-fit">
+                                            <img alt="Midone - HTML Admin Template" class="rounded-full"
+                                                 src="dist/images/profile-7.jpg">
+                                        </div>
+                                        <div class="ml-3 flex-1">
+                                            <div class="flex items-center">
                                                 <span class="font-medium">
                                                     {{ $comment->commenter_name }}
                                                 </span>
+                                            </div>
+                                            <div class="text-slate-500 text-xs sm:text-sm">13 minutes ago</div>
+                                            <div class="mt-2">{{ $comment->comment }}</div>
                                         </div>
-                                        <div class="text-slate-500 text-xs sm:text-sm">13 minutes ago</div>
-                                        <div class="mt-2">{{ $comment->comment }}</div>
                                     </div>
                                 </div>
+                            @endforeach
+                        @else
+                            <div>
+                                <center>
+                                    <p class="text-lg text-gray-600 mt-5">No comment posted</p>
+                                </center>
                             </div>
-                        @endforeach
-                    @else
-                        <div>
-                            <center>
-                                <p class="text-lg text-gray-600 mt-5">No comment posted</p>
-                            </center>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </div>
-            </div>
+            @endif
         @endforeach
         <!-- END: Blog Layout -->
     </div>

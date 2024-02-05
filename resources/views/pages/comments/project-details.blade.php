@@ -160,7 +160,7 @@
             <!-- END: Comments -->
         </div>
         <div class="intro-y news col-span-12 md:col-span-6 xl:col-span-6">
-            @php $deliverables = $commitment->deliverables()->get(); @endphp
+            @php $deliverables = $commitment->deliverables; @endphp
             <div class="intro-y grid grid-cols-12 gap-6">
                 <div class="intro-y news col-span-12 md:col-span-12 xl:col-span-12 p-5">
                     <div class="intro-y flex flex-col sm:flex-row items-center">
