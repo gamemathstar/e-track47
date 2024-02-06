@@ -160,7 +160,7 @@
             <!-- END: Comments -->
         </div>
         <div class="intro-y news col-span-12 md:col-span-6 xl:col-span-6">
-            @php $deliverables = $commitment->deliverables()->get(); @endphp
+            @php $deliverables = $commitment->deliverables; @endphp
             <div class="intro-y grid grid-cols-12 gap-6">
                 <div class="intro-y news col-span-12 md:col-span-12 xl:col-span-12 p-5">
                     <div class="intro-y flex flex-col sm:flex-row items-center">
@@ -174,7 +174,7 @@
                                 <tr>
                                     <th class="whitespace-nowrap">#</th>
                                     <th class="whitespace-nowrap">Deliverable</th>
-                                    <th class="whitespace-nowrap">Budget</th>
+                                    {{--                                    <th class="whitespace-nowrap">Budget</th>--}}
                                     <th class="whitespace-nowrap">Start Date</th>
                                     <th class="whitespace-nowrap">Status</th>
                                     <th class="whitespace-nowrap">Progress</th>
@@ -187,7 +187,7 @@
                                             {{ $loop->iteration }}
                                         </td>
                                         <td>{{ $deliverable->deliverable }}</td>
-                                        <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
+                                        {{--                                        <td>&#8358;{{ number_format($deliverable-> budget)}}</td>--}}
                                         <td>{{ $deliverable->start_date }}</td>
                                         <td>{{ $deliverable->status }}</td>
                                         <td>
