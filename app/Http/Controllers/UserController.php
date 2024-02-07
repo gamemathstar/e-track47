@@ -11,6 +11,7 @@ use App\Models\SectorHead;
 use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use function Laravel\Prompts\password;
 
@@ -26,7 +27,7 @@ class UserController extends Controller
 
     public function awaitingVerification(Request $request)
     {
-        $performanceTrackings = Sector::select('sectors.*',DB::raw("COUNT(sectors.id) as count"))
+        $performanceTrackings = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
             ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
@@ -35,12 +36,13 @@ class UserController extends Controller
             ->groupBy('sectors.id')
             ->get();
 
-        return view('pages.users.awaiting',compact('performanceTrackings'));
+        return view('pages.users.awaiting', compact('performanceTrackings'));
     }
-    public function awaitingVerificationView(Request $request,$id)
+
+    public function awaitingVerificationView(Request $request, $id)
     {
         $sector = Sector::find($id);
-        $performanceTrackings = Commitment::select('commitments.*',DB::raw("COUNT(commitments.id) as count"))
+        $performanceTrackings = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
@@ -49,12 +51,13 @@ class UserController extends Controller
             ->groupBy('commitments.id')
             ->get();
 
-        return view('pages.users.awaiting_commitment',compact('performanceTrackings','sector'));
+        return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
     }
-    public function awaitingVerificationCommView(Request $request,$id)
+
+    public function awaitingVerificationCommView(Request $request, $id)
     {
         $commitment = Commitment::find($id);
-        $performanceTrackings = Deliverable::select('deliverables.*',DB::raw("COUNT(deliverables.id) as count"))
+        $performanceTrackings = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
 //            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
@@ -63,21 +66,22 @@ class UserController extends Controller
             ->groupBy('deliverables.id')
             ->get();
 
-        return view('pages.users.awaiting_deliverables',compact('performanceTrackings','commitment'));
+        return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
     }
 
-    public function awaitingVerificationDelView(Request $request,$id)
+    public function awaitingVerificationDelView(Request $request, $id)
     {
         $deliverable = Deliverable::find($id);
-        $kpis = Kpi::select('kpis.*',DB::raw("COUNT(kpis.id) as count"))
+        $kpis = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
             ->where('performance_trackings.confirmation_status', 'Not Confirmed')
             ->where('kpis.deliverable_id', $id)
             ->groupBy('kpis.id')
             ->get();
 
-        return view('pages.users.awaiting_kpis',compact('kpis','deliverable'));
+        return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable'));
     }
+
     public function create()
     {
         return view('users.create');
@@ -107,11 +111,12 @@ class UserController extends Controller
         // You can return a response if needed
         return response()->json(['message' => 'Performance tracking updated successfully']);
     }
+
     public function store(Request $request)
     {
         // Validate and store user data
 //        return $request;
-        $roles = ['Governor'=>'State','System Admin'=>'System','Sector Head'=>'Sector','Sector Admin'=>'Sector','Delivery Department'=>'Deliverable'];
+        $roles = ['Governor' => 'State', 'System Admin' => 'System', 'Sector Head' => 'Sector', 'Sector Admin' => 'Sector', 'Delivery Department' => 'Deliverable'];
         if (isset($request->id))
             $user = User::find($request->id);
         else
@@ -131,7 +136,7 @@ class UserController extends Controller
             $userRole->user_id = $user->id;
             $userRole->role = $request->role;
             $userRole->target_entity = $roles[$request->role];
-            $userRole->entity_id = $roles[$request->role]=='Sector'?$request->sector_id:1;
+            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 1;
             $userRole->role_status = 'Active';
             $userRole->save();
         }
@@ -161,6 +166,21 @@ class UserController extends Controller
             $user->password = bcrypt($request->password);
             $user->save();
         }
+
+        return back();
+    }
+
+    public function uploadPhoto(Request $request)
+    {
+        $request->validate(['img_url' => 'required|file|mimes:jpg,png|max:2048']);
+
+        $user = User::find($request->user_id);
+        $file = $request->file('img_url');
+        $fileName = $user->id . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads/users'), $fileName);
+
+        $user->image_url = $fileName;
+        $user->save();
 
         return back();
     }

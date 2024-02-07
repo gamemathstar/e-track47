@@ -13,18 +13,18 @@
             <div class="flex flex-1 px-5 items-center justify-center lg:justify-start">
                 <div class="w-20 h-20 sm:w-24 sm:h-24 flex-none lg:w-32 lg:h-32 image-fit relative">
                     <img alt="Midone - HTML Admin Template" class="rounded-full"
-                         src="{{ asset('dist/images/profile-5.jpg') }}">
+                         src="{{ asset($user->image_url? 'uploads/users/' . $user->image_url: 'dist/images/profile-5.jpg') }}">
                 </div>
                 <div class="ml-5">
                     @php $sector = $user->sector(); @endphp
                     <div
-                            class="w-24 sm:w-40 truncate sm:whitespace-normal font-medium text-lg">{{ $user->full_name }}</div>
+                        class="w-24 sm:w-40 truncate sm:whitespace-normal font-medium text-lg">{{ $user->full_name }}</div>
                     <div
-                            class="text-slate-500">{{ $user->role()->role }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
+                        class="text-slate-500">{{ $user->role()->role }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
                 </div>
             </div>
             <div
-                    class="mt-6 lg:mt-0 flex-1 px-5 border-l border-r border-slate-200/60 dark:border-darkmode-400 border-t lg:border-t-0 pt-5 lg:pt-0">
+                class="mt-6 lg:mt-0 flex-1 px-5 border-l border-r border-slate-200/60 dark:border-darkmode-400 border-t lg:border-t-0 pt-5 lg:pt-0">
                 <div class="font-medium text-center lg:text-left lg:mt-3">Contact Details</div>
                 <div class="flex flex-col justify-center items-center lg:items-start mt-4">
                     <div class="truncate sm:whitespace-normal flex items-center">
@@ -44,24 +44,24 @@
                 </div>
             </div>
             <div
-                    class="mt-6 lg:mt-0 flex-1 flex items-center justify-center px-5 border-t lg:border-0 border-slate-200/60 dark:border-darkmode-400 pt-5 lg:pt-0">
-                <div class="text-center rounded-md w-20 py-3">
-                    <div class="font-medium text-primary text-xl">201</div>
-                    <div class="text-slate-500">Orders</div>
-                </div>
-                <div class="text-center rounded-md w-20 py-3">
-                    <div class="font-medium text-primary text-xl">1k</div>
-                    <div class="text-slate-500">Purchases</div>
-                </div>
-                <div class="text-center rounded-md w-20 py-3">
-                    <div class="font-medium text-primary text-xl">492</div>
-                    <div class="text-slate-500">Reviews</div>
-                </div>
+                class="mt-6 lg:mt-0 flex-1 flex items-center justify-center px-5 border-t lg:border-0 border-slate-200/60 dark:border-darkmode-400 pt-5 lg:pt-0">
+                {{--                <div class="text-center rounded-md w-20 py-3">--}}
+                {{--                    <div class="font-medium text-primary text-xl">201</div>--}}
+                {{--                    <div class="text-slate-500">Orders</div>--}}
+                {{--                </div>--}}
+                {{--                <div class="text-center rounded-md w-20 py-3">--}}
+                {{--                    <div class="font-medium text-primary text-xl">1k</div>--}}
+                {{--                    <div class="text-slate-500">Purchases</div>--}}
+                {{--                </div>--}}
+                {{--                <div class="text-center rounded-md w-20 py-3">--}}
+                {{--                    <div class="font-medium text-primary text-xl">492</div>--}}
+                {{--                    <div class="text-slate-500">Reviews</div>--}}
+                {{--                </div>--}}
             </div>
         </div>
         <ul class="nav nav-link-tabs flex-col sm:flex-row justify-center lg:justify-start text-center" role="tablist">
             <li id="profile-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#profile"
+                <a href="javascript:;" class="nav-link py-4 flex items-center active" data-tw-target="#profile"
                    aria-controls="profile" aria-selected="true" role="tab"> <i class="w-4 h-4 mr-2"
                                                                                data-lucide="user"></i> Profile </a>
             </li>
@@ -75,7 +75,7 @@
                 </a>
             </li>
             <li id="edit-profile-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center active" data-tw-target="#edit-profile"
+                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#edit-profile"
                    aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="pencil"></i> Edit Profile
                 </a>
             </li>
@@ -88,7 +88,7 @@
     <!-- END: Profile Info -->
 
     <div class="tab-content mt-5">
-        <div id="profile" class="tab-pane" role="tabpanel" aria-labelledby="profile-tab">
+        <div id="profile" class="tab-pane active" role="tabpanel" aria-labelledby="profile-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- BEGIN: Latest Uploads -->
                 <div class="intro-y box col-span-12 lg:col-span-6">
@@ -111,16 +111,13 @@
                 <!-- BEGIN: Latest Uploads -->
                 <div class="intro-y box col-span-12 lg:col-span-6">
                     <div class="p-8">
-                        <form method="post" data-single="true" action="/file-upload" class="dropzone">
+                        <form method="post" data-single="true" action="{{ route('users.upload.photo') }}"
+                              class="p-3"
+                              enctype="multipart/form-data">
                             @csrf
-                            <input type="hidden" name="id" value="{{ $user->id }}">
-                            <div class="fallback">
-                                <input name="file" type="file"/>
-                            </div>
-                            <div class="dz-message" data-dz-message>
-                                <div class="text-lg font-medium">Drop photo here or click to upload.</div>
-                            </div>
-                            {{--                            <button type="submit" class="btn btn-primary mt-5">Change</button>--}}
+                            <input type="hidden" name="user_id" value="{{ $user->id }}">
+                            <input name="img_url" type="file"/>
+                            <button type="submit" class="btn btn-primary mr-3 mb-3 float-right">Upload</button>
                         </form>
                     </div>
                 </div>
@@ -163,7 +160,7 @@
             </div>
         </div>
 
-        <div id="edit-profile" class="tab-pane active" role="tabpanel" aria-labelledby="edit-profile-tab">
+        <div id="edit-profile" class="tab-pane" role="tabpanel" aria-labelledby="edit-profile-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- BEGIN: Latest Uploads -->
                 <div class="intro-y box col-span-12 lg:col-span-12">
@@ -199,16 +196,16 @@
                                     <select name="role" id="" class="form-control">
                                         <option value="">Select</option>
                                         <option
-                                                {{ $user->role()->role == 'Governor'? 'selected' : '' }}
-                                                value="Governor"> Governor
+                                            {{ $user->role()->role == 'Governor'? 'selected' : '' }}
+                                            value="Governor"> Governor
                                         </option>
                                         <option
-                                                {{ $user->role()->role == 'System Admin'? 'selected' : '' }}
-                                                value="System Admin"> System Admin
+                                            {{ $user->role()->role == 'System Admin'? 'selected' : '' }}
+                                            value="System Admin"> System Admin
                                         </option>
                                         <option
-                                                {{ $user->role()->role == 'Sector Head'? 'selected' : '' }}
-                                                value="Sector Head"> Sector Head
+                                            {{ $user->role()->role == 'Sector Head'? 'selected' : '' }}
+                                            value="Sector Head"> Sector Head
                                         </option>
                                         <option {{ $user->role()->role == 'Sector Admin'? 'selected' : '' }}
                                                 value="Sector Admin">Sector Admin

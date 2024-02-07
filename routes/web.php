@@ -43,6 +43,7 @@ Route::post('performance/update', [UserController::class, 'updatePerformance'])-
 Route::post('users/store', [UserController::class, 'store'])->name("users.add");
 Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
 Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");
+Route::post('users/update-photo', [UserController::class, 'uploadPhoto'])->name("users.upload.photo");
 
 Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
 Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');
