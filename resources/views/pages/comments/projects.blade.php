@@ -92,7 +92,7 @@
                         <div class="p-5">
                             <div class="h-40 2xl:h-56 image-fit">
                                 <img alt="Midone - HTML Admin Template" class="rounded-md"
-                                     src="dist/images/preview-3.jpg">
+                                     src="{{$commitment->img_url?asset('uploads/'.$commitment->img_url):"dist/images/preview-3.jpg"}}">
                             </div>
                             <span class="block font-medium text-base mt-5"> {{ $commitment->name }} </span>
                             <div class="text-slate-600 dark:text-slate-500 mt-2">

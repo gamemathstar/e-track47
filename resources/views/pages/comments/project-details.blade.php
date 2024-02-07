@@ -94,7 +94,7 @@
             <div class="intro-y mt-6">
                 <div class="news__preview image-fit">
                     <img alt="Midone - HTML Admin Template" class="rounded-md"
-                         src="{{ asset('dist/images/preview-5.jpg') }}">
+                         src="{{ asset('uploads/'.$commitment->img_url) }}">
                 </div>
             </div>
             <div class="text-slate-600 dark:text-slate-500 mt-5">

@@ -46,8 +46,17 @@ class CommitmentController extends Controller
             'start_date' => 'required',
             'end_date' => 'required',
             'status' => 'required',
-            'budget' => 'required'
+            'budget' => 'required',
+            'img_url'=>'required|file|mimes:jpg,png|max:2048'
         ]);
+
+//        return [];
+//        if ($request->file('img_url')->isValid()) {
+            $file = $request->file('img_url');
+            $fileName = time() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads'), $fileName); // Move the file to a directory (here, 'uploads')
+
+//        }
 
         $dt_start = new \DateTime($request->start_date);
         $dt_end = new \DateTime($request->end_date);
@@ -64,6 +73,7 @@ class CommitmentController extends Controller
         $commitment->end_date = $request->end_date;
         $commitment->status = $request->status;
         $commitment->budget = $request->budget;
+        $commitment->img_url = $fileName;
         $commitment->save();
 
         return redirect()->back()->with('success', 'Commitment created successfully');

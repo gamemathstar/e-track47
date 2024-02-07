@@ -196,7 +196,7 @@
                 <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('commitments.save')}}" method="post">
+                            <form action="{{route('commitments.save')}}" method="post" enctype="multipart/form-data">
                                 @csrf
                                 <input type="hidden" name="sector_id" value="{{$sector->id}}">
                                 <!-- BEGIN: Modal Header -->
@@ -220,6 +220,10 @@
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-2" class="form-label">Description</label>
                                         <textarea name="description" id="" class="form-control" required></textarea>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="modal-form-2" class="form-label">Picture</label>
+                                        <input type="file" name="img_url" id="" class="form-control">
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Status</label>
