@@ -33,6 +33,7 @@ Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
 // User Resource
     Route::get('users', [UserController::class, 'index'])->name("users.index");
