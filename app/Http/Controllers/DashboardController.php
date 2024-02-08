@@ -18,7 +18,7 @@ class DashboardController extends Controller
     public function index()
     {
         $user = Auth::user();
-        if(!$user->isGovernor() && !$user->isDeliveryDepartment()){
+        if(!$user->isGovernor() && !$user->isDeliveryDepartment() && !$user->isSystemAdmin()){
             $userRole = UserRole::where(['user_id' => $user->id])->first();
             return redirect(route('sectors.view',[$userRole->entity_id]));
         }
