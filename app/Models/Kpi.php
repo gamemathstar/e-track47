@@ -25,12 +25,24 @@ class Kpi extends Model
 
     public function performanceTracking()
     {
-        return $this->hasMany(PerformanceTracking::class);
+        return $this->hasMany(PerformanceTracking::class)->orderBy('quarter','ASC');
     }
 
     public function status()
     {
         $track = $this->performanceTracking()->first();
         return $track ? $track->status() : '';
+    }
+
+    public function kpiTargets($year=null)
+    {
+        if($year)
+            return $this->kpiTargets()->where('year',$year);
+        return $this->hasMany(KpiTarget::class);
+    }
+
+    public function quarter($quarter=1)
+    {
+        return $this->performanceTracking()->where('quarter',$quarter)->first();
     }
 }

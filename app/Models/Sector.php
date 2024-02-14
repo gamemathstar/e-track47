@@ -17,6 +17,19 @@ class Sector extends Model
         'description',
     ];
 
+    public function countKPI()
+    {
+//        $records = Sector::with(["commitments.deliverables.kpis"])->where('id', $this->id)->get();
+        $total = 0;
+            foreach ($this->commitments as $commitment) {
+                foreach ($commitment->deliverables as $deliverable) {
+                    $total += $deliverable->kpis->count();
+                }
+            }
+
+        return $total;
+    }
+
     public function reports()
     {
         return $this->hasMany(Report::class);

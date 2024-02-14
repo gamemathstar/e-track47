@@ -59,4 +59,8 @@ class Deliverable extends Model
         return "$confirmed of $total";
     }
 
+    public function countKPI()
+    {
+        return $this->kpis->count();
+    }
 }

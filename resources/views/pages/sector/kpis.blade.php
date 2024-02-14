@@ -12,7 +12,7 @@
                     <div class="text-primary text-2xl">{{ $deliverable->deliverable }}</div>
                 </div>
                 &#8358; {{ $deliverable->budget?number_format($deliverable->budget):'Budget Not Set' }}
-                <button class="btn btn-primary w-24 float-right">Files</button>
+{{--                <button class="btn btn-primary w-24 float-right">Files</button>--}}
                 <br><br>
             </div>
         </div>
@@ -21,16 +21,25 @@
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
             <div class="rounded-md">
-                <a href="javascript:;" class="btn btn-primary ml-3" data-tw-toggle="modal"
+                <a href="javascript:;" class="btn btn-primary btn-sm" data-tw-toggle="modal"
                    data-tw-target="#header-footer-modal-preview">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                         icon-name="edit" data-lucide="edit" class="lucide lucide-edit w-4 h-4 mr-2">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    Add New
+                    <i data-lucide="edit" class="block mx-auto"></i>
+                    Add New KPI
                 </a>
+                <a href="javascript:;" class="btn btn-primary btn-" data-tw-toggle="modal"
+                   data-tw-target="#targetModal">
+                    <i data-lucide="list" class="block mx-auto"></i>
+                    Targets
+                </a>
+                <a href="javascript:;" class="btn">
+                    Select Target Year <i data-lucide="bar-chart" class="block mx-auto"></i>
+                <select name="" id="changeYear" class="form-control btn" style="display: inline-block;width:100px;">
+                    @foreach(range(2020,date("Y")) as $yr)
+                        <option {{$year==$yr?"selected":""}}>{{$yr}}</option>
+                    @endforeach
+                </select>
+                </a>
+
                 @if(session('success'))
                     <div class="alert alert-success-soft alert-dismissible show flex items-center mb-2 mt-5"
                          role="alert">
@@ -55,12 +64,13 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">KPI</th>
-                            <th class="whitespace-nowrap">Target</th>
+                            <th class="whitespace-nowrap">Baseline Value</th>
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">1<sup>st</sup> QPT</th>
                             <th class="whitespace-nowrap">2<sup>nd</sup> QPT</th>
                             <th class="whitespace-nowrap">3<sup>rd</sup> QPT</th>
                             <th class="whitespace-nowrap">4<sup>th</sup> QPT</th>
+                            <th class="text-center whitespace-nowrap">Target</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -87,7 +97,7 @@
                                         </a>
                                     @else
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="1"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
@@ -104,7 +114,7 @@
                                         </a>
                                     @elseif(count($tracks)>0)
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"  data-quarter="2"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
@@ -120,7 +130,7 @@
                                         </a>
                                     @elseif(count($tracks)>1)
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"  data-quarter="3"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
@@ -137,29 +147,22 @@
                                         </a>
                                     @elseif(count($tracks)>2)
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="4"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
                                     @endif
                                 </td>
                                 <td>
+                                    @php $trgt = $kpi->kpiTargets($year)->first(); @endphp
+                                    {{$trgt?$trgt->target:"--"}}
+                                </td>
+                                <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center text-danger tooltip" data-theme="dark"
                                            title="Delete KPI" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#delete-modal-preview{{ $kpi->id }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="trash-2" data-lucide="trash-2"
-                                                 class="lucide lucide-trash-2 w-4 h-4 mr-1">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path
-                                                    d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                                            </svg>
+                                            <i data-lucide="trash-2" class="block mx-auto"></i>
                                         </a>
                                     </div>
                                     <div id="delete-modal-preview{{$kpi->id}}" class="modal" tabindex="-1"
@@ -187,6 +190,7 @@
                                             </div>
                                         </div>
                                     </div>
+
                                 </td>
                             </tr>
                         @endforeach
@@ -218,7 +222,7 @@
                                                name="kpi" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Target Value</label>
+                                        <label for="modal-form-1" class="form-label">Baseline Value</label>
                                         <input id="modal-form-1" type="number" class="form-control"
                                                name="target_value" step="any" required>
                                     </div>
@@ -257,6 +261,7 @@
                                 @csrf
                                 <input type="hidden" id="kpi_id" name="kpi_id">
                                 <input type="hidden" id="track_id" name="id">
+                                <input type="hidden" id="quarterX" name="quarter">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
                                     <h2 class="font-medium text-base mr-auto">
@@ -272,9 +277,15 @@
                                                {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
                                                name="tracking_date" required>
                                     </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="milestone" class="form-label">Milestone</label>
+                                        <input id="milestone" type="number" class="form-control"
+                                               {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
+                                               name="milestone" required>
+                                    </div>
 
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="actual-value" class="form-label">Actual Value</label>
+                                        <label for="actual-value" class="form-label">Actual Delivery</label>
                                         <input id="actual-value" type="number" class="form-control"
                                                name="actual_value" step="any"
                                                {{--                                               value="{{ $track?$track->actual_value:'' }}"--}}
@@ -321,6 +332,50 @@
                         </div>
                     </div>
                 </div>
+                <div id="targetModal" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 class="font-medium text-base mr-auto">
+                                    Target for {{$year}}
+                                </h2>
+                            </div>
+                            <form action="{{route('kpis.target.save')}}" method="post">
+                                @csrf
+                                <div class="modal-body">
+                                    <table class="table table-bordered" style="width: 100%">
+                                        <tr>
+                                            <th>KPI</th>
+                                            <th>Base Value</th>
+                                            <th>Target Value</th>
+                                        </tr>
+                                        @foreach($targets as $target)
+                                            <tr>
+                                                <td>{{$target->kpi}}</td>
+                                                <td>{{$target->target_value}} ({{$target->unit_of_measurement}})</td>
+                                                <td>
+
+                                                    <input type="text" name="target[{{$target->id}}]" class="form-control" value="{{$target->target}}">
+                                                    ({{$target->unit_of_measurement}})
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </table>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="submit" data-tw-dismiss="modal"
+                                            class="btn btn-secondary w-20 mr-1">Save
+                                    </button>
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Close
+                                    </button>
+                                    {{--                                <button type="button" class="btn btn-primary w-20">Edit</button>--}}
+                                </div>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -351,7 +406,12 @@
             $('body .add').on('click', function () {
                 $('#kpi').html($(this).data('kpi'))
                 $('#kpi_id').val($(this).data('id'))
-            })
+                $('#quarterX').val($(this).data('quarter'))
+            });
+
+            $("#changeYear").on("change",function (){
+                document.location ="{{route('deliverable.kpis',[$deliverable->id])}}?year="+$(this).val()
+            });
 
             $('.view').on('click', function () {
                 $('#quarter').html($(this).data('qt'))

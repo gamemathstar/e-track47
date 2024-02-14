@@ -81,9 +81,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
     Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
     Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
+    Route::post('deliverable/kpi/target/save', [KpiController::class, 'saveTarget'])->name('kpis.target.save');
     Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');
 
-    Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
-    Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('home.post.comment');
-
 });
+
+Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
+Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('home.post.comment');

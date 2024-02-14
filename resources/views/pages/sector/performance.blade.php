@@ -7,9 +7,15 @@
         </td>
     </tr>
     <tr>
-        <th class="whitespace-nowrap">Actual Value</th>
+        <th class="whitespace-nowrap">Delivery Value</th>
         <td class="whitespace-nowrap">
             {{ $track->actual_value }} ({{ $kpi->unit_of_measurement }})
+        </td>
+    </tr>
+    <tr>
+        <th class="whitespace-nowrap">Milestone</th>
+        <td class="whitespace-nowrap">
+            {{ $track->milestone }} ({{ $kpi->unit_of_measurement }})
         </td>
     </tr>
     <tr>

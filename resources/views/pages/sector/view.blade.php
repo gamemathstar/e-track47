@@ -64,7 +64,7 @@
                     <div class="text-primary text-2xl">{{ $sector->sector_name }}</div>
                 </div>
                 {{ $sector->description }}
-                <button class="btn btn-primary w-24 float-right">Files</button>
+                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}" target="_blank">Download Report</a>
                 <br><br>
             </div>
         </div>
@@ -81,7 +81,7 @@
                         <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
-                    Add New
+                    Add New Commitment
                 </a>
                 @if(session('success'))
                     <div class="alert alert-success-soft alert-dismissible show flex items-center mb-2 mt-5"

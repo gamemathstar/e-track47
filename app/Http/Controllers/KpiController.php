@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kpi;
+use App\Models\KpiTarget;
 use App\Models\PerformanceTracking;
 use Illuminate\Http\Request;
 
@@ -52,6 +53,16 @@ class KpiController extends Controller
     {
         $kpi->delete();
         return back()->with('success', 'KPI deleted successfully');
+    }
+
+    public function saveTarget(Request $request)
+    {
+        foreach($request->target as $key=>$value){
+            $target = KpiTarget::find($key);
+            $target->target = $value;
+            $target->save();
+        }
+        return back();
     }
 
 }

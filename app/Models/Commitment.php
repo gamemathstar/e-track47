@@ -72,4 +72,17 @@ class Commitment extends Model
     {
         return $this->comments()->orderBy('id', 'desc')->get();
     }
+
+
+    public function countKPI()
+    {
+//        $records = Sector::with(["commitments.deliverables.kpis"])->where('id', $this->id)->get();
+        $total = 0;
+        foreach ($this->deliverables as $deliverable) {
+            $total += $deliverable->kpis->count();
+        }
+
+        return $total;
+    }
+
 }
