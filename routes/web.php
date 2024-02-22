@@ -71,6 +71,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('commitment/{commitment}/delete', [CommitmentController::class, 'delete'])->name('commitments.delete');
 
 
+    Route::post('deliverable/kpi/tracking/save', [DeliverableController::class, 'storeTracking'])->name('deliverable.tracking.save');
     Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
     Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
     Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');

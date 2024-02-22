@@ -7,6 +7,7 @@ use App\Models\Deliverable;
 use App\Models\DeliveryKpi;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
+use App\Models\PerformanceTracking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +33,26 @@ class DeliverableController extends Controller
         ]);
 
         Deliverable::create($request->all());
+
+        return redirect()->back()->with('success', 'Deliverable created successfully');
+    }
+
+    public function storeTracking(Request $request)
+    {
+        return $request;
+        $request->validate([
+            'delivery_department_value' => "required",
+            'delivery_department_remark' => "required",
+            'confirmation_status' => "required",
+//            'id'=>'required:exists'
+        ]);
+        $pt = PerformanceTracking::find($request->id);
+        if($pt){
+            $pt->delivery_department_value = $request->delivery_department_value;
+            $pt->delivery_department_remark = $request->delivery_department_remark;
+            $pt->confirmation_status = $request->confirmation_status;
+            $pt->save();
+        }
 
         return redirect()->back()->with('success', 'Deliverable created successfully');
     }

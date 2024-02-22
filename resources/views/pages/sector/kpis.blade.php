@@ -12,7 +12,7 @@
                     <div class="text-primary text-2xl">{{ $deliverable->deliverable }}</div>
                 </div>
                 &#8358; {{ $deliverable->budget?number_format($deliverable->budget):'Budget Not Set' }}
-{{--                <button class="btn btn-primary w-24 float-right">Files</button>--}}
+                {{--                <button class="btn btn-primary w-24 float-right">Files</button>--}}
                 <br><br>
             </div>
         </div>
@@ -33,11 +33,11 @@
                 </a>
                 <a href="javascript:;" class="btn">
                     Select Target Year <i data-lucide="bar-chart" class="block mx-auto"></i>
-                <select name="" id="changeYear" class="form-control btn" style="display: inline-block;width:100px;">
-                    @foreach(range(2020,date("Y")) as $yr)
-                        <option {{$year==$yr?"selected":""}}>{{$yr}}</option>
-                    @endforeach
-                </select>
+                    <select name="" id="changeYear" class="form-control btn" style="display: inline-block;width:100px;">
+                        @foreach(range(2020,date("Y")) as $yr)
+                            <option {{$year==$yr?"selected":""}}>{{$yr}}</option>
+                        @endforeach
+                    </select>
                 </a>
 
                 @if(session('success'))
@@ -58,6 +58,10 @@
                         </button>
                     </div>
                 @endif
+                @php
+                    $user = \Illuminate\Support\Facades\Auth::user();
+
+                @endphp
                 @if($kpis->count())
                     <table class="table table-bordered table-report mt-2">
                         <thead>
@@ -87,20 +91,37 @@
                                 <td>{{ $kpi->target_value }} ({{ $kpi->unit_of_measurement }})</td>
                                 <td>{{ Carbon::parse($kpi->start_date)->format('d M, Y') }}</td>
                                 <td>
+
                                     @if(count($tracks)>0)
                                         @php $track = $tracks[0]; @endphp
-                                        <a href="javascript:;" data-tw-toggle="modal" data-tw-target="#view-performance"
+                                        <a href="javascript:;" data-tw-toggle="modal"
+                                           data-tw-target="#view-performance"
                                            data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}"
                                            data-kpi-id="{{$kpi->id}}" data-qt="1st QT"
                                            class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
                                             {{ $track->actual_value }}
                                         </a>
-                                    @else
+                                    @elseif($user->isSectorHead())
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
                                            data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="1"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
+                                    @endif
+                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
+                                        @php $track = $tracks[0]; @endphp
+                                        @if($track->actual_value)
+                                            <a href="javascript:" class="updM" data-tw-toggle="modal"
+                                               data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
+                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
+                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
+                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                               data-tw-target="#update-performance">
+                                                <i data-lucide="plus-square" class="block mx-auto"></i>
+                                            </a>
+                                        @endif
                                     @endif
                                 </td>
                                 <td>
@@ -112,12 +133,13 @@
                                            class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
                                             {{ $track->actual_value }}
                                         </a>
-                                    @elseif(count($tracks)>0)
+                                    @elseif(count($tracks)>0 && $user->isSectorHead())
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"  data-quarter="2"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="2"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
+                                    @elseif($user->isDeliveryDepartment())
                                     @endif
                                 </td>
                                 <td> @if(count($tracks)>2)
@@ -128,12 +150,13 @@
                                            class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
                                             {{ $track->actual_value }}
                                         </a>
-                                    @elseif(count($tracks)>1)
+                                    @elseif(count($tracks)>1 && $user->isSectorHead())
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"  data-quarter="3"
+                                           data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="3"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
+                                    @elseif($user->isDeliveryDepartment())
                                     @endif
                                 </td>
                                 <td>
@@ -145,12 +168,13 @@
                                            class="view text-{{ $track->confirmation_status=='Confirmed'?'success':($track->confirmation_status=='Rejected'?'danger':'') }} block">
                                             {{ $track->actual_value }}
                                         </a>
-                                    @elseif(count($tracks)>2)
+                                    @elseif(count($tracks)>2 && $user->isSectorHead())
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
                                            data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}" data-quarter="4"
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
+                                    @elseif($user->isDeliveryDepartment())
                                     @endif
                                 </td>
                                 <td>
@@ -312,6 +336,73 @@
                     </div>
                 </div> <!-- END: Modal Content -->
 
+                <div id="update-performance" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form action="{{route('deliverable.tracking.save')}}" method="post">
+                                @csrf
+                                <input type="hidden" id="track_idX" name="id">
+                                <input type="hidden" id="quarterX" name="quarter">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">
+                                        Verify Performance Tracking to <span id="kpi"></span>
+                                    </h2>
+
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="milestone" class="form-label">Milestone:</label>
+                                        <div id="milestoneView"></div>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="milestone" class="form-label">Actual Value:</label>
+                                        <div id="actual_valueView"></div>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="milestone" class="form-label">Quarter:</label>
+                                        <div id="quarterView"></div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="milestone" class="form-label">Remark:</label>
+                                        <div id="remarkView"></div>
+                                    </div>
+
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="actual-value" class="form-label">Actual Delivery</label>
+                                        <input id="delivery_department_valueIx" type="number" class="form-control"
+                                               name="delivery_department_value" step="any"
+                                               required>
+                                    </div>
+
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="remark" class="form-label">Remark</label>
+                                        <textarea name="delivery_department_remark" id="delivery_department_remarkIx"
+                                                  class="form-control"></textarea>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="remark" class="form-label">Status</label>
+                                        <select name="confirmation_status" id="confirmation_statusIx" required>
+                                            <option value="">Select</option>
+                                            <option>Confirmed</option>
+                                            <option>Rejected</option>
+                                        </select>
+                                    </div>
+
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Save</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div> <!-- END: Modal Content -->
+
                 <div id="view-performance" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
@@ -355,7 +446,8 @@
                                                 <td>{{$target->target_value}} ({{$target->unit_of_measurement}})</td>
                                                 <td>
 
-                                                    <input type="text" name="target[{{$target->id}}]" class="form-control" value="{{$target->target}}">
+                                                    <input type="text" name="target[{{$target->id}}]"
+                                                           class="form-control" value="{{$target->target}}">
                                                     ({{$target->unit_of_measurement}})
                                                 </td>
                                             </tr>
@@ -408,9 +500,20 @@
                 $('#kpi_id').val($(this).data('id'))
                 $('#quarterX').val($(this).data('quarter'))
             });
-
-            $("#changeYear").on("change",function (){
-                document.location ="{{route('deliverable.kpis',[$deliverable->id])}}?year="+$(this).val()
+            $('body .updM').on('click', function () {
+                $('#track_idX').val($(this).data('id'))
+                $('#delivery_department_valueIx').val($(this).data('delivery_department_value'))
+                $('#delivery_department_remarkIx').val($(this).data('delivery_department_remark'))
+                $('#confirmation_statusIx').val($(this).data('confirmation_status'))
+                $('#milestoneView').html($(this).data('milestone'))
+                $('#remarkView').html($(this).data('remarks'))
+                $('#quarterView').html($(this).data('quarter'))
+                $('#actual_valueView').html($(this).data('actual_value'))
+                console.log($(this).data('milestone'),$(this).data('remarks'),$(this).data('actual_value'));
+            });
+            //milestoneView
+            $("#changeYear").on("change", function () {
+                document.location = "{{route('deliverable.kpis',[$deliverable->id])}}?year=" + $(this).val()
             });
 
             $('.view').on('click', function () {
