@@ -139,7 +139,21 @@
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
-                                    @elseif($user->isDeliveryDepartment())
+                                    @endif
+                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
+                                        @php $track = $tracks[0]; @endphp
+                                        @if($track->actual_value)
+                                            <a href="javascript:" class="updM" data-tw-toggle="modal"
+                                               data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
+                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
+                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
+                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                               data-tw-target="#update-performance">
+                                                <i data-lucide="plus-square" class="block mx-auto"></i>
+                                            </a>
+                                        @endif
                                     @endif
                                 </td>
                                 <td> @if(count($tracks)>2)
@@ -156,7 +170,22 @@
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
-                                    @elseif($user->isDeliveryDepartment())
+                                    @endif
+
+                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
+                                        @php $track = $tracks[0]; @endphp
+                                        @if($track->actual_value)
+                                            <a href="javascript:" class="updM" data-tw-toggle="modal"
+                                               data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
+                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
+                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
+                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                               data-tw-target="#update-performance">
+                                                <i data-lucide="plus-square" class="block mx-auto"></i>
+                                            </a>
+                                        @endif
                                     @endif
                                 </td>
                                 <td>
@@ -174,7 +203,21 @@
                                            data-tw-target="#add-performance">
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
-                                    @elseif($user->isDeliveryDepartment())
+                                    @endif
+                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
+                                        @php $track = $tracks[0]; @endphp
+                                        @if($track->actual_value)
+                                            <a href="javascript:" class="updM" data-tw-toggle="modal"
+                                               data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
+                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
+                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
+                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                               data-tw-target="#update-performance">
+                                                <i data-lucide="plus-square" class="block mx-auto"></i>
+                                            </a>
+                                        @endif
                                     @endif
                                 </td>
                                 <td>

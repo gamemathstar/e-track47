@@ -39,7 +39,7 @@ class DeliverableController extends Controller
 
     public function storeTracking(Request $request)
     {
-        return $request;
+//        return $request;
         $request->validate([
             'delivery_department_value' => "required",
             'delivery_department_remark' => "required",
