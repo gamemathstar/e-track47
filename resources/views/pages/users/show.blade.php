@@ -38,7 +38,7 @@
                     @if(!is_null($user->sector()))
                         <div class="truncate sm:whitespace-normal flex items-center mt-3">
                             <i data-lucide="home" class="w-4 h-4 mr-2"></i>
-                            {{ $user->sector()->sector_name }}
+                            {{ $sector?$sector->sector_name:"" }}
                         </div>
                     @endif
                 </div>
