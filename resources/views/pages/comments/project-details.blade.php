@@ -11,7 +11,9 @@
     <meta name="keywords"
           content="admin template, Enigma Admin Template, dashboard template, flat admin template, responsive admin template, web app">
     <meta name="author" content="LEFT4CODE">
-    <title>Blog - Midone</title>
+    <title>
+        Projects
+    </title>
     <!-- BEGIN: CSS Assets-->
     <link rel="stylesheet" href="{{ asset('dist/css/app.css') }}"/>
     <!-- END: CSS Assets-->

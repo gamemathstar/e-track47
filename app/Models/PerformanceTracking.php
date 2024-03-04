@@ -13,6 +13,8 @@ class PerformanceTracking extends Model
 
     protected $fillable = [
         'kpi_id',
+        'quarter',
+        'milestone',
         'tracking_date',
         'actual_value',
         'remarks',
