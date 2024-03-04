@@ -47,14 +47,14 @@ class CommitmentController extends Controller
             'end_date' => 'required',
             'status' => 'required',
             'budget' => 'required',
-            'img_url'=>'required|file|mimes:jpg,png|max:2048'
+            'img_url' => 'required|file|mimes:jpg,png|max:2048'
         ]);
 
 //        return [];
 //        if ($request->file('img_url')->isValid()) {
-            $file = $request->file('img_url');
-            $fileName = time() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads'), $fileName); // Move the file to a directory (here, 'uploads')
+        $file = $request->file('img_url');
+        $fileName = time() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads'), $fileName); // Move the file to a directory (here, 'uploads')
 
 //        }
 
@@ -77,6 +77,24 @@ class CommitmentController extends Controller
         $commitment->save();
 
         return redirect()->back()->with('success', 'Commitment created successfully');
+    }
+
+    public function changePhoto(Request $request)
+    {
+        $request->validate([
+            'commitment_id' => "required",
+            'img_url' => 'required|file|mimes:jpg,png|max:2048'
+        ]);
+
+        $file = $request->file('img_url');
+        $fileName = time() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads'), $fileName);
+
+        $commitment = Commitment::where(['id' => $request->commitment_id])->first();
+        $commitment->img_url = $fileName;
+        $commitment->save();
+
+        return redirect()->back()->with('success', 'Commitment photo changed successfully');
     }
 
     public function deliverables(Request $request, Commitment $commitment)

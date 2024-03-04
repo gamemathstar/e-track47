@@ -66,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('commitment', [CommitmentController::class, 'index'])->name('commitments.index');
     Route::post('commitment/update', [CommitmentController::class, 'update'])->name('commitments.update');
     Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
+    Route::post('commitment/change/photo', [CommitmentController::class, 'changePhoto'])->name('commitments.change.photo');
     Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
     Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
     Route::get('commitment/{commitment}/delete', [CommitmentController::class, 'delete'])->name('commitments.delete');

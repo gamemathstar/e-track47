@@ -136,7 +136,7 @@ class UserController extends Controller
             $userRole->user_id = $user->id;
             $userRole->role = $request->role;
             $userRole->target_entity = $roles[$request->role];
-            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 1;
+            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 0;
             $userRole->role_status = 'Active';
             $userRole->save();
         }

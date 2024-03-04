@@ -64,7 +64,8 @@
                     <div class="text-primary text-2xl">{{ $sector->sector_name }}</div>
                 </div>
                 {{ $sector->description }}
-                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}" target="_blank">Download Report</a>
+                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}"
+                   target="_blank">Download Report</a>
                 <br><br>
             </div>
         </div>
@@ -127,6 +128,21 @@
                                 <td>{{ $commitment->duration_in_days? $commitment->duration_in_days.' day(s)':'---' }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
+                                        <a class="flex items-center text-warning mr-3 tooltip edit" data-theme="dark"
+                                           title="Edit Commitment" href="javascript:;" data-tw-toggle="modal"
+                                           data-tw-target="#edit-photo" data-id="{{$commitment->id}}"
+                                           data-photo="{{ asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                                 viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round"
+                                                 stroke-linejoin="round" icon-name="check-square"
+                                                 data-lucide="check-square"
+                                                 class="lucide lucide-check-square w-4 h-4 mr-1">
+                                                <polyline points="9 11 12 14 22 4"></polyline>
+                                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                                            </svg>
+                                        </a>
                                         <a class="flex items-center mr-3  items-center text-success tooltip"
                                            data-theme="dark" title="View Commitment"
                                            href="{{route('commitments.deliverables',[$commitment->id])}}">
@@ -192,6 +208,39 @@
                         Click <em class="text-success">Add New </em> to add commitments.
                     </center>
                 @endif
+
+                <div id="edit-photo" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form action="{{route('commitments.change.photo')}}" method="post"
+                                  enctype="multipart/form-data">
+                                @csrf
+                                <input type="hidden" name="commitment_id" id="commitmentId">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">Edit Commitment Photo</h2>
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-12 sm:col-span-12 h-40 2xl:h-56 image-fit">
+                                        <img class="rounded-md" id="commitmentPhoto"/>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="modal-form-2" class="form-label">Picture</label>
+                                        <input type="file" name="img_url" id="" class="form-control">
+                                    </div>
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Change</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div>
 
                 <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
@@ -301,6 +350,12 @@
             // $("#year").on('change', function (e) {
             //     document.location = url + $(this).val();
             // });
+
+            $('.edit').on('click', function () {
+                //  console.log($(this).data('photo'))
+                $('#commitmentId').val($(this).data('id'))
+                $('#commitmentPhoto').attr('src', $(this).data('photo'))
+            })
 
             pendingCompleted()
 
