@@ -33,7 +33,7 @@ class KpiController extends Controller
 
     public function storeTracking(Request $request)
     {
-        return $request;
+//        return $request;
         if (is_null($request->id))
             $tracking = new PerformanceTracking();
         else

@@ -144,7 +144,7 @@
                                                     {{ $comment->commenter_name }}
                                                 </span>
                                             </div>
-                                            <div class="text-slate-500 text-xs sm:text-sm">{{  Carbon::parse($comment->created_at)->format('jS F Y')  }}</div>
+                                            <div class="text-slate-500 text-xs sm:text-sm">{{  \Carbon\Carbon::parse($comment->created_at)->format('jS F Y')  }}</div>
                                             <div class="mt-2">{{ $comment->comment }}</div>
                                         </div>
                                     </div>
