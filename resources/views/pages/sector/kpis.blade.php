@@ -140,8 +140,8 @@
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
                                     @endif
-                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
-                                        @php $track = $tracks[0]; @endphp
+                                    @if($user->isDeliveryDepartment() && count($tracks)>1)
+                                        @php $track = $tracks[1]; @endphp
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
@@ -172,8 +172,8 @@
                                         </a>
                                     @endif
 
-                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
-                                        @php $track = $tracks[0]; @endphp
+                                    @if($user->isDeliveryDepartment() && count($tracks)>2)
+                                        @php $track = $tracks[2]; @endphp
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
@@ -204,8 +204,8 @@
                                             <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
                                     @endif
-                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
-                                        @php $track = $tracks[0]; @endphp
+                                    @if($user->isDeliveryDepartment() && count($tracks)>3)
+                                        @php $track = $tracks[3]; @endphp
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
