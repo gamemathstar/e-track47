@@ -54,7 +54,7 @@ class DeliverableController extends Controller
             $pt->save();
         }
 
-        return redirect()->back()->with('success', 'Deliverable created successfully');
+        return redirect()->back()->with('success', 'Delivery '.$request->confirmation_status );
     }
 
     public function view(Request $request)
