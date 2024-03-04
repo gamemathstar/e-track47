@@ -218,7 +218,7 @@
                                     <select name="sector_id" id="" class="form-control">
                                         <option value="">Select</option>
                                         @foreach($sectors as $sektor)
-                                            <option {{ $sector->id===$sektor->id? 'selected':'' }}
+                                            <option {{ $sector && $sector->id===$sektor->id? 'selected':'' }}
                                                     value="{{$sektor->id}}">{{$sektor->sector_name}}
                                             </option>
                                         @endforeach
