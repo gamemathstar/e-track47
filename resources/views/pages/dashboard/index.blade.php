@@ -18,6 +18,51 @@
                         General Report {{$year}}
                     </h2>
                 </div>
+            </div>
+
+            <div class="col-span-12 lg:col-span-10 xl:col-span-9 mt-2">
+
+                @php
+                    $year = date("Y");
+                @endphp
+                <div class="bg-white p-5 rounded">
+                    <table class="table table-bordered" style="font-size: 12px;">
+                        <tr>
+                            <th rowspan="2">SN</th>
+                            <th rowspan="2">Sector</th>
+                            <th colspan="4" class="text-center"> {{ $year  }} Performance Score (%)</th>
+                        </tr>
+                        <tr>
+                            <th>1st</th>
+                            <th>2nd</th>
+                            <th>3rd</th>
+                            <th>4th</th>
+                        </tr>
+
+                        @foreach(\App\Models\Sector::get() as $sector)
+                            @php
+                                $commitmentIds = $sector->commitments->pluck('id');
+                                $deliverableIds = \App\Models\Deliverable::whereIn('commitment_id',$commitmentIds)->pluck('id');
+                                $kpiIds = \App\Models\Kpi::whereIn('deliverable_id',$deliverableIds)->pluck('id');
+                                $perf = \App\Models\PerformanceTracking::whereIn('kpi_id',$kpiIds)
+                                ->select([
+                                    'quarter',
+                                    \Illuminate\Support\Facades\DB::raw("SUM( IF( delivery_department_value > 0 AND milestone > 0, (delivery_department_value / milestone) * 100, 0 )) /COUNT(delivery_department_value) AS performance",
+                                    )])->where('year',$year)->whereIn('quarter',[1,2,3,4])->groupBy('quarter')->orderBy('quarter')->get();
+                            @endphp
+                            <tr>
+                                <th>{{$loop->iteration}}</th>
+                                <th>{{$sector->sector_name}}</th>
+                                <th>{{ isset($perf[0]) && $perf[0]->quarter==1?number_format($perf[0]->performance,1)."%":"" }}</th>
+                                <th>{{ isset($perf[1]) && $perf[1]->quarter==2?number_format($perf[1]->performance,1)."%":"" }}</th>
+                                <th>{{ isset($perf[2]) && $perf[2]->quarter==3?number_format($perf[2]->performance,1)."%":"" }}</th>
+                                <th>{{ isset($perf[3]) && $perf[3]->quarter==4?number_format($perf[3]->performance,1)."%":"" }}</th>
+                            </tr>
+                        @endforeach
+                    </table>
+                </div>
+            </div>
+            <div class="col-span-12 lg:col-span-10 xl:col-span-9 mt-2">
                 <div class="report-box-2 intro-y mt-12 sm:mt-5">
                     <div class="box sm:flex">
                         <div class="px-8 py-12 flex flex-col justify-center flex-1">
@@ -45,7 +90,6 @@
                         <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
 
                             <div class="h-[290px]">
-
                                 <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
                             </div>
                         </div>

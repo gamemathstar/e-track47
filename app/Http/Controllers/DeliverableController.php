@@ -37,7 +37,7 @@ class DeliverableController extends Controller
         return redirect()->back()->with('success', 'Deliverable created successfully');
     }
 
-    public function storeTracking(Request $request)
+    public function  storeTracking(Request $request)
     {
 //        return $request;
         $request->validate([

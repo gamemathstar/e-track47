@@ -329,6 +329,7 @@
                                 <input type="hidden" id="kpi_id" name="kpi_id">
                                 <input type="hidden" id="track_id" name="id">
                                 <input type="hidden" id="quarterX" name="quarter">
+                                <input type="hidden" id="year" name="year" value="{{$year}}">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
                                     <h2 class="font-medium text-base mr-auto">
@@ -543,6 +544,7 @@
                 $('#kpi_id').val($(this).data('id'))
                 $('#quarterX').val($(this).data('quarter'))
             });
+
             $('body .updM').on('click', function () {
                 $('#track_idX').val($(this).data('id'))
                 $('#delivery_department_valueIx').val($(this).data('delivery_department_value'))
@@ -554,6 +556,7 @@
                 $('#actual_valueView').html($(this).data('actual_value'))
                 console.log($(this).data('milestone'),$(this).data('remarks'),$(this).data('actual_value'));
             });
+
             //milestoneView
             $("#changeYear").on("change", function () {
                 document.location = "{{route('deliverable.kpis',[$deliverable->id])}}?year=" + $(this).val()
