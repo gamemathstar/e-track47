@@ -7,7 +7,8 @@
         $releasedAmount = 40000;//\App\Models\StateBudget::releases();
         $releasedIncomplete = 8;//\App\Models\StateBudget::releaseCount();
         $deliverablesSoFar = 3;//\App\Models\StateBudget::deliveredIn();
-
+        $commitments= \App\Models\Commitment::count('id');
+        $kpis= \App\Models\Kpi::count('id');
     @endphp
     <div class="relative">
         <div class="grid grid-cols-12 gap-6">
@@ -150,6 +151,40 @@
                                 <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">
                                     <span
                                         class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget Not Set" }}</span>
+
+                                </div>
+                                <div
+                                    class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3 mt-5">
+                                    Total Commitments
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle"
+                                         class="lucide lucide-alert-circle tooltip w-4 h-4 ml-1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                </div>
+                                <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">
+                                    <span
+                                        class="absolte text-xl top-0 left-0 -mt-1.5">{{$commitments??"No Commitment Added" }}</span>
+
+                                </div>
+                                <div
+                                    class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3 mt-5">
+                                    Total KPIs
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle"
+                                         class="lucide lucide-alert-circle tooltip w-4 h-4 ml-1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                </div>
+                                <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">
+                                    <span
+                                        class="absolte text-xl top-0 left-0 -mt-1.5">{{$kpis??"No KPI Added" }}</span>
 
                                 </div>
                             </div>
