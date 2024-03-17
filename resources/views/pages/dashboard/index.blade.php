@@ -53,10 +53,34 @@
                             <tr>
                                 <th>{{$loop->iteration}}</th>
                                 <th>{{$sector->sector_name}}</th>
-                                <th>{{ isset($perf[0]) && $perf[0]->quarter==1?number_format($perf[0]->performance,1)."%":"" }}</th>
-                                <th>{{ isset($perf[1]) && $perf[1]->quarter==2?number_format($perf[1]->performance,1)."%":"" }}</th>
-                                <th>{{ isset($perf[2]) && $perf[2]->quarter==3?number_format($perf[2]->performance,1)."%":"" }}</th>
-                                <th>{{ isset($perf[3]) && $perf[3]->quarter==4?number_format($perf[3]->performance,1)."%":"" }}</th>
+                                <th>
+                                    @if(isset($perf[0]) && $perf[0]->quarter==1)
+                                        <img style="display: inline; height: 16px;"
+                                             src="{{ asset('dist/images/arrow-' . ($perf[0]->performance >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($perf[0]->performance,1)."%" }}
+                                    @endif
+                                </th>
+                                <th>
+                                    @if(isset($perf[1]) && $perf[1]->quarter==2)
+                                        <img style="display: inline; height: 16px;"
+                                             src="{{ asset('dist/images/arrow-' . ($perf[1]->performance >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($perf[1]->performance,1)."%" }}
+                                    @endif
+                                </th>
+                                <th>
+                                    @if(isset($perf[2]) && $perf[2]->quarter==3)
+                                        <img style="display: inline; height: 16px;"
+                                             src="{{ asset('dist/images/arrow-' . ($perf[2]->performance >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($perf[2]->performance,1)."%" }}
+                                    @endif
+                                </th>
+                                <th>
+                                    @if(isset($perf[3]) && $perf[3]->quarter==4)
+                                        <img style="display: inline; height: 16px;"
+                                             src="{{ asset('dist/images/arrow-' . ($perf[3]->performance >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($perf[3]->performance,1)."%" }}
+                                    @endif
+                                </th>
                             </tr>
                         @endforeach
                     </table>
@@ -67,13 +91,16 @@
                     <div class="box sm:flex">
                         <div class="px-8 py-12 flex flex-col justify-center flex-1">
                             <div class="h-[290px]">
-                                <canvas id="sectorPerformanceChart" width="506" height="580" style="display: block; box-sizing: border-box; height: 580px; width: 506px;"></canvas>
+                                <canvas id="sectorPerformanceChart" width="506" height="580"
+                                        style="display: block; box-sizing: border-box; height: 580px; width: 506px;"></canvas>
                             </div>
                         </div>
-                        <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
+                        <div
+                            class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
 
                             <div class="h-[290px]">
-                                <canvas id="sectorPerformanceChartRatio" width="506" height="580" style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
+                                <canvas id="sectorPerformanceChartRatio" width="506" height="580"
+                                        style="display: block; box-sizing: border-box; height: 290px; width: 253px;"></canvas>
                             </div>
                         </div>
                     </div>
@@ -87,7 +114,8 @@
 
                             </div>
                         </div>
-                        <div class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
+                        <div
+                            class="px-8 py-12 flex flex-col justify-center flex-1 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-darkmode-300 border-dashed">
 
                             <div class="h-[290px]">
                                 <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
@@ -100,25 +128,43 @@
             <!-- BEGIN: Sales Report -->
 
 
-
         </div>
-        <div class="report-box-4 w-full h-full grid grid-cols-12 gap-6 xl:absolute -mt-8 xl:mt-0 pb-6 xl:pb-0 top-0 right-0 z-30 xl:z-auto">
+        <div
+            class="report-box-4 w-full h-full grid grid-cols-12 gap-6 xl:absolute -mt-8 xl:mt-0 pb-6 xl:pb-0 top-0 right-0 z-30 xl:z-auto">
             <div class="col-span-12 xl:col-span-3 xl:col-start-10 xl:pb-16 z-30">
                 <div class="h-full flex flex-col">
                     <div class="box p-5 mt-6 bg-primary intro-x">
                         <div class="flex flex-wrap gap-3 pb-10">
                             <div class="mr-auto">
-                                <div class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3"> Total Budget <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle" class="lucide lucide-alert-circle tooltip w-4 h-4 ml-1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> </div>
+                                <div class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3">
+                                    Total Budget
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle"
+                                         class="lucide lucide-alert-circle tooltip w-4 h-4 ml-1.5">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                </div>
                                 <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">
-                                    <span class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget Not Set" }}</span>
+                                    <span
+                                        class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget Not Set" }}</span>
 
                                 </div>
                             </div>
                             @if(!$stateBudget)
-                            <a class="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-darkmode-300 bg-opacity-20 hover:bg-opacity-30 text-white" href="">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" icon-name="plus" data-lucide="plus" class="lucide lucide-plus w-6 h-6"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            </a>
-                                @endif
+                                <a class="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-darkmode-300 bg-opacity-20 hover:bg-opacity-30 text-white"
+                                   href="">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" icon-name="plus" data-lucide="plus"
+                                         class="lucide lucide-plus w-6 h-6">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </a>
+                            @endif
 
                         </div>
                     </div>
@@ -129,12 +175,13 @@
 
 @endsection
 
-@section('js')<!-- jQuery -->
+@section('js')
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
 
-        $(function (){
+        $(function () {
             // alert(3);
 
 
@@ -211,21 +258,19 @@
             });
 
 
-
             doKpiPerformance(2024)
             doKpiPerformanceRatio()
             distribution()
             pendingCompleted()
 
 
-
-            function doKpiPerformanceRatio(year){
+            function doKpiPerformanceRatio(year) {
                 // chart.sector.kpi.performance.ratio/
                 $.ajax({
-                    type:'get',
-                    data:{year:year},
-                    url:"{{route('chart.sector.kpi.performance.ratio')}}",
-                    success:function (data) {
+                    type: 'get',
+                    data: {year: year},
+                    url: "{{route('chart.sector.kpi.performance.ratio')}}",
+                    success: function (data) {
                         // Extract data from the response myChartRatio
                         const sectorNames = data.map(sector => sector.sector_name);
                         const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
@@ -249,12 +294,12 @@
 
             }
 
-            function distribution(year){
+            function distribution(year) {
 
                 $.ajax({
-                    type:'get',
-                    url:"{{route('chart.sector.budget.distribution')}}",
-                    success:function (data) {
+                    type: 'get',
+                    url: "{{route('chart.sector.budget.distribution')}}",
+                    success: function (data) {
                         // Extract data from the response
                         const sectorNamesBudget = data.map(sector => sector.sector_name);
                         const totalBudgets = data.map(sector => sector.total_budget);
@@ -268,12 +313,12 @@
                 });
             }
 
-            function doKpiPerformance (year){
+            function doKpiPerformance(year) {
                 $.ajax({
-                    type:'get',
-                    data:{year:year},
-                    url:"{{route('chart.sector.kpi.performance')}}",
-                    success:function (data) {
+                    type: 'get',
+                    data: {year: year},
+                    url: "{{route('chart.sector.kpi.performance')}}",
+                    success: function (data) {
                         // Extract data from the response
                         const sectorNames = data.map(sector => sector.sector_name);
                         const confirmedKpiCounts = data.map(sector => sector.confirmed_kpi_count);
@@ -287,12 +332,12 @@
                 });
             }
 
-            function pendingCompleted(){
+            function pendingCompleted() {
 
                 $.ajax({
-                    type:'get',
-                    url:"{{route('chart.sector.pending.completed')}}",
-                    success:function (data) {
+                    type: 'get',
+                    url: "{{route('chart.sector.pending.completed')}}",
+                    success: function (data) {
                         // Extracting sector names and commitment counts for the chart
                         const sectorNames = data.map(sector => sector.sector_name);
                         const completedCounts = data.map(sector => sector.completed_commitments_count);
