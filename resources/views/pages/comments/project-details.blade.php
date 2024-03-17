@@ -24,7 +24,7 @@
 <div class="mobile-menu md:hidden">
     <div class="mobile-menu-bar">
         <a href="" class="flex mr-auto">
-            <img alt="Midone - HTML Admin Template" class="w-6" src="{{ asset('jg_logo.png') }}">
+            <img alt="App Logo" class="w-6" src="{{ asset('jg_logo.png') }}">
         </a>
         <a href="javascript:;" class="mobile-menu-toggler"> <i data-lucide="bar-chart-2"
                                                                class="w-8 h-8 text-white transform -rotate-90"></i> </a>
@@ -55,7 +55,7 @@
     <div class="h-full flex items-center">
         <!-- BEGIN: Logo -->
         <a href="" class="logo -intro-x hidden md:flex xl:w-[180px] block">
-            <img alt="Midone - HTML Admin Template" class="logo__image w-6" src="{{asset('jg_logo.png')}}">
+            <img alt="App Logo" class="logo__image w-6" src="{{asset('jg_logo.png')}}">
             <span class="logo__text text-white text-lg ml-3"> JS-EPM </span>
         </a>
         <!-- END: Logo -->
@@ -95,7 +95,7 @@
             </div>
             <div class="intro-y mt-6">
                 <div class="news__preview image-fit">
-                    <img alt="Midone - HTML Admin Template" class="rounded-md"
+                    <img alt="Commitment Photo" class="rounded-md"
                          src="{{ asset('uploads/'.$commitment->img_url) }}">
                 </div>
             </div>
@@ -137,7 +137,7 @@
                             class="pt-5 {{ $loop->iteration>1?'mt-5 border-t border-slate-200/60 dark:border-darkmode-400':'' }}">
                             <div class="flex">
                                 <div class="w-10 h-10 sm:w-12 sm:h-12 flex-none image-fit">
-                                    <img alt="Midone - HTML Admin Template" class="rounded-full"
+                                    <img alt="Commitment Photo" class="rounded-full"
                                          src="{{ asset('dist/images/profile-7.jpg') }}">
                                 </div>
                                 <div class="ml-3 flex-1">

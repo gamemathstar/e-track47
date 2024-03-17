@@ -85,8 +85,8 @@
                 <div class="box">
                     <div class="flex flex-col lg:flex-row items-center p-5">
                         <div class="w-24 h-24 lg:w-12 lg:h-12 image-fit lg:mr-1">
-                            <img alt="Midone - HTML Admin Template" class="rounded-full"
-                                 src="{{ asset('dist/images/profile-1.jpg') }}">
+                            <img alt="User Photo" class="rounded-full"
+                                 src="{{ asset($user->image_url? 'uploads/users/' . $user->image_url: 'dist/images/profile-5.jpg') }}">
                         </div>
                         <div class="lg:ml-2 lg:mr-auto text-center lg:text-left mt-3 lg:mt-0">
                             <a href="" class="font-medium">{{ $user->full_name }}</a>
