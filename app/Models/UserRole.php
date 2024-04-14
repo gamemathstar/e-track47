@@ -11,6 +11,6 @@ class UserRole extends Model
 
     public function sector()
     {
-        return Sector::where(['id' => $this->entity_id])->get();
+        return Sector::where(['id' => $this->entity_id])->first();
     }
 }
