@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\Commitment;
 use App\Models\Deliverable;
+use App\Models\Sector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,11 +16,12 @@ class ProjectController extends Controller
 
     public function index(Request $request)
     {
-        $commts = Commitment::join('comments','commitments.id','=','comments.commitment_id')
+        $commts = Commitment::leftJoin('comments','commitments.id','=','comments.commitment_id')
             ->select([
                 'commitments.id','commitments.name','comments.commitment_id',
                 'description',DB::raw("COUNT(comments.id) AS comments_count")
             ])
+            ->groupBy('commitments.id')
             ->get();
         $projects = [];
         foreach ($commts  as $commt){
@@ -35,7 +37,7 @@ class ProjectController extends Controller
 
     public function project(Request $request,$id)
     {
-        $commt = Commitment::join('comments','commitments.id','=','comments.commitment_id')
+        $commt = Commitment::leftJoin('comments','commitments.id','=','comments.commitment_id')
             ->where('commitments.id',$id)
             ->select([
                 'commitments.id','commitments.name','comments.commitment_id',
@@ -71,7 +73,7 @@ class ProjectController extends Controller
             'description'=>$commt->description,'comments_count'=>$commt->comments_count,
             'comments'=>$comments,'deliverables'=>$deliverables
         ];
-        return $project;
+        return response(['success'=>true,'message'=>"",'data'=>$project]);;
     }
 
     public function addComment(Request $request)
@@ -99,5 +101,11 @@ class ProjectController extends Controller
         }
         return response(['message'=>"Invalid Project",'errors'=>[]]);
 
+    }
+
+    public function sectors(Request $request)
+    {
+        $sectors = Sector::select(['id','sector_name','description'])->get();
+        return response(['success'=>true,'message'=>"",'data'=>$sectors]);
     }
 }

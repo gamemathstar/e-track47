@@ -27,7 +27,10 @@ Route::get('/project/comment/add', [ProjectController::class, 'addComment']);
 
 Route::middleware('auth:api')->prefix('/')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
-    Route::prefix('/projects')->group(function () {
-        Route::get('/u', [ProjectController::class, 'index']);
+    Route::prefix('/sectors')->group(function () {
+        Route::get('/', [ProjectController::class, 'sectors']);
+    });
+    Route::prefix('/project')->group(function () {
+        Route::get('/deliverables', [ProjectController::class, 'index']);
     });
 });
