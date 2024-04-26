@@ -31,6 +31,19 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
         Route::get('/', [ProjectController::class, 'sectors']);
     });
     Route::prefix('/project')->group(function () {
-        Route::get('/deliverables', [ProjectController::class, 'index']);
+        Route::get('/deliverables/{commitment_id?}', [ProjectController::class, 'index']);
+        Route::get('/kpis/{deliverable_id?}', [ProjectController::class, 'getKPIs']);
+
+        Route::post('/insert/deliverable', [ProjectController::class, 'insertDeliverable']);
+        Route::post('/insert/commitment', [ProjectController::class, 'insertCommitment']);
+        Route::post('/insert/kpi', [ProjectController::class, 'insertKpi']);
+    });
+    Route::prefix('/report')->group(function () {
+        Route::get('/', [ProjectController::class, 'report']);
+    });
+    Route::prefix('/user')->group(function () {
+        Route::post('/edit', [ProjectController::class, 'editUser']);
+        Route::get('/fetch', [ProjectController::class, 'getUser']);
+        Route::get('/change/password', [ProjectController::class, 'changePassword']);
     });
 });
