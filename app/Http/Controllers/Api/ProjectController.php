@@ -126,6 +126,7 @@ class ProjectController extends Controller
 
     public function sectors(Request $request)
     {
+
         try {
             $sectors = Sector::select(['id', 'sector_name', 'description'])->get();
             return response(['success' => true, 'message' => "", 'data' => $sectors]);
