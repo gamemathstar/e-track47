@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\Kpi;
+use App\Models\Notification;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\User;
@@ -397,4 +398,42 @@ class ProjectController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
         }
     }
+
+
+
+    public function notifications(Request $request)
+    {
+
+        $user = Auth::user();
+        $date = \Carbon\Carbon::now();
+        $lastMonth = $date->subMonth(2)->format('Y-m-d');
+
+
+        $notifications = Notification::join("users AS receiver", "receiver.id", "=", "notifications.user_id")
+            ->leftJoin("users AS sender", "sender.id", "=", "notifications.sender_id")
+            ->select([
+                'notifications.id', 'user_id',
+                'type', 'title', 'body', 'sender_id',
+                'model_id', 'status', DB::raw("IF(sender.name,sender.name,'System') AS sender"),
+                'receiver.name AS receiver', 'notifications.created_at AS posted_date'
+            ])
+            ->whereRaw("(notifications.created_at>='$lastMonth' OR status='Not Read') AND user_id=" . $user->id)
+            ->orderBy('notifications.created_at','DESC');
+
+        if ($request->id) {
+            return $notifications->where('id', '=', $request->id)->first();
+        }
+        return $notifications->get();
+    }
+
+    public function savePushNotificationToken(Request $request)
+    {
+        try {
+            auth()->user()->update(['fcm_token'=>$request->token]);
+            return response(["message"=>'token saved successfully.']);
+        }catch (\Exception $exception){
+            return response(["message"=>'Something went wrong']);
+        }
+    }
+
 }
