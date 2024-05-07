@@ -59,7 +59,7 @@ class ProjectController extends Controller
                 ->where('commitments.id', $id)
                 ->select([
                     'commitments.id', 'commitments.name', 'comments.commitment_id',
-                    'description', DB::raw("COUNT(comments.id) AS comments_count")
+                    'description', DB::raw("COUNT(comments.id) AS comments_count"), 'commitments.img_url'
                 ])
                 ->first();
 
