@@ -89,6 +89,7 @@ class ProjectController extends Controller
             $project = [
                 'id' => $commt->id, 'name' => $commt->name, 'commitment_id' => $commt->commitment_id,
                 'description' => $commt->description, 'comments_count' => $commt->comments_count,
+                'photo' => $commt->img_url != null ? asset('uploads/' . $commt->img_url) : '',
                 'comments' => $comments, 'deliverables' => $deliverables
             ];
             return response(['success' => true, 'message' => "", 'data' => $project]);
