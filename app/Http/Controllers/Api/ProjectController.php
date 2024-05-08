@@ -142,7 +142,7 @@ class ProjectController extends Controller
     public function getUser(Request $request)
     {
         try {
-            $users = User::select(['users.id', 'full_name AS name', 'email', 'phone_number', 'image_url AS photo', 'token', 'role AS rank', 'entity_id'])
+            $users = User::select(['users.id', 'full_name AS name', 'email', 'phone_number', 'image_url AS photo', 'token', 'user_roles.role AS rank', 'entity_id'])
                 ->leftJoin('user_roles', 'user_roles.user_id', '=', 'users.id')->get();
             $userEx = [];
             foreach ($users as $user) {
@@ -281,19 +281,19 @@ class ProjectController extends Controller
                     'sector' => $sector->sector_name,
                     'first_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[0]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => number_format($perf[0]->performance, 1) . "%"
+                        'value' => isset($perf[0])?number_format($perf[0]->performance, 1) . "%":""
                     ],
                     'second_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[1]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => number_format($perf[1]->performance, 1) . "%"
+                        'value' => isset($perf[1])?number_format($perf[1]->performance, 1) . "%":""
                     ],
                     'third_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[2]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => number_format($perf[2]->performance, 1) . "%"
+                        'value' => isset($perf[2])?number_format($perf[2]->performance, 1) . "%":""
                     ],
                     'fourth_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[3]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => number_format($perf[3]->performance, 1) . "%"
+                        'value' => isset($perf[3])?number_format($perf[3]->performance, 1) . "%":""
                     ],
                 ];
 
