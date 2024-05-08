@@ -30,17 +30,19 @@ class ProjectController extends Controller
             $commts = Commitment::leftJoin('comments', 'commitments.id', '=', 'comments.commitment_id')
                 ->select([
                     'commitments.id', 'commitments.name', 'comments.commitment_id',
-                    'description', DB::raw("COUNT(comments.id) AS comments_count")
+                    'description', DB::raw("COUNT(comments.id) AS comments_count"), 'commitments.img_url'
                 ])
                 ->where($where)
                 ->groupBy('commitments.id')
                 ->get();
             $projects = [];
             foreach ($commts as $commt) {
+                $comment = Comment::comment($commt->commitment_id);
                 $projects[] = [
                     'id' => $commt->id, 'name' => $commt->name,
                     'description' => $commt->description, 'comments_count' => $commt->comments_count,
-                    'comments' => [Comment::comment($commt->commitment_id)], 'deliverables' => []
+                    'photo' => $commt->img_url != null ? asset('uploads/' . $commt->img_url) : '',
+                    'comments' => $comment == null ? [] : [$comment], 'deliverables' => []
                 ];
             }
 
@@ -57,7 +59,7 @@ class ProjectController extends Controller
                 ->where('commitments.id', $id)
                 ->select([
                     'commitments.id', 'commitments.name', 'comments.commitment_id',
-                    'description', DB::raw("COUNT(comments.id) AS comments_count")
+                    'description', DB::raw("COUNT(comments.id) AS comments_count"), 'commitments.img_url'
                 ])
                 ->first();
 
@@ -87,6 +89,7 @@ class ProjectController extends Controller
             $project = [
                 'id' => $commt->id, 'name' => $commt->name, 'commitment_id' => $commt->commitment_id,
                 'description' => $commt->description, 'comments_count' => $commt->comments_count,
+                'photo' => $commt->img_url != null ? asset('uploads/' . $commt->img_url) : '',
                 'comments' => $comments, 'deliverables' => $deliverables
             ];
             return response(['success' => true, 'message' => "", 'data' => $project]);

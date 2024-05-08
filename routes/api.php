@@ -23,7 +23,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('login', [AuthController::class, 'login']);
 Route::get('/projects', [ProjectController::class, 'index']);
 Route::get('/project/{id}', [ProjectController::class, 'project']);
-Route::get('/project/comment/add', [ProjectController::class, 'addComment']);
+Route::post('/project/comment/add', [ProjectController::class, 'addComment']);
 
 Route::middleware('auth:api')->prefix('/')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
