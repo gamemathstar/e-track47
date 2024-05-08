@@ -50,7 +50,7 @@ class AuthController extends Controller
                 'email'=>$user->email,
                 'phone'=>$user->phone_number,
                 'rank'=>$userRole->role,
-                'sector'=>$userRole?($userRole->target_entity=="Sector"?$userRole->sector:""),
+                'sector'=>$userRole?($userRole->target_entity=="Sector"?$userRole->sector:""):"",
                 'photo'=>asset('uploads/users/'.$user->image_url),
                 'token'=>$token
             ];
