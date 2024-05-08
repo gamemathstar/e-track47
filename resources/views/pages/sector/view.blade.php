@@ -131,7 +131,7 @@
                                         <a class="flex items-center text-warning mr-3 tooltip edit" data-theme="dark"
                                            title="Edit Commitment" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#edit-photo" data-id="{{$commitment->id}}"
-                                           data-photo="{{ asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
+                                           data-photo="{{ secure_asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
                                                  fill="none" stroke="currentColor" stroke-width="2"
