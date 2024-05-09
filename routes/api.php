@@ -31,6 +31,7 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
         Route::get('/', [ProjectController::class, 'sectors']);
     });
     Route::prefix('/project')->group(function () {
+        Route::get('/commitments/{sector_id}', [ProjectController::class, 'commitments']);
         Route::get('/deliverables/{commitment_id?}', [ProjectController::class, 'index']);
         Route::get('/kpis/{deliverable_id?}', [ProjectController::class, 'getKPIs']);
 

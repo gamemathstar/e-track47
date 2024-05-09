@@ -98,6 +98,29 @@ class ProjectController extends Controller
         }
     }
 
+    public function commitments($sector_id)
+    {
+        try {
+            $sector = Sector::find($sector_id);
+            $commitments = $sector->__commitments()->get();
+
+            $projects = [];
+            foreach ($commitments as $commitment) {
+                $date = date_create($commitment->start_date);
+                $projects[] = [
+                    'id' => $commitment->id, 'sector_id' => $commitment->sector_id,
+                    'name' => $commitment->name, 'description' => $commitment->description,
+                    'budget' => $commitment->budget, 'start_date' => date_format($date, "d M, Y"),
+                    'duration_in_days' => $commitment->duration_in_days,
+                ];
+            }
+
+            return response()->json(['success' => true, 'message' => 'Commitments list', 'data' => $projects]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
+        }
+    }
+
     public function addComment(Request $request)
     {
         try {
@@ -281,19 +304,19 @@ class ProjectController extends Controller
                     'sector' => $sector->sector_name,
                     'first_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[0]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[0])?number_format($perf[0]->performance, 1) . "%":""
+                        'value' => isset($perf[0]) ? number_format($perf[0]->performance, 1) . "%" : ""
                     ],
                     'second_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[1]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[1])?number_format($perf[1]->performance, 1) . "%":""
+                        'value' => isset($perf[1]) ? number_format($perf[1]->performance, 1) . "%" : ""
                     ],
                     'third_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[2]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[2])?number_format($perf[2]->performance, 1) . "%":""
+                        'value' => isset($perf[2]) ? number_format($perf[2]->performance, 1) . "%" : ""
                     ],
                     'fourth_quarter' => [
                         'img' => asset('dist/images/arrow-' . ($perf[3]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[3])?number_format($perf[3]->performance, 1) . "%":""
+                        'value' => isset($perf[3]) ? number_format($perf[3]->performance, 1) . "%" : ""
                     ],
                 ];
 
@@ -403,7 +426,6 @@ class ProjectController extends Controller
     }
 
 
-
     public function notifications(Request $request)
     {
 
@@ -421,7 +443,7 @@ class ProjectController extends Controller
                 'receiver.name AS receiver', 'notifications.created_at AS posted_date'
             ])
             ->whereRaw("(notifications.created_at>='$lastMonth' OR status='Not Read') AND user_id=" . $user->id)
-            ->orderBy('notifications.created_at','DESC');
+            ->orderBy('notifications.created_at', 'DESC');
 
         if ($request->id) {
             return $notifications->where('id', '=', $request->id)->first();
@@ -432,10 +454,10 @@ class ProjectController extends Controller
     public function savePushNotificationToken(Request $request)
     {
         try {
-            auth()->user()->update(['fcm_token'=>$request->token]);
-            return response(["message"=>'token saved successfully.']);
-        }catch (\Exception $exception){
-            return response(["message"=>'Something went wrong']);
+            auth()->user()->update(['fcm_token' => $request->token]);
+            return response(["message" => 'token saved successfully.']);
+        } catch (\Exception $exception) {
+            return response(["message" => 'Something went wrong']);
         }
     }
 
