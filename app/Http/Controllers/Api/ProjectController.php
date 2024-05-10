@@ -110,7 +110,8 @@ class ProjectController extends Controller
                 $projects[] = [
                     'id' => $commitment->id, 'sector_id' => $commitment->sector_id,
                     'name' => $commitment->name, 'description' => $commitment->description,
-                    'budget' => $commitment->budget, 'start_date' => date_format($date, "d M, Y"),
+                    'budget' => '₦' . number_format($commitment->budget, 2),
+                    'start_date' => date_format($date, "d M, Y"),
                     'duration_in_days' => $commitment->duration_in_days,
                 ];
             }
