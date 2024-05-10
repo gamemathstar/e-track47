@@ -300,24 +300,28 @@ class ProjectController extends Controller
                         'quarter',
                         DB::raw("SUM( IF( delivery_department_value > 0 AND milestone > 0, (delivery_department_value / milestone) * 100, 0 )) /COUNT(delivery_department_value) AS performance",
                         )])->where('year', $year)->whereIn('quarter', [1, 2, 3, 4])->groupBy('quarter')->orderBy('quarter')->get();
-                $reportX[$sector->sector_name] = [
+                $reportX[] = [
                     'sector' => $sector->sector_name,
-                    'first_quarter' => [
-                        'img' => asset('dist/images/arrow-' . ($perf[0]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[0]) ? number_format($perf[0]->performance, 1) . "%" : ""
-                    ],
-                    'second_quarter' => [
-                        'img' => asset('dist/images/arrow-' . ($perf[1]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[1]) ? number_format($perf[1]->performance, 1) . "%" : ""
-                    ],
-                    'third_quarter' => [
-                        'img' => asset('dist/images/arrow-' . ($perf[2]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[2]) ? number_format($perf[2]->performance, 1) . "%" : ""
-                    ],
-                    'fourth_quarter' => [
-                        'img' => asset('dist/images/arrow-' . ($perf[3]->performance >= 50 ? 'up' : 'down') . '.png'),
-                        'value' => isset($perf[3]) ? number_format($perf[3]->performance, 1) . "%" : ""
-                    ],
+                    'first' => isset($perf[0]) ? floatval(number_format($perf[0]->performance, 1)) : 0,
+//                    [
+//                        'img' => asset('dist/images/arrow-' . ($perf[0]->performance >= 50 ? 'up' : 'down') . '.png'),
+//                        'value' => isset($perf[0]) ? number_format($perf[0]->performance, 1) . "%" : ""
+//                    ],
+                    'second' => isset($perf[1]) ? floatval(number_format($perf[1]->performance, 1)) : 0,
+//                    [
+//                        'img' => isset($perf[1]) ? asset('dist/images/arrow-' . ($perf[1]->performance >= 50 ? 'up' : 'down') . '.png') : '',
+//                        'value' => isset($perf[1]) ? number_format($perf[1]->performance, 1) . "%" : ""
+//                    ],
+                    'third' => isset($perf[2]) ? floatval(number_format($perf[2]->performance, 1)) : 0,
+//                    [
+//                        'img' => isset($perf[2]) ? asset('dist/images/arrow-' . ($perf[2]->performance >= 50 ? 'up' : 'down') . '.png') : '',
+//                        'value' => isset($perf[2]) ? number_format($perf[2]->performance, 1) . "%" : ""
+//                    ],
+                    'fourth' => isset($perf[3]) ? floatval(number_format($perf[3]->performance, 1)) : 0,
+//                    [
+//                        'img' => isset($perf[3]) ? asset('dist/images/arrow-' . ($perf[3]->performance >= 50 ? 'up' : 'down') . '.png') : '',
+//                        'value' => isset($perf[3]) ? number_format($perf[3]->performance, 1) . "%" : ""
+//                    ],
                 ];
 
             }

@@ -45,16 +45,16 @@ class AuthController extends Controller
             $userRole = $user->role();
             $token = $user->createToken('eTrackerX8nE@9')->accessToken;
             $usr = [
-                'id'=>$user->id,
-                'name'=>$user->full_name,
-                'email'=>$user->email,
-                'phone'=>$user->phone_number,
-                'rank'=>$userRole->role,
-                'sector'=>$userRole?($userRole->target_entity=="Sector"?$userRole->sector()->name:""):"",
-                'photo'=>asset('uploads/users/'.$user->image_url),
-                'token'=>$token
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+                'phone' => $user->phone_number,
+                'rank' => $userRole->role,
+                'sector' => $userRole ? ($userRole->target_entity == "Sector" ? $userRole->sector()->name : "") : "",
+                'photo' => asset('uploads/users/' . $user->image_url),
+                'token' => $token
             ];
-            return response()->json(['success'=>true,'message'=>'successful login','data'=>$usr], 200);
+            return response()->json(['success' => true, 'message' => 'successful login', 'data' => $usr], 200);
         } else {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
