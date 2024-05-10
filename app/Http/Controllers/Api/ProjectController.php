@@ -153,9 +153,18 @@ class ProjectController extends Controller
 
     public function sectors(Request $request)
     {
-
         try {
-            $sectors = Sector::select(['id', 'sector_name', 'description'])->get();
+            $user = Auth::user();
+
+            if ($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryDepartment())
+                $sectors = Sector::select(['id', 'sector_name', 'description'])->get();
+            else if ($sector = $user->isSectorHead())
+                $sectors = Sector::select(['id', 'sector_name', 'description'])
+                    ->where('id', $sector->id)
+                    ->get();
+            else
+                $sectors = [];
+
             return response(['success' => true, 'message' => "", 'data' => $sectors]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
