@@ -455,7 +455,21 @@ class ProjectController extends Controller
             if ($id) {
                 $where[] = ['deliverable_id', '=', $id];
             }
-            return response()->json(['success' => true, 'message' => 'KPI list', 'data' => Kpi::where($where)->get()]);
+            $kpis = Kpi::where($where)->get();
+            $data = [];
+            foreach ($kpis as $kpi) {
+                $data[] = [
+                    'id' => $kpi->id,
+                    'deliverable_id' => $kpi->deliverable_id,
+                    'kpi' => $kpi->kpi,
+                    'target_value' => $kpi->target_value,
+                    'start_date' => date_format(date_create($kpi->start_date), "d M, Y"),
+                    'end_date' => date_format(date_create($kpi->end_date), "d M, Y"),
+                    'unit_of_measurement' => $kpi->unit_of_measurement
+                ];
+            }
+
+            return response()->json(['success' => true, 'message' => 'KPI list', 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
         }
