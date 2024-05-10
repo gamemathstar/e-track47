@@ -32,7 +32,7 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
     });
     Route::prefix('/project')->group(function () {
         Route::get('/commitments/{sector_id}', [ProjectController::class, 'commitments']);
-        Route::get('/deliverables/{commitment_id?}', [ProjectController::class, 'index']);
+        Route::get('/deliverables/{commitment_id?}', [ProjectController::class, 'deliverables']);
         Route::get('/kpis/{deliverable_id?}', [ProjectController::class, 'getKPIs']);
 
         Route::post('/insert/deliverable', [ProjectController::class, 'insertDeliverable']);

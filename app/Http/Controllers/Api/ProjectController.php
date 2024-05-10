@@ -172,6 +172,24 @@ class ProjectController extends Controller
         }
     }
 
+    public function deliverables($commitment_id)
+    {
+        $deliverables = Deliverable::where(['commitment_id' => $commitment_id])->get();
+        $data = [];
+        foreach ($deliverables as $deliverable) {
+            $data[] = [
+                'id' => $deliverable->id,
+                'commitment_id' => $deliverable->commitment_id,
+                'deliverable' => $deliverable->deliverable,
+                'budget' => '₦' . number_format($deliverable->budget, 2),
+                'start_date' => date_format(date_create($deliverable->start_date), "d M, Y"),
+                'end_date' => date_format(date_create($deliverable->end_date), "d M, Y"),
+            ];
+        }
+
+        return $data;
+    }
+
     public function getUser(Request $request)
     {
         try {
