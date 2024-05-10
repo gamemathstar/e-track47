@@ -231,26 +231,26 @@ class ProjectController extends Controller
             $user = Auth::user();
             $this->validate($request, [
                 'name' => 'required',
-                'email' => 'required|email|unique:users,email',
-                'phone' => 'required|unique:users,phone_number',
+                'email' => 'required',
+                'phone' => 'required',
 //            'sector'=>'required|exists:sectors,id'
 
             ]);
             $roles = ['Governor' => 'State', 'System Admin' => 'System', 'Sector Head' => 'Sector', 'Sector Admin' => 'Sector', 'Delivery Department' => 'Deliverable'];
 //            $user = User::find($user->id);
-            $user->name = $request->name;
+            $user->full_name = $request->name;
             $user->email = $request->email;
             $user->phone_number = $request->phone;
-            $userRole = $user->role();
-            if (!$userRole) {
-                $userRole = new UserRole();
-                $userRole->user_id = $user->id;
-                $userRole->role_status = 'Active';
-            }
-            $userRole->role = $user->rank;
-            $userRole->target_entity = $roles[$request->role];
-            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 0;
-            $userRole->save();
+//            $userRole = $user->role();
+//            if (!$userRole) {
+//                $userRole = new UserRole();
+//                $userRole->user_id = $user->id;
+//                $userRole->role_status = 'Active';
+//            }
+//            $userRole->role = $user->rank;
+//            $userRole->target_entity = $roles[$request->role];
+//            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 0;
+//            $userRole->save();
             if (in_array($user->rank, ['Sector Head', 'Sector Admin'])) {
                 $sector = Sector::find($user->entity_id);
                 $sName = $sector ? $sector->name : "";
@@ -262,20 +262,19 @@ class ProjectController extends Controller
                 $sName = "Delivery Department";
             }
             if ($user->save()) {
-                $userX = [
-                    'id' => $user->id, 'name' => $user->name,
-                    'email' => $user->email, 'phone' => $user->phone_number,
-                    'photo' => asset('uploads/users/' . $user->photo), 'token' => $user->token,
-                    'rank' => $user->rank, 'sector' => $sName
-                ];
-                return response(['success' => true, 'message' => 'User record updated', 'data' => $userX]);
+//                $userX = [
+//                    'id' => $user->id, 'name' => $user->name,
+//                    'email' => $user->email, 'phone' => $user->phone_number,
+//                    'photo' => asset('uploads/users/' . $user->photo), 'token' => $user->token,
+//                    'rank' => $user->rank, 'sector' => $sName
+//                ];
+                return response(['success' => true, 'message' => 'Record updated']);
             } else {
-                return response(['success' => false, 'message' => 'Failed to update user records', 'data' => []]);
+                return response(['success' => false, 'message' => 'Failed to update record']);
             }
         } catch (\Exception $e) {
-            return response(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
+            return response(['success' => false, 'message' => $e->getMessage()]);
         }
-
     }
 
     public function changePassword(Request $request)
@@ -474,7 +473,6 @@ class ProjectController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
         }
     }
-
 
     public function notifications(Request $request)
     {
