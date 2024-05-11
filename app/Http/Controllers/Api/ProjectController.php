@@ -478,7 +478,8 @@ class ProjectController extends Controller
                     'target_value' => $kpi->target_value,
                     'start_date' => date_format(date_create($kpi->start_date), "d M, Y"),
                     'end_date' => date_format(date_create($kpi->end_date), "d M, Y"),
-                    'unit_of_measurement' => $kpi->unit_of_measurement
+                    'unit_of_measurement' => $kpi->unit_of_measurement,
+                    'tracks' => $kpi->performanceTracking()->get()
                 ];
             }
 
