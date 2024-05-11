@@ -414,7 +414,7 @@ class ProjectController extends Controller
 //            'description'=>'required',
                 'start_date' => 'required',
                 'end_date' => 'required',
-//            'budget'=>'required',
+                'budget' => 'required',
             ]);
 
             $deliverable = new Deliverable();
@@ -425,11 +425,11 @@ class ProjectController extends Controller
 //        $deliverable->description = $request->description;
             $deliverable->budget = $request->budget;
             if ($deliverable->save()) {
-                return response()->json(['success' => true, 'message' => 'Deliverable created', 'data' => $deliverable]);
+                return response()->json(['success' => true, 'message' => 'Deliverable created']);
             }
-            return response()->json(['success' => false, 'message' => 'failed to create Deliverable', 'data' => []]);
+            return response()->json(['success' => false, 'message' => 'failed to create Deliverable']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 
