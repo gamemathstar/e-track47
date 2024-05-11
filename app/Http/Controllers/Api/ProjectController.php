@@ -63,11 +63,15 @@ class ProjectController extends Controller
                 ])
                 ->first();
 
-            $deliverables = Deliverable::where('commitment_id', $commt->id)
-                ->select([
-                    'deliverables.id', 'deliverables.commitment_id', 'deliverables.budget',
-                    'deliverables.start_date', 'deliverables.end_date', 'deliverables.deliverable'
-                ])->get();
+            $deliverables = [];
+            foreach (Deliverable::where('commitment_id', $commt->id)->get() as $del) {
+                $deliverables[] = [
+                    'id' => $del->id, 'commitment_id' => $del->commitment_id, 'budget' => '',
+                    'start_date' => date_format(date_create($del->start_date), "d M, Y"),
+                    'end_date' => date_format(date_create($del->end_date), "d M, Y"),
+                    'deliverable' => $del->deliverable
+                ];
+            }
             $comments = Comment::where('commitment_id', $commt->id)
                 ->select([
                     'id', 'comment', 'commenter_name AS name',
