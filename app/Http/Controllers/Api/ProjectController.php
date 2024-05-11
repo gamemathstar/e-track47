@@ -369,25 +369,35 @@ class ProjectController extends Controller
             $this->validate($request, [
                 'sector_id' => 'required',
                 'name' => 'required',
+                'type' => "required",
                 'description' => 'required',
                 'start_date' => 'required',
-                'duration_in_days' => 'required',
-//            'budget'=>'required',
+                'end_date' => 'required',
+                'status' => 'required',
+                'budget' => 'required',
             ]);
+
+            $dt_start = new \DateTime($request->start_date);
+            $dt_end = new \DateTime($request->end_date);
+            $diff = $dt_start->diff($dt_end);
+            $duration = $diff->format('%a');
 
             $commitment = new Commitment();
             $commitment->sector_id = $request->sector_id;
             $commitment->name = $request->name;
+            $commitment->type = $request->type;
             $commitment->start_date = $request->start_date;
-            $commitment->duration_in_days = $request->duration_in_days;
+            $commitment->end_date = $request->end_date;
+            $commitment->duration_in_days = $duration;
             $commitment->description = $request->description;
+            $commitment->status = $request->status;
             $commitment->budget = $request->budget;
             if ($commitment->save()) {
-                return response()->json(['success' => true, 'message' => 'Commitment created', 'data' => $commitment]);
+                return response()->json(['success' => true, 'message' => 'Commitment created']);
             }
-            return response()->json(['success' => false, 'message' => 'failed to create commitment', 'data' => []]);
+            return response()->json(['success' => false, 'message' => 'failed to create commitment']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 
