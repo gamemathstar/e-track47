@@ -58,7 +58,7 @@ class KpiController extends Controller
 
     public function saveTarget(Request $request)
     {
-        foreach($request->target as $key=>$value){
+        foreach ($request->target as $key => $value) {
             $target = KpiTarget::find($key);
             $target->target = $value;
             $target->save();

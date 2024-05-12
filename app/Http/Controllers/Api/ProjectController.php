@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\Kpi;
+use App\Models\KpiTarget;
 use App\Models\Notification;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
@@ -468,9 +469,19 @@ class ProjectController extends Controller
             if ($id) {
                 $where[] = ['deliverable_id', '=', $id];
             }
+            $year = $request->year ?: 2024;
             $kpis = Kpi::where($where)->get();
             $data = [];
             foreach ($kpis as $kpi) {
+                $target = KpiTarget::where(['year' => $year, 'kpi_id' => $kpi->id])->first();
+                if (!$target) {
+                    $target = new KpiTarget();
+                    $target->year = $year;
+                    $target->kpi_id = $kpi->id;
+                    $target->target = "";
+                    $target->save();
+                }
+
                 $data[] = [
                     'id' => $kpi->id,
                     'deliverable_id' => $kpi->deliverable_id,
@@ -479,7 +490,7 @@ class ProjectController extends Controller
                     'start_date' => date_format(date_create($kpi->start_date), "d M, Y"),
                     'end_date' => date_format(date_create($kpi->end_date), "d M, Y"),
                     'unit_of_measurement' => $kpi->unit_of_measurement,
-                    'tracks' => $kpi->performanceTracking()->get()
+                    'target' => $target, 'tracks' => $kpi->performanceTracking()->get()
                 ];
             }
 
