@@ -452,13 +452,13 @@ class ProjectController extends Controller
             $kpi->target_value = $request->target_value;
             $kpi->start_date = $request->start_date;
             $kpi->end_date = $request->end_date;
-            $kpi->budget = $request->unit_of_measurement;
+            $kpi->unit_of_measurement = $request->unit_of_measurement;
             if ($kpi->save()) {
-                return response()->json(['success' => true, 'message' => 'KPI created', 'data' => $kpi]);
+                return response()->json(['success' => true, 'message' => 'KPI created']);
             }
-            return response()->json(['success' => false, 'message' => 'failed to create KPI', 'data' => []]);
+            return response()->json(['success' => false, 'message' => 'failed to create KPI']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 
