@@ -292,7 +292,7 @@ class ProjectController extends Controller
 
 
             if (!Hash::check($request->old, $user->password)) {
-                return response()->json(['message' => 'Incorrect old password', 'success' => false, 'data' => []], 401);
+                return response()->json(['message' => 'Incorrect old password', 'success' => false], 200);
             }
 
             // Update user's password
