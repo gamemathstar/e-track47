@@ -46,5 +46,9 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
         Route::post('/edit', [ProjectController::class, 'editUser']);
         Route::get('/fetch', [ProjectController::class, 'getUser']);
         Route::post('/change/password', [ProjectController::class, 'changePassword']);
+
+        Route::get('/notifications', [ProjectController::class, 'notifications']);
+        Route::post('/notification/mark/read', [ProjectController::class, 'markRead']);
+        Route::post('/save/fcm-token', [ProjectController::class, 'saveFcmToken']);
     });
 });
