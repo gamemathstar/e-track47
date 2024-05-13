@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\DB;
 class ProjectController extends Controller
 {
     //
-
     public function index(Request $request, $id = null)
     {
         try {
@@ -486,11 +485,9 @@ class ProjectController extends Controller
 
     public function notifications(Request $request)
     {
-
         $user = Auth::user();
         $date = \Carbon\Carbon::now();
         $lastMonth = $date->subMonth(2)->format('Y-m-d');
-
 
         $notifications = Notification::join("users AS receiver", "receiver.id", "=", "notifications.user_id")
             ->leftJoin("users AS sender", "sender.id", "=", "notifications.sender_id")

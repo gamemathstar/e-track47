@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    //
-
     // UserController.php
 
     public function register(Request $request)
