@@ -64,7 +64,7 @@ class AuthController extends Controller
                 'sector' => $sName,
                 'photo' => asset('uploads/users/' . $user->image_url),
                 'token' => $token,
-                'fcm_token' => $user->fcm_token
+                'fcm_token' => $user->fcm_token ?: ''
             ];
             return response()->json(['success' => true, 'message' => 'successful login', 'data' => $usr], 200);
         } else {
