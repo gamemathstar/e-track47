@@ -45,8 +45,8 @@ class AuthController extends Controller
             $token = $user->createToken('eTrackerX8nE@9')->accessToken;
 
             if (in_array($userRole->role, ['Sector Head', 'Sector Admin'])) {
-                $sector = Sector::find($user->entity_id);
-                $sName = $sector ? $sector->name : "";
+                $sector = Sector::find($userRole->entity_id);
+                $sName = $sector ? $sector->sector_name : "";
             } elseif ($userRole->role == 'Governor') {
                 $sName = "Jigawa State";
             } elseif ($userRole->role == 'System Admin') {
