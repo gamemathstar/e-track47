@@ -45,6 +45,6 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
     Route::prefix('/user')->group(function () {
         Route::post('/edit', [ProjectController::class, 'editUser']);
         Route::get('/fetch', [ProjectController::class, 'getUser']);
-        Route::get('/change/password', [ProjectController::class, 'changePassword']);
+        Route::post('/change/password', [ProjectController::class, 'changePassword']);
     });
 });
