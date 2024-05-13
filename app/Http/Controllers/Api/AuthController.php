@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Sector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -44,13 +45,25 @@ class AuthController extends Controller
             $user = Auth::user();
             $userRole = $user->role();
             $token = $user->createToken('eTrackerX8nE@9')->accessToken;
+
+            if (in_array($userRole->role, ['Sector Head', 'Sector Admin'])) {
+                $sector = Sector::find($user->entity_id);
+                $sName = $sector ? $sector->name : "";
+            } elseif ($userRole->role == 'Governor') {
+                $sName = "Jigawa State";
+            } elseif ($userRole->role == 'System Admin') {
+                $sName = "System";
+            } else {
+                $sName = "Delivery Department";
+            }
+
             $usr = [
                 'id' => $user->id,
                 'name' => $user->full_name,
                 'email' => $user->email,
                 'phone' => $user->phone_number,
                 'rank' => $userRole->role,
-                'sector' => $userRole ? ($userRole->target_entity == "Sector" ? $userRole->sector()->sector_name : "") : "",
+                'sector' => $sName,
                 'photo' => asset('uploads/users/' . $user->image_url),
                 'token' => $token
             ];

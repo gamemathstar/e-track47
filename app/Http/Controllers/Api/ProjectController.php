@@ -299,26 +299,10 @@ class ProjectController extends Controller
             // Update user's password
             $user->password = Hash::make($request->password);
             $user->save();
-            if (in_array($user->rank, ['Sector Head', 'Sector Admin'])) {
-                $sector = Sector::find($user->entity_id);
-                $sName = $sector ? $sector->name : "";
-            } elseif ($user->rank == 'Governor') {
-                $sName = "Jigawa State";
-            } elseif ($user->rank == 'System Admin') {
-                $sName = "System";
-            } else {
-                $sName = "Delivery Department";
-            }
-            $userX = [
-                'id' => $user->id, 'name' => $user->name,
-                'email' => $user->email, 'phone' => $user->phone_number,
-                'photo' => asset('uploads/users/' . $user->photo), 'token' => $user->token,
-                'rank' => $user->rank, 'sector' => $sName
-            ];
 
-            return response()->json(['success' => true, 'message' => 'Password changed successfully', 'data' => $userX], 200);
+            return response()->json(['success' => true, 'message' => 'Password changed successfully'], 200);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => []], 200);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 200);
         }
     }
 
