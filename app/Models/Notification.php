@@ -9,11 +9,11 @@ class Notification extends Model
 {
     use HasFactory;
 
-    public static function make(User $sender,User $recipient,Model $model,$title,$body,$type,$do=1)
+    public static function make(User $sender, User $recipient, Model $model, $title, $body, $type, $do = 1)
     {
         $notification = new Notification();
         $notification->user_id = $recipient->id;
-        $notification->sender_id = $sender?$sender->id:0;
+        $notification->sender_id = $sender ? $sender->id : 0;
         $notification->title = $title;
         $notification->body = $body;
         $notification->type = $type;
@@ -21,22 +21,22 @@ class Notification extends Model
         $notification->status = 'Not Read';
         $notification->save();
 
-        if($do){
-            self::sendPushNotification($recipient,$title,$body);
+        if ($do) {
+            self::sendPushNotification($recipient, $title, $body);
         }
 
     }
 
 
-    public static function sendPushNotification($recipient,$title,$body)
+    public static function sendPushNotification($recipient, $title, $body)
     {
-        if(is_array($recipient)){
-            $firebaseToken = User::whereIn('id',$recipient)->pluck('fcm_token')->all();
-        }else{
-            $firebaseToken = User::where('id',$recipient->id)->pluck('fcm_token')->all();
+        if (is_array($recipient)) {
+            $firebaseToken = User::whereIn('id', $recipient)->pluck('fcm_token')->all();
+        } else {
+            $firebaseToken = User::where('id', $recipient->id)->pluck('fcm_token')->all();
         }
 
-        $SERVER_API_KEY = 'AIzaSyCCNbOh7aSwGIF8yRdBAui8CUkGegw1Pw4';
+        $SERVER_API_KEY = 'AAAA6lmBYck:APA91bHvFS-Ay68e0J1t8nDYGFdXGoDSGh0D6a2CFtp-hLZzefy1i1yui4pLCdMKCYhiYDaC_5-0H7tz1rI4OnK98CGiZjzqByfDA7dmS1SdIG9YujLT3qMX4Ycao71copAmKzaqJKr6';
 
         $data = [
             "registration_ids" => $firebaseToken,
