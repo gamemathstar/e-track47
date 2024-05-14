@@ -310,6 +310,11 @@ class ProjectController extends Controller
     public function report(Request $request)
     {
         try {
+            $user = Auth::user();
+            if (!$user->isGovernor() && !$user->isDeliveryDepartment() && !$user->isSystemAdmin()) {
+                return response()->json(['success' => true, 'message' => 'you do not have a permission to view this report', 'data' => []]);
+            }
+
             $year = date('Y');
             $reportX = [];
             foreach (Sector::get() as $sector) {
