@@ -12,12 +12,12 @@ use App\Models\Notification;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\User;
-use App\Models\UserRole;
+use Carbon\Carbon;
+use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use PHPUnit\Exception;
 
 class ProjectController extends Controller
 {
@@ -372,8 +372,8 @@ class ProjectController extends Controller
                 'budget' => 'required',
             ]);
 
-            $dt_start = new \DateTime($request->start_date);
-            $dt_end = new \DateTime($request->end_date);
+            $dt_start = new DateTime($request->start_date);
+            $dt_end = new DateTime($request->end_date);
             $diff = $dt_start->diff($dt_end);
             $duration = $diff->format('%a');
 
@@ -490,11 +490,25 @@ class ProjectController extends Controller
         }
     }
 
+    public function setTarget(Request $request)
+    {
+        try {
+            $target = KpiTarget::find($request->id);
+            $target->target = $request->target;
+            if ($target->save())
+                return "Target set successfully";
+            else
+                return "Unable to set target";
+        } catch (\Exception $e) {
+            return $e->getMessage();
+        }
+    }
+
     public function notifications(Request $request)
     {
         try {
             $user = Auth::user();
-            $date = \Carbon\Carbon::now();
+            $date = Carbon::now();
             $lastMonth = $date->subMonth(2)->format('Y-m-d');
 
             $notifications = Notification::join("users AS receiver", "receiver.id", "=", "notifications.user_id")
@@ -530,7 +544,7 @@ class ProjectController extends Controller
             $alert = Notification::find($request->id);
             $alert->status = 'Read';
             return $alert->save();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
     }

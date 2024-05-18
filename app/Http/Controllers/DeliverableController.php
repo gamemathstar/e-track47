@@ -60,7 +60,7 @@ class DeliverableController extends Controller
             $receiverId = $pt->kpi->deliverable->commitment->sector->sector_head_id; // ->sector_name
             $receiver = User::find($receiverId);
 
-            $body = 'Delivery Department reviewed your submission on ' . $pt->kpi->kpi . ' ' . $pt->confirmation_status;
+            $body = 'Delivery department ' . $pt->confirmation_status . ' your submission on ' . $pt->kpi->kpi . '.';
             $forme = 'Your review on ' . $pt->kpi->kpi . ' has been submitted to ' . $receiver->role()->role . ' of ' . $receiver->sector()->sector_name;
 
             Notification::make($user, $receiver, $pt, 'Tracking Reviewed', $body, 'Tracking Reviewed');
