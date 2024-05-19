@@ -506,6 +506,27 @@ class ProjectController extends Controller
         }
     }
 
+    public function storeTracking(Request $request)
+    {
+        try {
+            if (!is_null($request->id))
+                $tracking = PerformanceTracking::find($request->id);
+            else
+                $tracking = new PerformanceTracking();
+            $tracking->fill($request->all());
+
+            if ($tracking->save()) {
+                Notification::submitTrackingForRewiew($tracking);
+
+                return response()->json(['success' => true, 'message' => 'Performance Tracking submitted successfully']);
+            }
+
+            return response()->json(['success' => false, 'message' => 'Unable to submit tracking']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function notifications(Request $request)
     {
         try {

@@ -39,6 +39,7 @@ Route::middleware('auth:api')->prefix('/')->group(function () {
         Route::post('/insert/commitment', [ProjectController::class, 'insertCommitment']);
         Route::post('/insert/kpi', [ProjectController::class, 'insertKpi']);
         Route::post('/set/kpi/target', [ProjectController::class, 'setTarget']);
+        Route::post('/store/kpi/tracking', [ProjectController::class, 'storeTracking']);
     });
     Route::prefix('/report')->group(function () {
         Route::get('/', [ProjectController::class, 'report']);
