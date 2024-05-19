@@ -459,6 +459,7 @@ class ProjectController extends Controller
             if ($id) {
                 $where[] = ['deliverable_id', '=', $id];
             }
+            $user = Auth::user();
             $year = $request->year ?: 2024;
             $kpis = Kpi::where($where)->get();
             $data = [];
@@ -476,6 +477,7 @@ class ProjectController extends Controller
                     'id' => $kpi->id,
                     'deliverable_id' => $kpi->deliverable_id,
                     'kpi' => $kpi->kpi,
+                    'role' => $user->isSectorHead() ? 'sh' : ($user->isDeliveryDepartment() ? 'dd' : ''),
                     'target_value' => $kpi->target_value,
                     'start_date' => date_format(date_create($kpi->start_date), "d M, Y"),
                     'end_date' => date_format(date_create($kpi->end_date), "d M, Y"),
