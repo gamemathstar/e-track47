@@ -4,10 +4,39 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Notification extends Model
 {
     use HasFactory;
+
+    public static function submitTrackingForRewiew($tracking)
+    {
+        $user = Auth::user();
+        $receiverId = UserRole::where(['role' => 'Delivery Department', 'role_status' => 'Active'])->pluck('user_id');
+        $receiver = User::whereIn('id', $receiverId)->first();
+
+        $body = $user->role()->role . ' of ' . $user->sector()->sector_name . ' made a submission on ' . $tracking->kpi->kpi . '. It awaits your review';
+        $forme = 'Your request on ' . $tracking->kpi->kpi . ' has been submitted to Delivery Department. It is waiting for review';
+
+        self::make($user, $receiver, $tracking, 'Review Request', $body, 'Tracking Submitted');
+        self::make($receiver, $user, $tracking, 'Tracking Submitted', $forme, 'System');
+    }
+
+    public static function submitTrackingReview($tracking)
+    {
+        $user = Auth::user();
+        $receiverId = $tracking->kpi->deliverable->commitment->sector->sector_head_id; // ->sector_name
+        $receiver = User::find($receiverId);
+
+        $body = 'Delivery department ' . $tracking->confirmation_status . ' your submission on '
+            . $tracking->kpi->kpi . '.';
+        $forme = 'Your review on ' . $tracking->kpi->kpi . ' has been submitted to ' . $receiver->role()->role
+            . ' of ' . $receiver->sector()->sector_name;
+
+        self::make($user, $receiver, $tracking, 'Tracking Reviewed', $body, 'Tracking Reviewed');
+        self::make($receiver, $user, $tracking, 'Tracking Reviewed', $forme, 'System');
+    }
 
     public static function make(User $sender, User $recipient, Model $model, $title, $body, $type, $do = 1)
     {

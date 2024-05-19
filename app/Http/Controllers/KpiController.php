@@ -45,15 +45,7 @@ class KpiController extends Controller
         $tracking->fill($request->all());
         $tracking->save();
 
-        $user = Auth::user();
-        $receiverId = UserRole::where(['role' => 'Delivery Department', 'role_status' => 'Active'])->pluck('user_id');
-        $receiver = User::whereIn('id', $receiverId)->first();
-
-        $body = $user->role()->role . ' of ' . $user->sector()->sector_name . ' made a submission on ' . $tracking->kpi->kpi . '. It awaits your review';
-        $forme = 'Your request on ' . $tracking->kpi->kpi . ' has been submitted to Delivery Department. It is waiting for review';
-
-        Notification::make($user, $receiver, $tracking, 'Review Request', $body, 'Tracking Submitted');
-        Notification::make($receiver, $user, $tracking, 'Tracking Submitted', $forme, 'System');
+        Notification::submitTrackingForRewiew($tracking);
 
         return back();
     }

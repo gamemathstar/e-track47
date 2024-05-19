@@ -42,12 +42,10 @@ class DeliverableController extends Controller
 
     public function storeTracking(Request $request)
     {
-//        return $request;
         $request->validate([
             'delivery_department_value' => "required",
             'delivery_department_remark' => "required",
             'confirmation_status' => "required",
-//            'id'=>'required:exists'
         ]);
         $pt = PerformanceTracking::find($request->id);
         if ($pt) {
@@ -56,15 +54,7 @@ class DeliverableController extends Controller
             $pt->confirmation_status = $request->confirmation_status;
             $pt->save();
 
-            $user = Auth::user();
-            $receiverId = $pt->kpi->deliverable->commitment->sector->sector_head_id; // ->sector_name
-            $receiver = User::find($receiverId);
-
-            $body = 'Delivery department ' . $pt->confirmation_status . ' your submission on ' . $pt->kpi->kpi . '.';
-            $forme = 'Your review on ' . $pt->kpi->kpi . ' has been submitted to ' . $receiver->role()->role . ' of ' . $receiver->sector()->sector_name;
-
-            Notification::make($user, $receiver, $pt, 'Tracking Reviewed', $body, 'Tracking Reviewed');
-            Notification::make($receiver, $user, $pt, 'Tracking Reviewed', $forme, 'System');
+            Notification::submitTrackingReview($pt);
         }
 
         return redirect()->back()->with('success', 'Delivery ' . $request->confirmation_status);
