@@ -496,11 +496,11 @@ class ProjectController extends Controller
             $target = KpiTarget::find($request->id);
             $target->target = $request->target;
             if ($target->save())
-                return "Target set successfully";
+                return response()->json(['success' => true, 'message' => 'Target set successfully']);
             else
-                return "Unable to set target";
+                return response()->json(['success' => false, 'message' => 'Unable to set target']);
         } catch (\Exception $e) {
-            return $e->getMessage();
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 
