@@ -516,7 +516,9 @@ class ProjectController extends Controller
             $tracking->fill($request->all());
 
             if ($tracking->save()) {
-                Notification::submitTrackingForRewiew($tracking);
+                Auth::user()->role()->role == "Delivery Department" ?
+                    Notification::submitTrackingReview($tracking)
+                    : Notification::submitTrackingForRewiew($tracking);
 
                 return response()->json(['success' => true, 'message' => 'Performance Tracking submitted successfully']);
             }

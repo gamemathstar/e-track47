@@ -54,7 +54,9 @@ class DeliverableController extends Controller
             $pt->confirmation_status = $request->confirmation_status;
             $pt->save();
 
-            Notification::submitTrackingReview($pt);
+            Auth::user()->role()->role == "Delivery Department" ?
+                Notification::submitTrackingReview($pt)
+                : Notification::submitTrackingForRewiew($pt);
         }
 
         return redirect()->back()->with('success', 'Delivery ' . $request->confirmation_status);
