@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Commitment;
 use App\Models\CommitmentBudget;
-use App\Models\DeliveryKpi;
 use App\Models\Sector;
 use App\Models\SectorBudget;
 use App\Models\SectorFile;
@@ -99,7 +97,7 @@ class SectorController extends Controller
     public function view(Request $request, $id, $comm_id = null)
     {
         $sector = Sector::find($id);
-        $commitments = $sector->__commitments()->get();
+        $commitments = $sector->__commitments()->orderBy('created_at', 'desc')->get();
         return view('pages.sector.view', compact('sector', 'commitments', 'comm_id'));
     }
 
@@ -110,7 +108,7 @@ class SectorController extends Controller
         $commitments = $sector->__commitments()->get();
         $baseYear = 2023;
         $targetYear = 2024;
-        $alphas = range("A","Z");
+        $alphas = range("A", "Z");
         $spreadsheet = new Spreadsheet();
         // Add data to the first sheet
         $sheet = $spreadsheet->getActiveSheet();
@@ -142,8 +140,8 @@ class SectorController extends Controller
         $sheet->setCellValue('F5', "Baseline Value (Actual-$baseYear)");
         $sheet->setCellValue('G5', "$targetYear Target");
         $quarter = 1;
-        for($numb=7;$numb<23;$numb+=4){
-            $sheet->setCellValue($alphas[$numb]."4", "$targetYear-Quarter-$quarter");
+        for ($numb = 7; $numb < 23; $numb += 4) {
+            $sheet->setCellValue($alphas[$numb] . "4", "$targetYear-Quarter-$quarter");
             $sheet->mergeCells("{$alphas[$numb]}4:{$alphas[$numb+3]}4");
             $sheet->getStyle("{$alphas[$numb]}4:{$alphas[$numb+3]}4")->applyFromArray($styleArray);
             $sheet->setCellValue("{$alphas[$numb]}5", "Delivery Milestone");
@@ -157,52 +155,52 @@ class SectorController extends Controller
 
         $cellPos = 6;
         $sn = 1;
-        foreach ($commitments as $commitment){
+        foreach ($commitments as $commitment) {
             $kpiCount = $commitment->countKPI();
             $commCount = $commitment->deliverables->count();
-            $count = max($kpiCount,$commCount,1);
+            $count = max($kpiCount, $commCount, 1);
             $sheet->setCellValue("A{$cellPos}", $sn);
             $sheet->setCellValue("B{$cellPos}", $commitment->name);
-            if($count>1){
-                $cellAdr = "A{$cellPos}:A".($cellPos-1+ $count);
+            if ($count > 1) {
+                $cellAdr = "A{$cellPos}:A" . ($cellPos - 1 + $count);
                 $sheet->mergeCells($cellAdr);
                 $sheet->getStyle($cellAdr)->applyFromArray($styleArray);
 
-                $cellAdr = str_replace("A","B",$cellAdr);
+                $cellAdr = str_replace("A", "B", $cellAdr);
                 $sheet->mergeCells($cellAdr);
                 $sheet->getStyle($cellAdr)->applyFromArray($styleVertArray);
             }
 
             $delCellPosBegin = $cellPos;
-            foreach ($commitment->deliverables as $deliverable){
+            foreach ($commitment->deliverables as $deliverable) {
                 $kpiCountDel = $deliverable->countKPI();
-                $countDel = max(1,$kpiCountDel);
+                $countDel = max(1, $kpiCountDel);
                 $sheet->setCellValue("C{$delCellPosBegin}", $deliverable->deliverable);
-                if($countDel>1){
-                    $cellAdr = "C{$delCellPosBegin}:C".($delCellPosBegin-1+ $countDel);
+                if ($countDel > 1) {
+                    $cellAdr = "C{$delCellPosBegin}:C" . ($delCellPosBegin - 1 + $countDel);
                     $sheet->mergeCells($cellAdr);
                     $sheet->getStyle($cellAdr)->applyFromArray($styleVertArray);
                 }
 
                 $dIndex = $delCellPosBegin;
-                foreach ($deliverable->kpis as $kpi){
+                foreach ($deliverable->kpis as $kpi) {
                     $target = $kpi->kpiTargets($targetYear)->first();
                     $quart1 = $kpi->quarter();
                     $quart2 = $kpi->quarter(2);
                     $quart3 = $kpi->quarter(3);
                     $quart4 = $kpi->quarter(4);
-                    $pscor1 = number_format($quart1 && $quart1->milestone && $quart1->delivery_department_value?($quart1->delivery_department_value/$quart1->milestone)*100:0,2);
-                    $pscor2 = number_format($quart2 && $quart2->milestone && $quart2->delivery_department_value?($quart2->delivery_department_value/$quart2->milestone)*100:0,2);
-                    $pscor3 = number_format($quart3 && $quart3->milestone && $quart3->delivery_department_value?($quart3->delivery_department_value/$quart3->milestone)*100:0,2);
-                    $pscor4 = number_format($quart4 && $quart4->milestone && $quart4->delivery_department_value?($quart4->delivery_department_value/$quart4->milestone)*100:0,2);
+                    $pscor1 = number_format($quart1 && $quart1->milestone && $quart1->delivery_department_value ? ($quart1->delivery_department_value / $quart1->milestone) * 100 : 0, 2);
+                    $pscor2 = number_format($quart2 && $quart2->milestone && $quart2->delivery_department_value ? ($quart2->delivery_department_value / $quart2->milestone) * 100 : 0, 2);
+                    $pscor3 = number_format($quart3 && $quart3->milestone && $quart3->delivery_department_value ? ($quart3->delivery_department_value / $quart3->milestone) * 100 : 0, 2);
+                    $pscor4 = number_format($quart4 && $quart4->milestone && $quart4->delivery_department_value ? ($quart4->delivery_department_value / $quart4->milestone) * 100 : 0, 2);
                     $remark = "";
                     $lastValue = 0;
-                    foreach (range(1,4) as $indx){
-                        $obj = "quart".$indx;
-                        if( $$obj && $$obj->delivery_department_remark ){
-                            $remark .= $$obj->delivery_department_remark.".\n";
+                    foreach (range(1, 4) as $indx) {
+                        $obj = "quart" . $indx;
+                        if ($$obj && $$obj->delivery_department_remark) {
+                            $remark .= $$obj->delivery_department_remark . ".\n";
                         }
-                        if( $$obj && $$obj->delivery_department_value){
+                        if ($$obj && $$obj->delivery_department_value) {
                             $lastValue = $$obj->delivery_department_value;
                         }
                     }
@@ -210,34 +208,34 @@ class SectorController extends Controller
                     $sheet->setCellValue("D{$dIndex}", $kpi->kpi);
                     $sheet->setCellValue("E{$dIndex}", $kpi->unit_of_measurement);
                     $sheet->setCellValue("F{$dIndex}", $kpi->target_value);
-                    $sheet->setCellValue("G{$dIndex}", $target?$target->target:"");
+                    $sheet->setCellValue("G{$dIndex}", $target ? $target->target : "");
 
-                    $sheet->setCellValue("H{$dIndex}", $quart1?$quart1->milestone:"");
-                    $sheet->setCellValue("I{$dIndex}", $quart1?$quart1->actual_value:"");
-                    $sheet->setCellValue("J{$dIndex}", $quart1?$quart1->delivery_department_value:"");
+                    $sheet->setCellValue("H{$dIndex}", $quart1 ? $quart1->milestone : "");
+                    $sheet->setCellValue("I{$dIndex}", $quart1 ? $quart1->actual_value : "");
+                    $sheet->setCellValue("J{$dIndex}", $quart1 ? $quart1->delivery_department_value : "");
                     $sheet->setCellValue("K{$dIndex}", $pscor1);
 
-                    $sheet->setCellValue("L{$dIndex}", $quart2?$quart2->milestone:"");
-                    $sheet->setCellValue("M{$dIndex}", $quart2?$quart2->actual_value:"");
-                    $sheet->setCellValue("N{$dIndex}", $quart2?$quart2->delivery_department_value:"");
+                    $sheet->setCellValue("L{$dIndex}", $quart2 ? $quart2->milestone : "");
+                    $sheet->setCellValue("M{$dIndex}", $quart2 ? $quart2->actual_value : "");
+                    $sheet->setCellValue("N{$dIndex}", $quart2 ? $quart2->delivery_department_value : "");
                     $sheet->setCellValue("O{$dIndex}", $pscor2);
 
-                    $sheet->setCellValue("P{$dIndex}", $quart3?$quart3->milestone:"");
-                    $sheet->setCellValue("Q{$dIndex}", $quart3?$quart3->actual_value:"");
-                    $sheet->setCellValue("R{$dIndex}", $quart3?$quart3->delivery_department_value:"");
+                    $sheet->setCellValue("P{$dIndex}", $quart3 ? $quart3->milestone : "");
+                    $sheet->setCellValue("Q{$dIndex}", $quart3 ? $quart3->actual_value : "");
+                    $sheet->setCellValue("R{$dIndex}", $quart3 ? $quart3->delivery_department_value : "");
                     $sheet->setCellValue("S{$dIndex}", $pscor3);
 
-                    $sheet->setCellValue("T{$dIndex}", $quart4?$quart4->milestone:"");
-                    $sheet->setCellValue("U{$dIndex}", $quart4?$quart4->actual_value:"");
-                    $sheet->setCellValue("V{$dIndex}", $quart4?$quart4->delivery_department_value:"");
+                    $sheet->setCellValue("T{$dIndex}", $quart4 ? $quart4->milestone : "");
+                    $sheet->setCellValue("U{$dIndex}", $quart4 ? $quart4->actual_value : "");
+                    $sheet->setCellValue("V{$dIndex}", $quart4 ? $quart4->delivery_department_value : "");
                     $sheet->setCellValue("W{$dIndex}", $pscor4);
                     $sheet->setCellValue("X{$dIndex}", $remark);
-                    $sheet->setCellValue("Y{$dIndex}", $target?(doubleval($target->target)-doubleval($lastValue)<1?0:$target->target-$lastValue):0);
+                    $sheet->setCellValue("Y{$dIndex}", $target ? (doubleval($target->target) - doubleval($lastValue) < 1 ? 0 : $target->target - $lastValue) : 0);
 
                     $dIndex++;
                 }
 
-                $delCellPosBegin=$delCellPosBegin+$deliverable->countKPI();
+                $delCellPosBegin = $delCellPosBegin + $deliverable->countKPI();
             }
             $sn++;
             $cellPos += $count;
@@ -255,13 +253,13 @@ class SectorController extends Controller
         $sheet->getStyle('B3:O3')->applyFromArray($styleArray);
         $sheet->getStyle('B4:G4')->applyFromArray($styleArray);
 
-        foreach(range('A','Y') as $columnID) {
+        foreach (range('A', 'Y') as $columnID) {
             $sheet->getColumnDimension($columnID)->setAutoSize(true);
         }
 
 // Create a writer and save the spreadsheet to a file
         $writer = new Xlsx($spreadsheet);
-        $filePath = 'report_'.time().'.xlsx';
+        $filePath = 'report_' . time() . '.xlsx';
         $writer->save($filePath);
         return response()->download($filePath)->deleteFileAfterSend(true);
     }

@@ -7,6 +7,7 @@ use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliverableController;
 use App\Http\Controllers\KpiController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -86,6 +87,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('deliverable/kpi/target/save', [KpiController::class, 'saveTarget'])->name('kpis.target.save');
     Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');
 
+    //  REPORTS
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::post('reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
+    Route::post('/reports/download', [ReportController::class, 'download'])->name('reports.download');
 });
 
 Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');

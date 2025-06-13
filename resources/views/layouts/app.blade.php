@@ -9,7 +9,7 @@
     <meta name="author" content="LEFT4CODE">
     <title>Jigawa State Government e-Track247</title>
     <!-- BEGIN: CSS Assets-->
-    <link rel="stylesheet" href="{{secure_asset('dist/css/app.css')}}" />
+    <link rel="stylesheet" href="{{asset('dist/css/app.css')}}" />
     <!-- END: CSS Assets-->
 </head>
 <!-- END: Head -->
