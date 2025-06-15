@@ -22,7 +22,7 @@
                     <table class="table table-report mt-2">
                             <thead>
                             <tr>
-                                <th>Sector</th>
+                                <th>MDA/Sector</th>
                                 <th>KPIs</th>
                                 <th>Action</th>
                             </tr>

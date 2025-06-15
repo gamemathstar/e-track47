@@ -30,7 +30,7 @@
                     <table class="table table-bordered" style="font-size: 12px;">
                         <tr>
                             <th rowspan="2">SN</th>
-                            <th rowspan="2">Sector</th>
+                            <th rowspan="2">MDA/Sector</th>
                             <th colspan="4" class="text-center"> {{ $year  }} Performance Score (%)</th>
                         </tr>
                         <tr>
@@ -110,7 +110,7 @@
                     <div class="box sm:flex">
                         <div class="px-8 py-12 flex flex-col justify-center flex-1">
                             <div class="h-[290px]">
-                                <h2>Sector-wise Budget Distribution</h2>
+                                <h2>Sector-wise Budget/Target Distribution</h2>
                                 <canvas id="budgetDistributionChart" width="640" height="640"></canvas>
 
                             </div>
@@ -138,7 +138,7 @@
                         <div class="flex flex-wrap gap-3 pb-10">
                             <div class="mr-auto">
                                 {{--                                <div class="text-white text-opacity-70 dark:text-slate-300 flex items-center leading-3">--}}
-                                {{--                                    Total Budget--}}
+                                {{--                                    Total Budget/Target--}}
                                 {{--                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"--}}
                                 {{--                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"--}}
                                 {{--                                         stroke-linejoin="round" icon-name="alert-circle" data-lucide="alert-circle"--}}
@@ -150,7 +150,7 @@
                                 {{--                                </div>--}}
                                 {{--                                <div class="text-white relative text-2xl font-medium leading-5 pl-4 mt-3.5">--}}
                                 {{--                                    <span--}}
-                                {{--                                        class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget Not Set" }}</span>--}}
+                                {{--                                        class="absolte text-xl top-0 left-0 -mt-1.5">&#8358; {{$stateBudget?number_format($stateBudget):"Budget/Target Not Set" }}</span>--}}
 
                                 {{--                                </div>--}}
                                 <div

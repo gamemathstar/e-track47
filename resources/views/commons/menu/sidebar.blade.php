@@ -19,7 +19,7 @@
                 <a href="javascript:;" class="side-menu">
                     <div class="side-menu__icon"><i data-lucide="box"></i></div>
                     <div class="side-menu__title">
-                        Sectors
+                        MDAs/Sectors
                         <div class="side-menu__sub-icon "><i data-lucide="chevron-down"></i></div>
                     </div>
                 </a>
@@ -27,7 +27,7 @@
                     <li>
                         <a href="{{route('sectors.index')}}" class="side-menu">
                             <div class="side-menu__icon"><i data-lucide="activity"></i></div>
-                            <div class="side-menu__title"> All Sectors</div>
+                            <div class="side-menu__title"> All MDAs/Sectors</div>
                         </a>
                     </li>
                     @foreach(\App\Models\Sector::get() as $sector)
@@ -95,7 +95,7 @@
         {{--                <li>--}}
         {{--                    <a href="{{route('sectors.index')}}" class="side-menu">--}}
         {{--                        <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>--}}
-        {{--                        <div class="side-menu__title"> All Sectors </div>--}}
+        {{--                        <div class="side-menu__title"> All MDAs/Sectors </div>--}}
         {{--                    </a>--}}
         {{--                </li>--}}
         {{--                @foreach(\App\Models\Sector::get() as $sector)--}}

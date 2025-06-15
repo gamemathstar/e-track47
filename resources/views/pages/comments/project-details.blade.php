@@ -176,7 +176,7 @@
                                 <tr>
                                     <th class="whitespace-nowrap">#</th>
                                     <th class="whitespace-nowrap">Deliverable</th>
-                                    {{--                                    <th class="whitespace-nowrap">Budget</th>--}}
+                                    {{--                                    <th class="whitespace-nowrap">Budget/Target</th>--}}
                                     <th class="whitespace-nowrap">Start Date</th>
                                     <th class="whitespace-nowrap">Status</th>
                                     <th class="whitespace-nowrap">Progress</th>

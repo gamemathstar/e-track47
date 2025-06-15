@@ -54,7 +54,7 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Deliverable</th>
-                            <th class="whitespace-nowrap">Budget</th>
+                            <th class="whitespace-nowrap">Budget/Target</th>
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Status</th>
                             <th class="whitespace-nowrap">Progress</th>
@@ -166,7 +166,7 @@
                                                name="deliverable" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Budget</label>
+                                        <label for="modal-form-1" class="form-label">Budget/Target</label>
                                         <input id="modal-form-1" type="number" class="form-control"
                                                name="budget" step="any" required>
                                     </div>

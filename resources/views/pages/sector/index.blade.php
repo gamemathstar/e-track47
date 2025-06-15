@@ -4,12 +4,12 @@
         $user = auth()->user();
     @endphp
     <h2 class="intro-y text-lg font-medium mt-10">
-        Manage Sectors
+        Manage MDAs/Sectors
     </h2>
     <div class="grid grid-cols-12 gap-6 mt-5">
         <div class="intro-y col-span-12 flex flex-wrap sm:flex-nowrap items-center mt-2">
             <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#header-footer-modal-preview">Add Sector
+                    data-tw-target="#header-footer-modal-preview">Add MDA/Sector
             </button>
 
             <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
@@ -19,13 +19,13 @@
                             @csrf
                             <!-- BEGIN: Modal Header -->
                             <div class="modal-header">
-                                <h2 class="font-medium text-base mr-auto">Add Sector</h2>
+                                <h2 class="font-medium text-base mr-auto">Add MDA/Sector</h2>
 
                             </div> <!-- END: Modal Header -->
                             <!-- BEGIN: Modal Body -->
                             <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
                                 <div class="col-span-12 sm:col-span-12">
-                                    <label for="modal-form-1" class="form-label">Sector Name</label>
+                                    <label for="modal-form-1" class="form-label">MDA/Sector Name</label>
                                     <input id="modal-form-1" type="text" class="form-control" name="sector_name">
                                 </div>
                                 <div class="col-span-12 sm:col-span-12">
@@ -107,7 +107,7 @@
                         <td class="table-report__action w-56">
                             <div class="flex justify-center items-center">
                                 <a class="flex items-center text-warning mr-3 tooltip" data-theme="dark"
-                                   title="Edit Sector" href="javascript:;" data-tw-toggle="modal"
+                                   title="Edit MDA/Sector" href="javascript:;" data-tw-toggle="modal"
                                    data-tw-target="#header-footer-modal-preview{{$sector->id}}">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -118,7 +118,7 @@
                                     </svg>
                                 </a>
                                 <a class="flex items-center mr-3  items-center text-success tooltip" data-theme="dark"
-                                   title="View Sector"
+                                   title="View MDA/Sector"
                                    href="{{route('sectors.view',[$sector->id])}}">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -129,7 +129,7 @@
                                     </svg>
                                 </a>
                                 <a class="flex items-center text-danger tooltip" data-theme="dark"
-                                   title="Delete Sector" href="javascript:;" data-tw-toggle="modal"
+                                   title="Delete MDA/Sector" href="javascript:;" data-tw-toggle="modal"
                                    data-tw-target="#delete-modal-preview{{$sector->id}}">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -153,14 +153,14 @@
                                             <input type="hidden" name="id" value="{{$sector->id}}">
                                             <!-- BEGIN: Modal Header -->
                                             <div class="modal-header">
-                                                <h2 class="font-medium text-base mr-auto">Edit Sector
+                                                <h2 class="font-medium text-base mr-auto">Edit MDA/Sector
                                                     ({{$sector->sector_name}})</h2>
 
                                             </div> <!-- END: Modal Header -->
                                             <!-- BEGIN: Modal Body -->
                                             <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
                                                 <div class="col-span-12 sm:col-span-12">
-                                                    <label for="modal-form-1" class="form-label">Sector Name</label>
+                                                    <label for="modal-form-1" class="form-label">MDA/Sector Name</label>
                                                     <input id="modal-form-1" type="text" class="form-control"
                                                            value="{{$sector->sector_name}}" name="sector_name">
                                                 </div>

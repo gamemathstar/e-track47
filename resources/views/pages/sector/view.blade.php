@@ -4,11 +4,11 @@
 @section('content')
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            Sector : {{$sector->sector_name}}
+            MDA/Sector : {{$sector->sector_name}}
         </h2>
         <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
             <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#sectorHeadModal">Sector Head
+                    data-tw-target="#sectorHeadModal">MDA/Sector Head
             </button>
             <div class="dropdown ml-auto sm:ml-0">
                 <button class="dropdown-toggle btn px-2 box" aria-expanded="false" data-tw-toggle="dropdown">

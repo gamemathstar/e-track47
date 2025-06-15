@@ -1,10 +1,10 @@
-<h1><strong>Budget For Commitments in {{$year}}</strong></h1>
+<h1><strong>Budget/Target For Commitments in {{$year}}</strong></h1>
 <hr>
 <br>
 
 <button class="btn btn-primary btn-sm commitmentBudgetBtn"
         year="{{$year}}">
-    Add Budget
+    Add Budget/Target
 </button>
 <table class="table table-bordered">
     <tr>

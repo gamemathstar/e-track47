@@ -10,7 +10,7 @@
     <meta name="keywords"
           content="admin template, Enigma Admin Template, dashboard template, flat admin template, responsive admin template, web app">
     <meta name="author" content="LEFT4CODE">
-    <title>Jigawa State Government e-Track247</title>
+    <title>Performance Delivery Coordination Unit (PDCU</title>
     <!-- BEGIN: CSS Assets-->
     <link rel="stylesheet" href="dist/css/app.css"/>
     <!-- END: CSS Assets-->
@@ -21,7 +21,7 @@
 <div class="mobile-menu md:hidden">
     <div class="mobile-menu-bar">
         <a href="" class="flex mr-auto">
-            <img alt="Jigawa State Government e-Track247" class="w-6" src="{{asset('jg_logo.png')}}">
+            <img alt="Performance Delivery Coordination Unit (PDCU" class="w-6" src="{{asset('jg_logo.png')}}">
         </a>
         <a href="javascript:;" class="mobile-menu-toggler">
             <i data-lucide="bar-chart-2"  class="w-8 h-8 text-white transform -rotate-90"></i>
@@ -54,7 +54,7 @@
         <!-- BEGIN: Logo -->
         <a href="" class="logo -intro-x hidden md:flex xl:w-[180px] block">
             <img alt="Midone - HTML Admin Template" class="logo__image w-6" src="{{asset('jg_logo.png')}}">
-            <span class="logo__text text-white text-lg ml-3"> Jigawa State Government e-Track247 </span>
+            <span class="logo__text text-white text-lg ml-3"> Performance Delivery Coordination Unit (PDCU </span>
         </a>
         <!-- END: Logo -->
     </div>

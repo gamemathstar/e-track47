@@ -3,7 +3,7 @@
 @section('content')
     <div class="intro-y flex items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            Sector: {{ $sector->sector_name }}
+            MDA/Sector: {{ $sector->sector_name }}
         </h2>
     </div>
     @php
@@ -145,7 +145,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
 
-                {{--                <h1><strong>Add Budget</strong></h1>--}}
+                {{--                <h1><strong>Add Budget/Target</strong></h1>--}}
                 {{--                <hr>--}}
                 {{--                <br>--}}
                 {{--                <br>--}}
@@ -169,7 +169,7 @@
 
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-primary" id="">Add Budget</button>
+                        <button class="btn btn-primary" id="">Add Budget/Target</button>
                         <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">Close</button>
                     </div>
                 </form>
@@ -232,7 +232,7 @@
                 <div class="modal-body">
                     <form action="{{ route('commitments.budget.save') }}" method="post">
                         @csrf
-                        <h2>Add Budget to Commitment <strong class="font-bold" id="del-title"></strong></h2>
+                        <h2>Add Budget/Target to Commitment <strong class="font-bold" id="del-title"></strong></h2>
                         {{--                        <input type="hidden" name="commitment_id" value="" id="commitment_budget_id">--}}
                         <input type="hidden" name="year" value="" id="year_budget">
                         <hr>

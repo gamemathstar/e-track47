@@ -36,7 +36,7 @@ class SectorController extends Controller
 
         Sector::create($request->all());
 
-        return redirect()->route('sectors.index')->with('success', 'Sector created successfully');
+        return redirect()->route('sectors.index')->with('success', 'MDA/Sector created successfully');
     }
 
     public function storeBudget(Request $request)
@@ -280,7 +280,7 @@ class SectorController extends Controller
 
         $sector->update($request->all());
 
-        return redirect()->route('sectors.index')->with('success', 'Sector updated successfully');
+        return redirect()->route('sectors.index')->with('success', 'MDA/Sector updated successfully');
     }
 
     public function destroy(Sector $sector)
