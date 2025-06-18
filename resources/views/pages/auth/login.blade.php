@@ -40,7 +40,7 @@
                 </h2>
                 <div class="intro-x mt-2 text-slate-400  text-center">
                 </div>
-                <form method="POST" action="{{ route('login') }}">
+                <form method="POST" action="{{ route('login.process') }}">
                     <div class="intro-x mt-8">
                         @csrf
                         <input type="email" name="email" class="intro-x login__input form-control py-3 px-4 block"

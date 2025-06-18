@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class KpiController extends Controller
 {
@@ -37,13 +39,35 @@ class KpiController extends Controller
 
     public function storeTracking(Request $request)
     {
-//        return $request;
+        if ($request->hasFile('files')) {
+            $request->validate([
+                'files.*' => 'required|mimes:jpg,jpeg,png,xlsx,xls,doc,docx,pdf|max:20480',
+            ]);
+        }
         if (is_null($request->id))
             $tracking = new PerformanceTracking();
         else
             $tracking = PerformanceTracking::find($request->id);
         $tracking->fill($request->all());
         $tracking->save();
+
+        if ($request->file('files')) {
+            $target = Auth::user()->role()->target_entity;
+            foreach ($request->file('files') as $file) {
+                $originalName = $file->getClientOriginalName();
+                $extension = $file->getClientOriginalExtension();
+                $fileName = Str::random(10) . '.' . $extension;
+                $path = $file->storeAs('uploads', $fileName, 'public');
+
+                $tracking->files()->create([
+                    'name' => $originalName,
+                    'path' => $path,
+                    'type' => $extension,
+                    'size' => $file->getSize(),
+                    'attached_by' => $target
+                ]);
+            }
+        }
 
         Notification::submitTrackingForRewiew($tracking);
 

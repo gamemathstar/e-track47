@@ -108,7 +108,7 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Commitment</th>
-                            <th class="whitespace-nowrap">Budget</th>
+                            {{--                            <th class="whitespace-nowrap">Budget</th>--}}
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Duration</th>
                             <th class="text-center whitespace-nowrap">Action</th>
@@ -123,7 +123,7 @@
                                 <td>
                                     <a href="javascript:;" class="ml-1">{{$commitment->title(48)}}</a>
                                 </td>
-                                <td>&#8358;{{ number_format($commitment->budget) }}</td>
+                                {{--                                <td>&#8358;{{ number_format($commitment->budget) }}</td>--}}
                                 <td>{{ $commitment->start_date?Carbon::parse($commitment->start_date)->format('d M, Y'):'---' }}</td>
                                 <td>{{ $commitment->duration_in_days? $commitment->duration_in_days.' day(s)':'---' }}</td>
                                 <td>
@@ -292,11 +292,11 @@
                                         <input id="modal-form-1" type="date" class="form-control"
                                                name="end_date" required>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Budget</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="budget" required>
-                                    </div>
+                                    {{--                                    <div class="col-span-6 sm:col-span-6">--}}
+                                    {{--                                        <label for="modal-form-1" class="form-label">Budget</label>--}}
+                                    {{--                                        <input id="modal-form-1" type="text" class="form-control"--}}
+                                    {{--                                               name="budget" required>--}}
+                                    {{--                                    </div>--}}
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
                                 <div class="modal-footer">

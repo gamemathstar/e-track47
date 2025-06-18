@@ -10,6 +10,7 @@ use App\Http\Controllers\KpiController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\UserController;
+use App\Models\PerformanceTracking;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Route;
 //Route::get('/', [AuthLoginController::class, 'showLoginForm']);
 Route::get('/', [CommentController::class, 'index'])->name('home');
 Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login');
-Route::post('login', [AuthLoginController::class, 'login'])->name('login');
+Route::post('login', [AuthLoginController::class, 'login'])->name('login.process');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth'])->group(function () {
@@ -83,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
     Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
     Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
+    Route::get('deliverable/kpi/tracking/files/{id}', [PerformanceTracking::class, 'attachments'])->name('deliverable.kpi.tracking.files');
     Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
     Route::post('deliverable/kpi/target/save', [KpiController::class, 'saveTarget'])->name('kpis.target.save');
     Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');

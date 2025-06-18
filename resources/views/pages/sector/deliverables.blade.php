@@ -54,7 +54,7 @@
                         <tr>
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Deliverable</th>
-                            <th class="whitespace-nowrap">Budget/Target</th>
+                            {{--                            <th class="whitespace-nowrap">Budget/Target</th>--}}
                             <th class="whitespace-nowrap">Start Date</th>
                             <th class="whitespace-nowrap">Status</th>
                             <th class="whitespace-nowrap">Progress</th>
@@ -68,7 +68,7 @@
                                     {{ $loop->iteration }}
                                 </td>
                                 <td>{{ $deliverable->deliverable }}</td>
-                                <td>&#8358;{{ number_format($deliverable-> budget)}}</td>
+                                {{--                                <td>&#8358;{{ number_format($deliverable-> budget)}}</td>--}}
                                 <td>{{ $deliverable->start_date }}</td>
                                 <td>{{ $deliverable->status }}</td>
                                 <td>
@@ -165,11 +165,11 @@
                                         <input id="modal-form-1" type="text" class="form-control"
                                                name="deliverable" required>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Budget/Target</label>
-                                        <input id="modal-form-1" type="number" class="form-control"
-                                               name="budget" step="any" required>
-                                    </div>
+                                    {{--                                    <div class="col-span-6 sm:col-span-6">--}}
+                                    {{--                                        <label for="modal-form-1" class="form-label">Budget/Target</label>--}}
+                                    {{--                                        <input id="modal-form-1" type="number" class="form-control"--}}
+                                    {{--                                               name="budget" step="any" required>--}}
+                                    {{--                                    </div>--}}
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="modal-form-1" class="form-label">Start Date</label>
                                         <input id="modal-form-1" type="date" class="form-control"

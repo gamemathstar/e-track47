@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\DeliveryKpi;
+use App\Models\File;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\Notification;
@@ -29,7 +30,7 @@ class DeliverableController extends Controller
         $request->validate([
             'commitment_id' => "required",
             'deliverable' => "required",
-            'budget' => "required",
+//            'budget' => "required",
             'start_date' => "required",
             'end_date' => "required",
             'status' => "required",

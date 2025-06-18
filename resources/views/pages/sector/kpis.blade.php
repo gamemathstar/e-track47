@@ -113,8 +113,10 @@
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
-                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
-                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-delivery_department_value="{{ $track->delivery_department_value }}"
                                                data-delivery_department_remark="{{ $track->delivery_department_remark }}"
                                                data-confirmation_status="{{ $track->confirmation_status }}"
@@ -145,8 +147,10 @@
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
-                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
-                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-delivery_department_value="{{ $track->delivery_department_value }}"
                                                data-delivery_department_remark="{{ $track->delivery_department_remark }}"
                                                data-confirmation_status="{{ $track->confirmation_status }}"
@@ -177,8 +181,10 @@
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
-                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
-                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-delivery_department_value="{{ $track->delivery_department_value }}"
                                                data-delivery_department_remark="{{ $track->delivery_department_remark }}"
                                                data-confirmation_status="{{ $track->confirmation_status }}"
@@ -209,8 +215,10 @@
                                         @if($track->actual_value)
                                             <a href="javascript:" class="updM" data-tw-toggle="modal"
                                                data-kpi="{{ $kpi->kpi }}" data-id="{{ $track->id }}"
-                                               data-quarter="{{ $track->quarter }}" data-milestone="{{ $track->milestone }}"
-                                               data-actual_value="{{ $track->actual_value }}" data-remarks="{{ $track->remarks }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual_value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-delivery_department_value="{{ $track->delivery_department_value }}"
                                                data-delivery_department_remark="{{ $track->delivery_department_remark }}"
                                                data-confirmation_status="{{ $track->confirmation_status }}"
@@ -324,7 +332,8 @@
                 <div id="add-performance" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('deliverable.store.tracking')}}" method="post">
+                            <form action="{{route('deliverable.store.tracking')}}" enctype="multipart/form-data"
+                                  method="post">
                                 @csrf
                                 <input type="hidden" id="kpi_id" name="kpi_id">
                                 <input type="hidden" id="track_id" name="id">
@@ -361,12 +370,18 @@
                                                required>
                                     </div>
 
-                                    <div class="col-span-12 sm:col-span-12">
+                                    <div class="col-span-6 sm:col-span-6">
                                         <label for="remark" class="form-label">Remark</label>
                                         <textarea name="remarks" id="remark"
                                                   class="form-control"></textarea>
                                     </div>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="files" class="form-label">Optional Attachments(s)</label>
+                                        <input type="file" name="files[]" id="files" class="form-control mb-2" multiple
+                                               accept=".jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx,.pdf">
+                                    </div>
 
+                                    <div class="col-span-12 sm:col-span-12" id="preview"></div>
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
                                 <div class="modal-footer">
@@ -457,6 +472,7 @@
                             </div>
                             <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
                                 <div class="col-span-12 sm:col-span-12" id="track-details"></div>
+                                <div class="col-span-12 sm:col-span-12 mt-3" id="attachments"></div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" data-tw-dismiss="modal"
@@ -467,6 +483,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div id="targetModal" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
@@ -554,7 +571,7 @@
                 $('#remarkView').html($(this).data('remarks'))
                 $('#quarterView').html($(this).data('quarter'))
                 $('#actual_valueView').html($(this).data('actual_value'))
-                console.log($(this).data('milestone'),$(this).data('remarks'),$(this).data('actual_value'));
+                console.log($(this).data('milestone'), $(this).data('remarks'), $(this).data('actual_value'));
             });
 
             //milestoneView
@@ -573,6 +590,55 @@
                         $('#track-details').html(response)
                     }
                 )
+
+                $.get('{{ route('deliverable.kpi.tracking.files',[':id']) }}'.replace(':id', id), function (data) {
+                    $('#attachments').html(data)
+                })
+            })
+
+            $(document).on('change', '#files', function () {
+                const files = this.files;
+                const $table = $('#preview');
+                $table.empty(); // Clear previous previews
+
+                Array.from(files).forEach(file => {
+                    const fileType = file.type;
+                    const fileName = file.name;
+                    const fileSizeKB = (file.size / 1024).toFixed(2);
+
+                    const reader = new FileReader();
+
+                    reader.onload = function (e) {
+                        let preview;
+
+                        if (['image/jpeg', 'image/png', 'image/jpg'].includes(fileType)) {
+                            preview = `<img src="${e.target.result}" class="mt-2 max-w-full h-32 object-contain">`;
+                        } else if (fileType === 'application/pdf') {
+                            preview = `<iframe src="${e.target.result}" class="mt-2 w-full h-32"></iframe>`;
+                        } else {
+                            preview = `<div class="mt-2 h-32 bg-gray-200 flex items-center justify-center">
+                                <span class="text-gray-500">No preview available</span>
+                           </div>`;
+                        }
+
+                        const row = `
+                <tr>
+                    <td style="width: 40%">
+                        ${preview}
+                    </td>
+                    <td>
+                        <p class="font-semibold">${fileName}</p>
+                        <p class="text-sm text-gray-600">Type: ${fileType}</p>
+                        <p class="text-sm text-gray-600">Size: ${fileSizeKB} KB</p>
+                        <button type="button" class="btn btn-primary mt-2" disabled>Download</button>
+                    </td>
+                </tr>
+            `;
+                        $table.append(row);
+                    };
+
+                    reader.readAsDataURL(file);
+                });
             })
         })
     </script>

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Auth;
 
 class PerformanceTracking extends Model
 {
@@ -31,5 +33,18 @@ class PerformanceTracking extends Model
     public function status()
     {
         return $this->confirmation_status;
+    }
+
+    public function files(): MorphMany
+    {
+        return $this->morphMany(File::class, 'fileable');
+    }
+
+    public function attachments($id)
+    {
+        $target = Auth::user()->role()->target_entity;
+        $files = File::where(['fileable_id' => $id, 'attached_by' => $target])->get();
+
+        return view('pages.sector.ajax.attachments', ['files' => $files]);
     }
 }

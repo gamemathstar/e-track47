@@ -46,7 +46,7 @@ class CommitmentController extends Controller
             'start_date' => 'required',
             'end_date' => 'required',
             'status' => 'required',
-            'budget' => 'required',
+//            'budget' => 'required',
             'img_url' => 'required|file|mimes:jpg,png|max:2048'
         ]);
 
@@ -72,7 +72,7 @@ class CommitmentController extends Controller
         $commitment->start_date = $request->start_date;
         $commitment->end_date = $request->end_date;
         $commitment->status = $request->status;
-        $commitment->budget = $request->budget;
+//        $commitment->budget = $request->budget;
         $commitment->img_url = $fileName;
         $commitment->save();
 
