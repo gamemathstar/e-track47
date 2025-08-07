@@ -95,5 +95,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/reports/download', [ReportController::class, 'download'])->name('reports.download');
 });
 
+Route::get('mdas/{commitment}/details', [CommentController::class, 'mda'])->name('public.mda.details');
 Route::get('projects/{commitment}/details', [CommentController::class, 'details'])->name('public.project.details');
 Route::post('projects/post/comment', [CommentController::class, 'postComment'])->name('home.post.comment');

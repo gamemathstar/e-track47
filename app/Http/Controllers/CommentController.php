@@ -4,13 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Comment;
 use App\Models\Commitment;
+use App\Models\Sector;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
     public function index()
     {
-        $commitments = Commitment::all();
+        $sectors = Sector::all();
+        return view('pages.comments.sectors', compact('sectors'));
+    }
+
+    public function mda($sId)
+    {
+        $commitments = Commitment::where(['sector_id' => $sId])->get();
         return view('pages.comments.projects', compact('commitments'));
     }
 
