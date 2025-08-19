@@ -369,8 +369,14 @@ class ReportController extends Controller
     {
         $year = $request->input('year', date('Y'));
 
-        // Get comprehensive KPI tracking data
-        $reportData = $this->getComprehensiveReportData($year);
+        try {
+            // Get comprehensive KPI tracking data
+            $reportData = $this->getComprehensiveReportData($year);
+        } catch (\Exception $e) {
+            // Handle database errors gracefully
+            $reportData = [];
+            session()->flash('error', 'Database tables not found. Please run database migrations first.');
+        }
 
         return view('pages.reports.comprehensive', compact('reportData', 'year'));
     }
@@ -379,8 +385,13 @@ class ReportController extends Controller
     {
         $year = $request->input('year', date('Y'));
 
-        // Get comprehensive KPI tracking data
-        $reportData = $this->getComprehensiveReportData($year);
+        try {
+            // Get comprehensive KPI tracking data
+            $reportData = $this->getComprehensiveReportData($year);
+        } catch (\Exception $e) {
+            // Handle database errors gracefully
+            return redirect()->back()->with('error', 'Database tables not found. Please run database migrations first.');
+        }
 
         // Create Excel file
         $spreadsheet = new Spreadsheet();
