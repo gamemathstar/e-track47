@@ -93,6 +93,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::post('reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
     Route::post('/reports/download', [ReportController::class, 'download'])->name('reports.download');
+
+    // Comprehensive KPI Report
+    Route::get('reports/comprehensive', [ReportController::class, 'comprehensiveReport'])->name('reports.comprehensive');
+    Route::post('reports/comprehensive/download', [ReportController::class, 'downloadComprehensiveReport'])->name('reports.comprehensive.download');
 });
 
 Route::get('mdas/{commitment}/details', [CommentController::class, 'mda'])->name('public.mda.details');

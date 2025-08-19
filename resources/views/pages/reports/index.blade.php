@@ -31,7 +31,12 @@
         <h2 class="text-lg font-medium mr-auto">
             Reports
         </h2>
-        <div class="w-full sm:w-auto flex mt-4 sm:mt-0"></div>
+        <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
+            <a href="{{ route('reports.comprehensive') }}" class="btn btn-primary">
+                <i class="w-4 h-4 mr-2" data-lucide="bar-chart-3"></i>
+                Comprehensive KPI Report
+            </a>
+        </div>
     </div>
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">
         <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
