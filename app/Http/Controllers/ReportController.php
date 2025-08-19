@@ -717,7 +717,7 @@ class ReportController extends Controller
     private function createGrandSummarySheet($spreadsheet, $year)
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Grand Summary-Sector_MDAs+');
+        $sheet->setTitle('Grand Summary-Sector_MDAs');
 
         // Set headers for Grand Summary
         $sheet->setCellValue('A1', 'S/N');
@@ -943,7 +943,10 @@ class ReportController extends Controller
         $sectors = Sector::all(); // Get all sectors
         foreach ($sectors as $sector) {
             $sheet = $spreadsheet->createSheet();
-            $sheet->setTitle($sector->sector_name);
+
+            // Truncate sheet title to fit Excel's 31 character limit
+            $sheetTitle = substr($sector->sector_name, 0, 31);
+            $sheet->setTitle($sheetTitle);
 
             // Set headers for Individual Sector Sheet
             $sheet->setCellValue('A1', 'S/N');
