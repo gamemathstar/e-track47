@@ -12,7 +12,14 @@ SET AUTOCOMMIT = 0;
 START TRANSACTION;
 SET time_zone = "+00:00";
 
+-- Disable foreign key checks temporarily
+SET FOREIGN_KEY_CHECKS = 0;
 
+-- Import your original SQL file here
+-- (You'll need to copy the content of if0_38970114_etracker.sql here)
+
+-- Re-enable foreign key checks
+SET FOREIGN_KEY_CHECKS = 1;
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
@@ -479,7 +486,7 @@ INSERT INTO `kpis` (`id`, `deliverable_id`, `kpi`, `target_value`, `start_date`,
 (88, 40, 'Milestones in the Budget Calander', '0', '2025-08-06', '2025-12-06', 'Number', NULL, '2025-08-06 13:29:28', '2025-08-06 13:29:28'),
 (89, 41, 'Percentage of Communities Covered by the State Social Register', '0', '2025-08-06', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:35:10', '2025-08-06 13:35:10'),
 (90, 41, 'Percentage of Poor and vulnerable Household Covered in the State Social Register', '0', '2025-08-06', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:35:52', '2025-08-06 13:35:52'),
-(91, 41, 'Percentage of the State\'s Population Covered in the social register', '0', '2025-08-31', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:36:45', '2025-08-06 13:36:45'),
+(91, 41, "Percentage of the State's Population Covered in the social register", '0', '2025-08-31', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:36:45', '2025-08-06 13:36:45'),
 (92, 42, 'Percentage of coverage of the poor and vulnarable households that include elderly and the most vulnarable segment in the social register', '0', '2025-08-06', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:39:15', '2025-08-06 13:39:15'),
 (93, 42, 'Percentage of already empowered poor and vulnarable households that exists the social register', '0', '2025-08-07', '2025-12-06', 'Percentage', NULL, '2025-08-06 13:40:01', '2025-08-06 13:40:01'),
 (94, 43, 'Number of kilometer of New Regional Roads constructed', '0', '2025-08-01', '2025-12-07', 'Number', NULL, '2025-08-07 12:16:55', '2025-08-07 12:16:55'),
