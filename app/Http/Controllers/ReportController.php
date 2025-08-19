@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Sector;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -362,5 +363,211 @@ class ReportController extends Controller
         } else {
             return 'Below Minimum Expectation';
         }
+    }
+
+    public function comprehensiveReport(Request $request)
+    {
+        $year = $request->input('year', date('Y'));
+
+        // Get comprehensive KPI tracking data
+        $reportData = $this->getComprehensiveReportData($year);
+
+        return view('pages.reports.comprehensive', compact('reportData', 'year'));
+    }
+
+    public function downloadComprehensiveReport(Request $request)
+    {
+        $year = $request->input('year', date('Y'));
+
+        // Get comprehensive KPI tracking data
+        $reportData = $this->getComprehensiveReportData($year);
+
+        // Create Excel file
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Comprehensive KPI Report');
+
+        // Set headers
+        $headers = [
+            'S/N', 'Sector/MDA', 'Commitment', 'Deliverable', 'KPI', 'Unit of Measurement',
+            'Target Value', 'Q1 Milestone', 'Q1 Actual', 'Q1 Remarks', 'Q1 Status', 'Q1 Date',
+            'Q2 Milestone', 'Q2 Actual', 'Q2 Remarks', 'Q2 Status', 'Q2 Date',
+            'Q3 Milestone', 'Q3 Actual', 'Q3 Remarks', 'Q3 Status', 'Q3 Date',
+            'Q4 Milestone', 'Q4 Actual', 'Q4 Remarks', 'Q4 Status', 'Q4 Date'
+        ];
+
+        foreach ($headers as $colIndex => $header) {
+            $sheet->setCellValue(chr(65 + $colIndex) . '1', $header);
+        }
+
+        // Style headers
+        $sheet->getStyle('A1:Z1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:Z1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+
+        // Set column widths
+        $sheet->getColumnDimension('A')->setWidth(5);   // S/N
+        $sheet->getColumnDimension('B')->setWidth(25);  // Sector/MDA
+        $sheet->getColumnDimension('C')->setWidth(40);  // Commitment
+        $sheet->getColumnDimension('D')->setWidth(40);  // Deliverable
+        $sheet->getColumnDimension('E')->setWidth(40);  // KPI
+        $sheet->getColumnDimension('F')->setWidth(20);  // Unit of Measurement
+        $sheet->getColumnDimension('G')->setWidth(15);  // Target Value
+
+        // Q1-Q4 columns
+        $quarterColumns = ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA'];
+        foreach ($quarterColumns as $col) {
+            $sheet->getColumnDimension($col)->setWidth(15);
+        }
+
+        // Fill data
+        $row = 2;
+        foreach ($reportData as $data) {
+            $sheet->setCellValue('A' . $row, $data['s_n']);
+            $sheet->setCellValue('B' . $row, $data['sector_name']);
+            $sheet->setCellValue('C' . $row, $data['commitment_name']);
+            $sheet->setCellValue('D' . $row, $data['deliverable']);
+            $sheet->setCellValue('E' . $row, $data['kpi']);
+            $sheet->setCellValue('F' . $row, $data['unit_of_measurement']);
+            $sheet->setCellValue('G' . $row, $data['target_value']);
+
+            // Q1 data
+            $sheet->setCellValue('H' . $row, $data['q1_milestone']);
+            $sheet->setCellValue('I' . $row, $data['q1_actual']);
+            $sheet->setCellValue('J' . $row, $data['q1_remarks']);
+            $sheet->setCellValue('K' . $row, $data['q1_status']);
+            $sheet->setCellValue('L' . $row, $data['q1_date']);
+
+            // Q2 data
+            $sheet->setCellValue('M' . $row, $data['q2_milestone']);
+            $sheet->setCellValue('N' . $row, $data['q2_actual']);
+            $sheet->setCellValue('O' . $row, $data['q2_remarks']);
+            $sheet->setCellValue('P' . $row, $data['q2_status']);
+            $sheet->setCellValue('Q' . $row, $data['q2_date']);
+
+            // Q3 data
+            $sheet->setCellValue('R' . $row, $data['q3_milestone']);
+            $sheet->setCellValue('S' . $row, $data['q3_actual']);
+            $sheet->setCellValue('T' . $row, $data['q3_remarks']);
+            $sheet->setCellValue('U' . $row, $data['q3_status']);
+            $sheet->setCellValue('V' . $row, $data['q3_date']);
+
+            // Q4 data
+            $sheet->setCellValue('W' . $row, $data['q4_milestone']);
+            $sheet->setCellValue('X' . $row, $data['q4_actual']);
+            $sheet->setCellValue('Y' . $row, $data['q4_remarks']);
+            $sheet->setCellValue('Z' . $row, $data['q4_status']);
+            $sheet->setCellValue('AA' . $row, $data['q4_date']);
+
+            $row++;
+        }
+
+        // Auto-fit all columns
+        foreach (range('A', 'Z') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $fileName = 'comprehensive_kpi_report_' . $year . '_' . time() . '.xlsx';
+        $writer->save(storage_path('app/public/' . $fileName));
+
+        return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true);
+    }
+
+    private function getComprehensiveReportData($year)
+    {
+        // Get performance tracking data pivoted by quarter
+        $performanceData = DB::table('performance_trackings as pt')
+            ->select([
+                'pt.kpi_id',
+                'pt.quarter',
+                'pt.milestone',
+                'pt.actual_value',
+                'pt.remarks',
+                'pt.confirmation_status',
+                'pt.tracking_date'
+            ])
+            ->where('pt.year', $year)
+            ->get()
+            ->groupBy('kpi_id');
+
+        // Get main report data
+        $reportData = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                     ->where('kt.year', '=', $year);
+            })
+            ->select([
+                's.sector_name',
+                'c.name as commitment_name',
+                'c.status as commitment_status',
+                'c.start_date as commitment_start_date',
+                'c.end_date as commitment_end_date',
+                'd.deliverable',
+                'd.status as deliverable_status',
+                'k.id as kpi_id',
+                'k.kpi',
+                'k.unit_of_measurement',
+                'kt.target as target_value'
+            ])
+            ->orderBy('s.sector_name')
+            ->orderBy('c.id')
+            ->orderBy('d.id')
+            ->orderBy('k.id')
+            ->get();
+
+        $result = [];
+        $sNo = 1;
+
+        foreach ($reportData as $data) {
+            $kpiId = $data->kpi_id ?? null;
+            $quarterlyData = $performanceData->get($kpiId, collect());
+
+            $result[] = [
+                's_n' => $sNo++,
+                'sector_name' => $data->sector_name,
+                'commitment_name' => $data->commitment_name,
+                'commitment_status' => $data->commitment_status,
+                'commitment_start_date' => $data->commitment_start_date,
+                'commitment_end_date' => $data->commitment_end_date,
+                'deliverable' => $data->deliverable,
+                'deliverable_status' => $data->deliverable_status,
+                'kpi' => $data->kpi,
+                'unit_of_measurement' => $data->unit_of_measurement,
+                'target_value' => $data->target_value,
+
+                // Q1 data
+                'q1_milestone' => $quarterlyData->where('quarter', 1)->first()->milestone ?? '',
+                'q1_actual' => $quarterlyData->where('quarter', 1)->first()->actual_value ?? '',
+                'q1_remarks' => $quarterlyData->where('quarter', 1)->first()->remarks ?? '',
+                'q1_status' => $quarterlyData->where('quarter', 1)->first()->confirmation_status ?? '',
+                'q1_date' => $quarterlyData->where('quarter', 1)->first()->tracking_date ?? '',
+
+                // Q2 data
+                'q2_milestone' => $quarterlyData->where('quarter', 2)->first()->milestone ?? '',
+                'q2_actual' => $quarterlyData->where('quarter', 2)->first()->actual_value ?? '',
+                'q2_remarks' => $quarterlyData->where('quarter', 2)->first()->remarks ?? '',
+                'q2_status' => $quarterlyData->where('quarter', 2)->first()->confirmation_status ?? '',
+                'q2_date' => $quarterlyData->where('quarter', 2)->first()->tracking_date ?? '',
+
+                // Q3 data
+                'q3_milestone' => $quarterlyData->where('quarter', 3)->first()->milestone ?? '',
+                'q3_actual' => $quarterlyData->where('quarter', 3)->first()->actual_value ?? '',
+                'q3_remarks' => $quarterlyData->where('quarter', 3)->first()->remarks ?? '',
+                'q3_status' => $quarterlyData->where('quarter', 3)->first()->confirmation_status ?? '',
+                'q3_date' => $quarterlyData->where('quarter', 3)->first()->tracking_date ?? '',
+
+                // Q4 data
+                'q4_milestone' => $quarterlyData->where('quarter', 4)->first()->milestone ?? '',
+                'q4_actual' => $quarterlyData->where('quarter', 4)->first()->actual_value ?? '',
+                'q4_remarks' => $quarterlyData->where('quarter', 4)->first()->remarks ?? '',
+                'q4_status' => $quarterlyData->where('quarter', 4)->first()->confirmation_status ?? '',
+                'q4_date' => $quarterlyData->where('quarter', 4)->first()->tracking_date ?? '',
+            ];
+        }
+
+        return $result;
     }
 }
