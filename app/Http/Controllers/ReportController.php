@@ -396,13 +396,17 @@ class ReportController extends Controller
             'Q4 Milestone', 'Q4 Actual', 'Q4 Remarks', 'Q4 Status', 'Q4 Date'
         ];
 
+        // Define column letters explicitly to avoid any calculation issues
+        $columnLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA'];
+
         foreach ($headers as $colIndex => $header) {
-            $sheet->setCellValue(chr(65 + $colIndex) . '1', $header);
+            $columnLetter = $columnLetters[$colIndex];
+            $sheet->setCellValue($columnLetter . '1', $header);
         }
 
         // Style headers
-        $sheet->getStyle('A1:Z1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:Z1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+        $sheet->getStyle('A1:AA1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:AA1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
 
         // Set column widths
         $sheet->getColumnDimension('A')->setWidth(5);   // S/N
@@ -418,6 +422,13 @@ class ReportController extends Controller
         foreach ($quarterColumns as $col) {
             $sheet->getColumnDimension($col)->setWidth(15);
         }
+
+        // Auto-fit all columns
+        foreach (range('A', 'Z') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        // Handle AA column separately
+        $sheet->getColumnDimension('AA')->setAutoSize(true);
 
         // Fill data
         $row = 2;
@@ -459,11 +470,6 @@ class ReportController extends Controller
             $sheet->setCellValue('AA' . $row, $data['q4_date']);
 
             $row++;
-        }
-
-        // Auto-fit all columns
-        foreach (range('A', 'Z') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
         $writer = new Xlsx($spreadsheet);
