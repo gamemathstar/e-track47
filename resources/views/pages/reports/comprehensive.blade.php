@@ -157,10 +157,10 @@
                             <td>{{ $data['result_number'] }}</td>
                             <td>{{ $data['target_value'] }}</td>
                             <td>{{ $data['actual_result'] }}</td>
-                            <td class="{{ $data['performance_ratio'] !== 'NA' ? 'performance-' . $this->getPerformanceClass($data['performance_ratio']) : '' }}">
+                            <td class="{{ $data['performance_ratio'] !== 'NA' ? 'performance-cell' : '' }}">
                                 {{ $data['performance_ratio'] }}
                             </td>
-                            <td class="{{ $data['adjusted_performance'] !== 'NA' ? 'performance-' . $this->getPerformanceClass($data['adjusted_performance']) : '' }}">
+                            <td class="{{ $data['adjusted_performance'] !== 'NA' ? 'performance-cell' : '' }}">
                                 {{ $data['adjusted_performance'] }}
                             </td>
                             <td>{{ $data['evidence'] }}</td>
