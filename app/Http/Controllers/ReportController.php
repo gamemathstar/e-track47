@@ -10,6 +10,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ReportController extends Controller
@@ -425,11 +426,11 @@ class ReportController extends Controller
         // Create Grand Summary sheet
         $this->createGrandSummarySheet($spreadsheet, $year);
 
-        // Create Sector Summary Details sheet
-        $this->createSectorSummaryDetailsSheet($spreadsheet, $year);
+        // Create individual sector sheets and get commitment average row mapping
+        $commitmentAverageRows = $this->createIndividualSectorSheets($spreadsheet, $year);
 
-        // Create individual sector sheets
-        $this->createIndividualSectorSheets($spreadsheet, $year);
+        // Create Sector Summary Details sheet
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows);
 
         // Create the Excel file
         $writer = new Xlsx($spreadsheet);
@@ -452,11 +453,11 @@ class ReportController extends Controller
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
                 's.sector_name',
@@ -571,11 +572,11 @@ class ReportController extends Controller
             ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
                 's.sector_name',
@@ -616,11 +617,11 @@ class ReportController extends Controller
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
                 'kt.target',
@@ -765,11 +766,11 @@ class ReportController extends Controller
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
                 's.sector_name',
@@ -807,11 +808,11 @@ class ReportController extends Controller
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
                 's.sector_name',
@@ -840,28 +841,29 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function createSectorSummaryDetailsSheet($spreadsheet, $year)
+    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [])
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Sector Summary Details');
+        $sheet->setTitle('Sector_MDAs Summary Details');
 
         // Row 1: Merged cells A-N
-        $sheet->setCellValue('A1', 'Sector Summary Details - ' . $year . ' Performance Report');
+        $sheet->setCellValue('A1', 'Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
         $sheet->mergeCells('A1:N1');
-        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A1')->getFont()->setName('Agency FB');
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle('A1')->getAlignment()->setWrapText(true);
-        $sheet->getRowDimension('1')->setRowHeight(35);
+        $sheet->getRowDimension('1')->setRowHeight(30);
 
         // Row 2: Merged cells A-N
-        $sheet->setCellValue('A2', 'Performance Assessment Report');
+        $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
         $sheet->mergeCells('A2:N2');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle('A2')->getAlignment()->setWrapText(true);
-        $sheet->getRowDimension('2')->setRowHeight(35);
+        $sheet->getRowDimension('2')->setRowHeight(30);
 
         // Row 3: Column headers
         // Cells A-D span rows 3-5
@@ -937,22 +939,22 @@ class ReportController extends Controller
 
         // Set row heights for header rows
         $sheet->getRowDimension('3')->setRowHeight(25);
-        $sheet->getRowDimension('4')->setRowHeight(22);
+        $sheet->getRowDimension('4')->setRowHeight(45);
         $sheet->getRowDimension('5')->setRowHeight(22);
 
         // Set column widths
-        $sheet->getColumnDimension('A')->setWidth(8);  // S/N
+        $sheet->getColumnDimension('A')->setWidth(5);  // S/N
         $sheet->getColumnDimension('B')->setWidth(40); // Commitments
-        $sheet->getColumnDimension('C')->setWidth(20); // No. of Outputs
-        $sheet->getColumnDimension('D')->setWidth(25); // No of Results to be Delivered
-        $sheet->getColumnDimension('E')->setWidth(18); // Exceptional
-        $sheet->getColumnDimension('F')->setWidth(18); // Above Expectation
-        $sheet->getColumnDimension('G')->setWidth(18); // Meets Expectation
-        $sheet->getColumnDimension('H')->setWidth(18); // Needs Improvement
-        $sheet->getColumnDimension('I')->setWidth(18); // Below Minimum Expectation
-        $sheet->getColumnDimension('J')->setWidth(18); // Not Assessed
-        $sheet->getColumnDimension('K')->setWidth(20); // Performance
-        $sheet->getColumnDimension('L')->setWidth(20); // Rating
+        $sheet->getColumnDimension('C')->setWidth(10); // No. of Outputs
+        $sheet->getColumnDimension('D')->setWidth(10); // No of Results to be Delivered
+        $sheet->getColumnDimension('E')->setWidth(12); // Exceptional
+        $sheet->getColumnDimension('F')->setWidth(12); // Above Expectation
+        $sheet->getColumnDimension('G')->setWidth(12); // Meets Expectation
+        $sheet->getColumnDimension('H')->setWidth(12); // Needs Improvement
+        $sheet->getColumnDimension('I')->setWidth(12); // Below Minimum Expectation
+        $sheet->getColumnDimension('J')->setWidth(12); // Not Assessed
+        $sheet->getColumnDimension('K')->setWidth(15); // Performance
+        $sheet->getColumnDimension('L')->setWidth(15); // Rating
         $sheet->getColumnDimension('M')->setWidth(8);  // r
         $sheet->getColumnDimension('N')->setWidth(10); // Check
 
@@ -965,119 +967,131 @@ class ReportController extends Controller
             }
         }
 
-        // Get sector summary data
+        // Get sector summary data with performance calculations
         $sectorSummary = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
-            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
-            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
-                     ->where('kt.year', '=', $year);
+                    ->where('kt.year', '=', $year);
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year);
+                    ->where('pt.year', '=', $year);
             })
             ->select([
+                's.id as sector_id',
                 's.sector_name',
+                's.description',
+                'c.id as commitment_id',
                 'c.name as commitment_name',
-                'c.status as commitment_status',
-                'd.deliverable',
-                'k.kpi',
-                'k.unit_of_measurement',
-                'kt.target as target_value',
-                'pt.actual_value',
-                'pt.remarks',
-                'pt.confirmation_status',
-                'pt.tracking_date'
+                DB::raw('COUNT(DISTINCT d.id) as deliverable_count'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) > 1 THEN 1 ELSE 0 END) as exceptional_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.7 AND (pt.actual_value / kt.target) <= 1 THEN 1 ELSE 0 END) as above_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.6 AND (pt.actual_value / kt.target) < 0.7 THEN 1 ELSE 0 END) as meets_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.4 AND (pt.actual_value / kt.target) < 0.6 THEN 1 ELSE 0 END) as needs_improvement_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) < 0.4 THEN 1 ELSE 0 END) as below_minimum_count'),
+                DB::raw('SUM(CASE WHEN pt.actual_value IS NULL OR pt.actual_value = 0 THEN 1 ELSE 0 END) as not_assessed_count')
             ])
+            ->groupBy('s.id', 's.sector_name', 's.description', 'c.id', 'c.name')
             ->orderBy('s.sector_name')
-            ->orderBy('c.name')
-            ->orderBy('d.deliverable')
-            ->orderBy('k.kpi')
+            ->orderBy('c.id')
             ->get();
 
+        // Group data by sector
+        $sectors = $sectorSummary->groupBy('sector_id');
+
         $row = 6; // Start data from row 6 after headers
-        foreach ($sectorSummary as $data) {
-            $sheet->setCellValue('A' . $row, $row - 5); // S/N
-            $sheet->setCellValue('B' . $row, $data->commitment_name);
-            $sheet->setCellValue('C' . $row, $data->deliverable);
-            $sheet->setCellValue('D' . $row, $data->kpi);
 
-            // Calculate performance metrics
-            $target = $data->target_value ?: 0;
-            $actual = $data->actual_value ?: 0;
+        foreach ($sectors as $sectorId => $sectorCommitments) {
+            $sector = $sectorCommitments->first();
 
-            $performanceRatio = 0;
-            if ($target > 0 && is_numeric($actual)) {
-                $performanceRatio = ($actual / $target) * 100;
-            }
+            // Sector Row
+            $sheet->setCellValue('B' . $row, $sector->sector_name);
+            $sheet->getStyle('B' . $row)->getFont()->setBold(true);
+            $sheet->getStyle('B' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E6F3FF');
+            $sheet->getStyle('B' . $row)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $row++;
 
-            // Determine performance category based on ratio
-            $performanceCategory = '';
-            if ($performanceRatio > 100) {
-                $performanceCategory = 'Exceptional';
-            } elseif ($performanceRatio >= 70) {
-                $performanceCategory = 'Above Expectation';
-            } elseif ($performanceRatio >= 60) {
-                $performanceCategory = 'Meets Expectation';
-            } elseif ($performanceRatio >= 40) {
-                $performanceCategory = 'Needs Improvement';
-            } elseif ($performanceRatio > 0) {
-                $performanceCategory = 'Below Minimum Expectation';
-            } else {
-                $performanceCategory = 'Not Assessed';
-            }
+            foreach ($sectorCommitments as $commitment) {
+                // Commitment Row
+                $sheet->setCellValue('B' . $row, $commitment->commitment_name);
+                $sheet->getStyle('B' . $row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->setCellValue('C' . $row, $commitment->deliverable_count);
+                $sheet->setCellValue('D' . $row, $commitment->kpi_count);
+                $sheet->setCellValue('E' . $row, $commitment->exceptional_count > 0 ? $commitment->exceptional_count : '-');
+                $sheet->setCellValue('F' . $row, $commitment->above_expectation_count > 0 ? $commitment->above_expectation_count : '-');
+                $sheet->setCellValue('G' . $row, $commitment->meets_expectation_count > 0 ? $commitment->meets_expectation_count : '-');
+                $sheet->setCellValue('H' . $row, $commitment->needs_improvement_count > 0 ? $commitment->needs_improvement_count : '-');
+                $sheet->setCellValue('I' . $row, $commitment->below_minimum_count > 0 ? $commitment->below_minimum_count : '-');
+                $sheet->setCellValue('J' . $row, $commitment->not_assessed_count > 0 ? $commitment->not_assessed_count : '-');
 
-            // Fill performance category in appropriate column
-            switch ($performanceCategory) {
-                case 'Exceptional':
-                    $sheet->setCellValue('E' . $row, '✓');
-                    break;
-                case 'Above Expectation':
-                    $sheet->setCellValue('F' . $row, '✓');
-                    break;
-                case 'Meets Expectation':
-                    $sheet->setCellValue('G' . $row, '✓');
-                    break;
-                case 'Needs Improvement':
-                    $sheet->setCellValue('H' . $row, '✓');
-                    break;
-                case 'Below Minimum Expectation':
-                    $sheet->setCellValue('I' . $row, '✓');
-                    break;
-                case 'Not Assessed':
-                    $sheet->setCellValue('J' . $row, '✓');
-                    break;
-            }
-
-            // Overall Performance
-            $sheet->setCellValue('K' . $row, number_format($performanceRatio, 2) . '%');
-            $sheet->setCellValue('L' . $row, $this->calculatePerformanceRating($performanceRatio));
-            $sheet->setCellValue('M' . $row, ''); // 'r' column - empty for now
-            $sheet->setCellValue('N' . $row, ''); // 'Check' column - empty for now
-
-            // Apply text wrapping and alignment to data cells to prevent stretching
-            for ($col = 'A'; $col <= 'N'; $col++) {
-                $sheet->getStyle($col . $row)->getAlignment()->setWrapText(true);
-                $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-
-                // Center align specific columns
-                if (in_array($col, ['A', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'])) {
-                    $sheet->getStyle($col . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                // Formula for cell K - reference the average performance from the sector sheet
+                if (isset($commitmentAverageRows[$sector->description][$commitment->commitment_id])) {
+                    $averageRow = $commitmentAverageRows[$sector->description][$commitment->commitment_id];
+                    $sheet->setCellValue('K' . $row, "='$sector->description'!I" . $averageRow);
+                    $sheet->getStyle('K' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
                 } else {
-                    // Left align for text content columns
-                    $sheet->getStyle($col . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                    // Fallback if mapping not found
+                    $sheet->setCellValue('K' . $row, "N/A");
                 }
+
+                // Apply formatting to numeric cells
+                for ($col = 'C'; $col <= 'J'; $col++) {
+                    $sheet->getStyle($col . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                }
+                
+                // Apply header background color to cells E-J and remove borders
+                $sheet->getStyle('E' . $row . ':J' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+                $sheet->getStyle('E' . $row . ':J' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_NONE);
+
+
+                $row++;
             }
 
+            // Summary Row for this sector
+            $summaryRow = $row;
+            $sheet->setCellValue('C' . $summaryRow, "=C" . ($row - 1));
+            $sheet->setCellValue('D' . $summaryRow, "=D" . ($row - 1));
+            $sheet->setCellValue('E' . $summaryRow, "=IF(E" . ($row - 1) . ">0,E" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('F' . $summaryRow, "=IF(F" . ($row - 1) . ">0,F" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('G' . $summaryRow, "=IF(G" . ($row - 1) . ">0,G" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('H' . $summaryRow, "=IF(H" . ($row - 1) . ">0,H" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('I' . $summaryRow, "=IF(I" . ($row - 1) . ">0,I" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('J' . $summaryRow, "=IF(J" . ($row - 1) . ">0,J" . ($row - 1) . ",\"-\")");
+            $sheet->setCellValue('K' . $summaryRow, "=K" . ($row - 1));
+            $sheet->getStyle('K' . $summaryRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+
+            // Style the summary row
+            $sheet->getStyle('C' . $summaryRow . ':K' . $summaryRow)->getFont()->setBold(true);
+            $sheet->getStyle('C' . $summaryRow . ':K' . $summaryRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
+
+            $row++;
+            
+            // Add empty row after summary row
             $row++;
         }
 
         // Style headers
         $sheet->getStyle('A1:N5')->getFont()->setBold(true);
+
+        // Apply background color to all header cells (rows 3-5)
         $sheet->getStyle('A3:N5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+
+        // Ensure merged cells also get the background color
+        $sheet->getStyle('A3:D5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1'); // S/N, Commitments, No. of Outputs, No of Results
+        $sheet->getStyle('E3:J3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1'); // Performance for Each Result
+        $sheet->getStyle('K3:L4')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1'); // Overall Performance
+        $sheet->getStyle('M3:M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1'); // r
+        $sheet->getStyle('N3:N5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1'); // Check
+
         $sheet->getStyle('A3:N5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A3:N5')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Remove auto-sizing and enforce fixed dimensions
         // Auto-fit columns - REMOVED to prevent stretching
@@ -1085,23 +1099,23 @@ class ReportController extends Controller
         //     $sheet->getColumnDimension($col)->setAutoSize(true);
         // }
 
-        // Add borders to the entire data range
+        // Add borders to the entire data range (excluding cells E-J)
         $lastRow = $row - 1;
         if ($lastRow > 5) {
-            $sheet->getStyle('A3:N' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            // Add borders to columns A-D, K-N (excluding E-J)
+            $sheet->getStyle('A3:D' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('K3:N' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
 
-        // Add borders to the header block (A1:I4)
-        $sheet->getStyle('A1:I4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        
-        // Set default white background for all cells
-        $sheet->getStyle('A1:I1000')->getFill()->setFillType(Fill::FILL_SOLID);
-        $sheet->getStyle('A1:I1000')->getFill()->getStartColor()->setRGB('FFFFFF');
+        // Add borders to the header block (A1:N5)
+        $sheet->getStyle('A1:N5')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
     private function createIndividualSectorSheets($spreadsheet, $year)
     {
         $sectors = Sector::all(); // Get all sectors
+        $commitmentAverageRows = []; // Track commitment average row numbers
+        
         foreach ($sectors as $sector) {
             $sheet = $spreadsheet->createSheet();
 
@@ -1171,15 +1185,15 @@ class ReportController extends Controller
             // Get individual sector data with commitments, deliverables, and KPIs
             $sectorData = DB::table('sectors as s')
                 ->join('commitments as c', 'c.sector_id', '=', 's.id')
-                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
-                ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+                ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
                 ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                     $join->on('kt.kpi_id', '=', 'k.id')
-                         ->where('kt.year', '=', $year);
+                        ->where('kt.year', '=', $year);
                 })
                 ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                     $join->on('pt.kpi_id', '=', 'k.id')
-                         ->where('pt.year', '=', $year);
+                        ->where('pt.year', '=', $year);
                 })
                 ->select([
                     'c.id as commitment_id',
@@ -1211,6 +1225,9 @@ class ReportController extends Controller
             $commitmentPerformanceData = [];
             $sectorPerformanceData = [];
             $currentCommitmentStartRow = null;
+            
+            // Track processed commitments to ensure all are handled
+            $processedCommitments = [];
 
             foreach ($sectorData as $data) {
                 // Check if this is a new commitment
@@ -1227,6 +1244,9 @@ class ReportController extends Controller
                         $hRange = 'H' . $currentCommitmentStartRow . ':H' . $commitmentEndRow;
                         $sheet->setCellValue('I' . $row, '=AVERAGE(' . $hRange . ')');
                         $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%');
+                        
+                        // Track this row for the summary sheet using commitment ID for accuracy
+                        $commitmentAverageRows[$sector->description][$currentCommitmentId] = $row;
 
                         // Make entire row bold
                         $sheet->getStyle('A' . $row . ':I' . $row)->getFont()->setBold(true);
@@ -1248,6 +1268,7 @@ class ReportController extends Controller
 
                     $currentCommitmentId = $data->commitment_id;
                     $currentCommitmentStartRow = $row + 1; // +1 because we're about to add commitment header
+                    $processedCommitments[] = $data->commitment_id;
 
                     // Add commitment header row
                     $sheet->setCellValue('A' . $row, 'Commitment-' . $commitmentCounter . ' ' . $data->commitment_name);
@@ -1319,11 +1340,11 @@ class ReportController extends Controller
 
                     // Set performance formula in column G: F/E
                     $sheet->setCellValue('G' . $row, '=F' . $row . '/E' . $row);
-                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('0');
+                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
 
                     // Set adjusted performance formula in column H: =G
                     $sheet->setCellValue('H' . $row, '=G' . $row);
-                    $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode('0');
+                    $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
                 } else {
                     // No performance data available - use 0 for computation but display 'Not Assessed'
                     $sheet->setCellValue('F' . $row, 0);
@@ -1374,12 +1395,62 @@ class ReportController extends Controller
                 $hRange = 'H' . $currentCommitmentStartRow . ':H' . $commitmentEndRow;
                 $sheet->setCellValue('I' . $row, '=AVERAGE(' . $hRange . ')');
                 $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%');
+                
+                // Track this row for the summary sheet using commitment ID for accuracy
+                $commitmentAverageRows[$sector->description][$currentCommitmentId] = $row;
 
                 // Make entire row bold
                 $sheet->getStyle('A' . $row . ':I' . $row)->getFont()->setBold(true);
                 $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
                 $row++;
+            }
+            
+            // Handle commitments with no KPIs (not processed in the main loop)
+            $allCommitments = DB::table('commitments')->where('sector_id', $sector->id)->orderBy('id')->get();
+            foreach ($allCommitments as $commitment) {
+                if (!in_array($commitment->id, $processedCommitments)) {
+                    // Add commitment header row
+                    $sheet->setCellValue('A' . $row, 'Commitment-' . $commitmentCounter . ' ' . $commitment->name);
+                    $sheet->mergeCells('A' . $row . ':I' . $row);
+                    $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+                    $sheet->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID);
+                    $sheet->getStyle('A' . $row)->getFill()->getStartColor()->setRGB('E6F3FF');
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setWrapText(true);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                    $row++;
+                    
+                    // Add placeholder row for no data
+                    $sheet->setCellValue('C' . $row, 'No KPIs available');
+                    $sheet->setCellValue('E' . $row, 0);
+                    $sheet->setCellValue('F' . $row, 0);
+                    $sheet->setCellValue('G' . $row, 0);
+                    $sheet->setCellValue('H' . $row, 0);
+                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('0%;"Not Assessed"');
+                    $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode('0%;"Not Assessed"');
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setWrapText(true);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                    $row++;
+                    
+                    // Add commitment average performance row
+                    $sheet->setCellValue('C' . $row, 'Average Performance');
+                    $sheet->getStyle('C' . $row)->getFont()->setBold(true);
+                    $sheet->setCellValue('I' . $row, 0);
+                    $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%;"Not Assessed"');
+                    
+                    // Track this row for the summary sheet
+                    $commitmentAverageRows[$sector->description][$commitment->id] = $row;
+                    
+                    // Make entire row bold
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getFont()->setBold(true);
+                    $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                    $row++;
+                    
+                    $commitmentCounter++;
+                }
             }
 
             // Add sector overall summary row
@@ -1410,5 +1481,7 @@ class ReportController extends Controller
                 $sheet->getStyle('A5:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             }
         }
+        
+        return $commitmentAverageRows;
     }
 }
