@@ -1337,15 +1337,20 @@ class ReportController extends Controller
 
             // Summary Row for this sector
             $summaryRow = $row;
-            $sheet->setCellValue('C' . $summaryRow, "=C" . ($row - 1));
-            $sheet->setCellValue('D' . $summaryRow, "=D" . ($row - 1));
-            $sheet->setCellValue('E' . $summaryRow, "=IF(E" . ($row - 1) . ">0,E" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('F' . $summaryRow, "=IF(F" . ($row - 1) . ">0,F" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('G' . $summaryRow, "=IF(G" . ($row - 1) . ">0,G" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('H' . $summaryRow, "=IF(H" . ($row - 1) . ">0,H" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('I' . $summaryRow, "=IF(I" . ($row - 1) . ">0,I" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('J' . $summaryRow, "=IF(J" . ($row - 1) . ">0,J" . ($row - 1) . ",\"-\")");
-            $sheet->setCellValue('K' . $summaryRow, "=K" . ($row - 1));
+
+            // Find the start row for this sector's data
+            $sectorStartRow = $row - count($sectorCommitments);
+
+            // Cells C-K: Sum the values above for the given sector, replace 0 with '-'
+            $sheet->setCellValue('C' . $summaryRow, "=IF(SUM(C" . $sectorStartRow . ":C" . ($row - 1) . ")>0,SUM(C" . $sectorStartRow . ":C" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('D' . $summaryRow, "=IF(SUM(D" . $sectorStartRow . ":D" . ($row - 1) . ")>0,SUM(D" . $sectorStartRow . ":D" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('E' . $summaryRow, "=IF(SUM(E" . $sectorStartRow . ":E" . ($row - 1) . ")>0,SUM(E" . $sectorStartRow . ":E" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('F' . $summaryRow, "=IF(SUM(F" . $sectorStartRow . ":F" . ($row - 1) . ")>0,SUM(F" . $sectorStartRow . ":F" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('G' . $summaryRow, "=IF(SUM(G" . $sectorStartRow . ":G" . ($row - 1) . ")>0,SUM(G" . $sectorStartRow . ":G" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('H' . $summaryRow, "=IF(SUM(H" . $sectorStartRow . ":H" . ($row - 1) . ")>0,SUM(H" . $sectorStartRow . ":H" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('I' . $summaryRow, "=IF(SUM(I" . $sectorStartRow . ":I" . ($row - 1) . ")>0,SUM(I" . $sectorStartRow . ":I" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('J' . $summaryRow, "=IF(SUM(J" . $sectorStartRow . ":J" . ($row - 1) . ")>0,SUM(J" . $sectorStartRow . ":J" . ($row - 1) . "),\"-\")");
+            $sheet->setCellValue('K' . $summaryRow, "=AVERAGE(K" . $sectorStartRow . ":K" . ($row - 1) . ")");
             $sheet->getStyle('K' . $summaryRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
 
             // Style the summary row
@@ -1404,7 +1409,7 @@ class ReportController extends Controller
             $sheet->setTitle($sector->description);
 
             // Row 1: Merged cells A-I
-            $sheet->setCellValue('A1', $sector->sector_name . ' - ' . $year . ' Performance Report');
+            $sheet->setCellValue('A1', strtoupper($sector->sector_name));
             $sheet->mergeCells('A1:I1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -1412,7 +1417,7 @@ class ReportController extends Controller
             $sheet->getRowDimension('1')->setRowHeight(28);
 
             // Row 2: Merged cells A-I
-            $sheet->setCellValue('A2', 'Performance Assessment Report');
+            $sheet->setCellValue('A2', 'FULL YEAR  [JANUARY TO DECEMBER ' . $year . '] PERFORMANCE ASSESSMENT');
             $sheet->mergeCells('A2:I2');
             $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
             $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
