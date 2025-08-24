@@ -726,7 +726,7 @@ class ReportController extends Controller
         $sheet->setTitle('Grand Summary-Sector_MDAs+');
 
         // Row 1: Top Title
-        $sheet->setCellValue('A1', 'Perfomance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
+        $sheet->setCellValue('A1', 'Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
         $sheet->mergeCells('A1:H1');
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
         $sheet->getStyle('A1')->getFont()->setName('Agency FB');
@@ -854,7 +854,7 @@ class ReportController extends Controller
 
             // Cell G: Insert a formula that references the last H cell in the corresponding sector sheet
             $sectorSheetName = $summary['sector_name'];
-            
+
             // Get the sector description (which is used as the sheet name) from the database
             $sector = DB::table('sectors')->where('sector_name', $sectorSheetName)->first();
             if ($sector && isset($sectorOverallAverageRows[$sector->description])) {
@@ -885,8 +885,52 @@ class ReportController extends Controller
             $iteration++;
         }
 
-        // Add borders to the entire data range
-        $lastRow = $row - 1;
+        // Add summary row after the last sector/ministry row
+        $summaryRow = $row;
+
+        // Cell A: Set to (last loop iteration + 1)
+        $sheet->setCellValue('A' . $summaryRow, $iteration);
+
+        // Cell B: Set to 'Overall State Performance'
+        $sheet->setCellValue('B' . $summaryRow, 'Overall State Performance');
+        $sheet->getStyle('B' . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $sheet->getStyle('B' . $summaryRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+        // Cells C, D, and E: Set to the sum of the values above in their respective columns
+        $dataStartRow = 5; // Start of data rows
+        $dataEndRow = $row - 1; // End before this summary row
+        $sheet->setCellValue('C' . $summaryRow, '=SUM(C' . $dataStartRow . ':C' . $dataEndRow . ')');
+        $sheet->setCellValue('D' . $summaryRow, '=SUM(D' . $dataStartRow . ':D' . $dataEndRow . ')');
+        $sheet->setCellValue('E' . $summaryRow, '=SUM(E' . $dataStartRow . ':E' . $dataEndRow . ')');
+
+        // Cells F and G: Set to the average of the values above in their respective columns
+        // Use IF formula to handle division by zero
+        $sheet->setCellValue('F' . $summaryRow, '=IF(COUNT(F' . $dataStartRow . ':F' . $dataEndRow . ')>0,AVERAGE(F' . $dataStartRow . ':F' . $dataEndRow . '),0)');
+        $sheet->setCellValue('G' . $summaryRow, '=IF(COUNT(G' . $dataStartRow . ':G' . $dataEndRow . ')>0,AVERAGE(G' . $dataStartRow . ':G' . $dataEndRow . '),0)');
+
+        // Apply the same font styling (Agency FB, size 15) to all cells
+        for ($col = 'A'; $col <= 'G'; $col++) {
+            $sheet->getStyle($col . $summaryRow)->getFont()->setName('Agency FB');
+            $sheet->getStyle($col . $summaryRow)->getFont()->setSize(15);
+            $sheet->getStyle($col . $summaryRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        }
+
+        // Center align numeric cells (A, C, D, E)
+        $sheet->getStyle('A' . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('C' . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('D' . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('E' . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Format percentage cells F and G
+        $sheet->getStyle('F' . $summaryRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+        $sheet->getStyle('G' . $summaryRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+
+        // Make the summary row bold to distinguish it
+        $sheet->getStyle('A' . $summaryRow . ':G' . $summaryRow)->getFont()->setBold(true);
+        $sheet->getStyle('A' . $summaryRow . ':G' . $summaryRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
+
+        // Add borders to the entire data range (including summary row)
+        $lastRow = $summaryRow;
         if ($lastRow > 4) {
             $sheet->getStyle('A3:H' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
