@@ -666,36 +666,117 @@ class ReportController extends Controller
     private function createOverallSummarySheet($spreadsheet, $year)
     {
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Overall Summary');
+        $sheet->setTitle('Overall Summary ');
 
-        // Set headers for Overall Summary
-        $sheet->setCellValue('A1', 'S/N');
-        $sheet->setCellValue('B1', 'Ministries and Agencies');
-        $sheet->setCellValue('C1', 'Commitments');
-        $sheet->setCellValue('D1', 'No. of Outputs');
-        $sheet->setCellValue('E1', 'No Results to be Delivered');
-        $sheet->setCellValue('F1', 'Performance for Each Result');
-        $sheet->setCellValue('G1', '');
-        $sheet->setCellValue('H1', '');
-        $sheet->setCellValue('I1', '');
-        $sheet->setCellValue('J1', 'Below Minimum Expectation');
+        // 1. Main Title (Row 1)
+        $sheet->setCellValue('A1', 'Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
+        $sheet->mergeCells('A1:M1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A1')->getFont()->setName('Agency FB');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A1')->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension('1')->setRowHeight(30);
 
-        // Sub-headers
-        $sheet->setCellValue('F2', 'Exceptional');
-        $sheet->setCellValue('G2', 'Above Expectation');
-        $sheet->setCellValue('H2', 'Meets Expectation');
-        $sheet->setCellValue('I2', 'Needs Improvement');
+        // 2. Subtitle (Row 2)
+        $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        $sheet->mergeCells('A2:M2');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getFont()->setName('Arial Narrow');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A2')->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension('2')->setRowHeight(25);
 
-        $sheet->setCellValue('F3', 'Above 100%');
-        $sheet->setCellValue('G3', '70% -100%');
-        $sheet->setCellValue('H3', '60% - 69%');
-        $sheet->setCellValue('I3', '40% - 59%');
-        $sheet->setCellValue('J3', 'Below 40%');
+        // 3. Row 3-5 Merged Cells
+        $sheet->setCellValue('A3', 'S/N');
+        $sheet->mergeCells('A3:A5');
+        $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('B3', 'Ministries and Agencies');
+        $sheet->mergeCells('B3:B5');
+        $sheet->getStyle('B3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('B3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('C3', 'Commitments');
+        $sheet->mergeCells('C3:C5');
+        $sheet->getStyle('C3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('C3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('C3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('D3', 'No. of Outputs');
+        $sheet->mergeCells('D3:D5');
+        $sheet->getStyle('D3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('D3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('D3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('E3', 'No. of Results to be Delivered');
+        $sheet->mergeCells('E3:E5');
+        $sheet->getStyle('E3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('E3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('E3')->getAlignment()->setWrapText(true);
+
+        // 4. Performance Group Header (Row 3-4)
+        $sheet->setCellValue('F3', 'Performance for Each Result');
+        $sheet->mergeCells('F3:I3');
+        $sheet->getStyle('F3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('F3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('F3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('F4', 'Exceptional');
+        $sheet->setCellValue('G4', 'Above Expectation');
+        $sheet->setCellValue('H4', 'Meets Expectation');
+        $sheet->setCellValue('I4', 'Needs Improvement');
+
+        $sheet->setCellValue('J3', 'Below Minimum Expectation');
+        $sheet->mergeCells('J3:J4');
+        $sheet->getStyle('J3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('J3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('J3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('K3', 'Not Assessed');
+        $sheet->mergeCells('K3:K4');
+        $sheet->getStyle('K3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('K3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('K3')->getAlignment()->setWrapText(true);
+
+        // 5. Overall Performance Header (Row 3-4)
+        $sheet->setCellValue('L3', 'Overall Performance');
+        $sheet->mergeCells('L3:M4');
+        $sheet->getStyle('L3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('L3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('L3')->getAlignment()->setWrapText(true);
+
+        // 6. Row 5 Descriptions
+        $sheet->setCellValue('F5', 'Above 100%');
+        $sheet->setCellValue('G5', '70%-100%');
+        $sheet->setCellValue('H5', '60%-69%');
+        $sheet->setCellValue('I5', '40%-59%');
+        $sheet->setCellValue('J5', 'Below 40%');
+        $sheet->setCellValue('K5', 'N/A');
+        $sheet->setCellValue('L5', 'Performance');
+        $sheet->setCellValue('M5', 'Rating');
+
+        // 7. Styling - Make all header text bold and center-aligned
+        $sheet->getStyle('A1:M5')->getFont()->setBold(true);
+        $sheet->getStyle('A1:M5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A1:M5')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A1:M5')->getAlignment()->setWrapText(true);
+
+        // Set row heights
+        $sheet->getRowDimension('1')->setRowHeight(28); // Main title
+        $sheet->getRowDimension('2')->setRowHeight(22); // Subtitle
+        $sheet->getRowDimension('3')->setRowHeight(20); // Merged headers
+        $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers
+        $sheet->getRowDimension('5')->setRowHeight(20); // Sub-labels
 
         // Get sector summary data
         $sectorSummary = $this->getSectorSummaryData($year);
 
-        $row = 4;
+        $row = 6; // Start data from row 6 after headers
         foreach ($sectorSummary as $sector) {
             $sheet->setCellValue('A' . $row, $sector['sn']);
             $sheet->setCellValue('B' . $row, $sector['sector_name']);
@@ -707,16 +788,34 @@ class ReportController extends Controller
             $sheet->setCellValue('H' . $row, $sector['meets_expectation_count']);
             $sheet->setCellValue('I' . $row, $sector['needs_improvement_count']);
             $sheet->setCellValue('J' . $row, $sector['below_minimum_count']);
+            $sheet->setCellValue('K' . $row, $sector['not_assessed_count'] ?? 0);
+            $sheet->setCellValue('L' . $row, $sector['overall_performance'] ?? 0);
+            $sheet->setCellValue('M' . $row, $sector['performance_rating'] ?? '');
             $row++;
         }
 
-        // Style headers
-        $sheet->getStyle('A1:J3')->getFont()->setBold(true);
-        $sheet->getStyle('A1:J3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+        // Style headers with background color
+        $sheet->getStyle('A3:M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
 
-        // Auto-fit columns
-        foreach (range('A', 'J') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+        // Set column widths
+        $sheet->getColumnDimension('A')->setWidth(6);   // S/N
+        $sheet->getColumnDimension('B')->setWidth(45);  // Ministries and Agencies
+        $sheet->getColumnDimension('C')->setWidth(12);  // Commitments
+        $sheet->getColumnDimension('D')->setWidth(12);  // No. of Outputs
+        $sheet->getColumnDimension('E')->setWidth(12);  // No. of Results to be Delivered
+        $sheet->getColumnDimension('F')->setWidth(12);  // Exceptional
+        $sheet->getColumnDimension('G')->setWidth(12);  // Above Expectation
+        $sheet->getColumnDimension('H')->setWidth(12);  // Meets Expectation
+        $sheet->getColumnDimension('I')->setWidth(12);  // Needs Improvement
+        $sheet->getColumnDimension('J')->setWidth(12);  // Below Minimum Expectation
+        $sheet->getColumnDimension('K')->setWidth(12);  // Not Assessed
+        $sheet->getColumnDimension('L')->setWidth(12);  // Performance
+        $sheet->getColumnDimension('M')->setWidth(20);  // Rating
+
+        // Add borders
+        $lastRow = $row - 1;
+        if ($lastRow > 5) {
+            $sheet->getStyle('A3:M' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
     }
 
