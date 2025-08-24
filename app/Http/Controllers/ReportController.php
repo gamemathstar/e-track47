@@ -681,7 +681,7 @@ class ReportController extends Controller
         // Calculate overall performance
         if ($totalAssessed > 0) {
             $counts['overall_performance'] = $totalPerformance / $totalAssessed;
-            
+
             // Determine performance rating
             if ($counts['overall_performance'] >= 100) {
                 $counts['performance_rating'] = 'Exceptional';
@@ -809,40 +809,139 @@ class ReportController extends Controller
         $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers
         $sheet->getRowDimension('5')->setRowHeight(20); // Sub-labels
 
-        // Get sector summary data
-        $sectorSummary = $this->getSectorSummaryData($year);
+        // Get all sectors for the overall summary
+        $sectors = DB::table('sectors')->orderBy('sector_name')->get();
 
         $row = 7; // Start data from row 7 after headers
-        foreach ($sectorSummary as $sector) {
-            $sheet->setCellValue('A' . $row, $sector['sn']);
-            $sheet->setCellValue('B' . $row, $sector['sector_name']);
-            $sheet->setCellValue('C' . $row, $sector['commitment_count']);
-            $sheet->setCellValue('D' . $row, $sector['output_count']);
-            $sheet->setCellValue('E' . $row, $sector['result_count']);
-            $sheet->setCellValue('F' . $row, $sector['exceptional_count']);
-            $sheet->setCellValue('G' . $row, $sector['above_expectation_count']);
-            $sheet->setCellValue('H' . $row, $sector['meets_expectation_count']);
-            $sheet->setCellValue('I' . $row, $sector['needs_improvement_count']);
-            $sheet->setCellValue('J' . $row, $sector['below_minimum_count']);
-            $sheet->setCellValue('K' . $row, $sector['not_assessed_count'] ?? 0);
-            $sheet->setCellValue('L' . $row, $sector['overall_performance'] ?? 0);
-            $sheet->setCellValue('M' . $row, $sector['performance_rating'] ?? '');
-            
+        $iteration = 1; // Loop iteration counter
+
+        foreach ($sectors as $sector) {
+            // Cell A: Loop iteration number
+            $sheet->setCellValue('A' . $row, $iteration);
+
+            // Cell B: Sector name with text wrapping
+            $sheet->setCellValue('B' . $row, $sector->sector_name);
+            $sheet->getStyle('B' . $row)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+            // Cell C: Number of commitments for that sector in the given year
+            $commitmentCount = DB::table('commitments')->where('sector_id', $sector->id)->count();
+            $sheet->setCellValue('C' . $row, $commitmentCount);
+
+            // Cell D: Number of deliverables across all commitments for that sector in that year
+            $deliverableCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->count();
+            $sheet->setCellValue('D' . $row, $deliverableCount);
+
+            // Cell E: Total number of KPIs across all deliverables and commitments for that sector in that year
+            $kpiCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+                ->where('c.sector_id', $sector->id)
+                ->count();
+            $sheet->setCellValue('E' . $row, $kpiCount);
+
+            // Get performance data for this sector
+            $performanceData = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+                ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                    $join->on('kt.kpi_id', '=', 'k.id')
+                        ->where('kt.year', '=', $year);
+                })
+                ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
+                    $join->on('pt.kpi_id', '=', 'k.id')
+                        ->where('pt.year', '=', $year);
+                })
+                ->select([
+                    'kt.target',
+                    'pt.actual_value'
+                ])
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('kt.target')
+                ->get();
+
+            // Cell F: Count of KPIs with performance tracking above 100%
+            $above100Count = 0;
+            // Cell G: Count of KPIs with performance tracking between 70%-100%
+            $between70to100Count = 0;
+            // Cell H: Count of KPIs with performance tracking between 60%-69%
+            $between60to69Count = 0;
+            // Cell I: Count of KPIs with performance tracking between 40%-59%
+            $between40to59Count = 0;
+            // Cell J: Count of KPIs with performance tracking below 40%
+            $below40Count = 0;
+            // Cell K: Count of KPIs with no performance tracking records
+            $noTrackingCount = 0;
+
+            // Variables for calculating average performance
+            $totalAssessed = 0;
+            $totalPerformance = 0;
+
+            foreach ($performanceData as $data) {
+                if ($data->target > 0 && is_numeric($data->actual_value)) {
+                    $ratio = ($data->actual_value / $data->target) * 100;
+                    $totalAssessed++;
+                    $totalPerformance += $ratio;
+
+                    if ($ratio > 100) {
+                        $above100Count++;
+                    } elseif ($ratio >= 70) {
+                        $between70to100Count++;
+                    } elseif ($ratio >= 60) {
+                        $between60to69Count++;
+                    } elseif ($ratio >= 40) {
+                        $between40to59Count++;
+                    } else {
+                        $below40Count++;
+                    }
+                } else {
+                    $noTrackingCount++;
+                }
+            }
+
+            $sheet->setCellValue('F' . $row, $above100Count);
+            $sheet->setCellValue('G' . $row, $between70to100Count);
+            $sheet->setCellValue('H' . $row, $between60to69Count);
+            $sheet->setCellValue('I' . $row, $between40to59Count);
+            $sheet->setCellValue('J' . $row, $below40Count);
+            $sheet->setCellValue('K' . $row, $noTrackingCount);
+
+            // Cell L: Insert a formula that references the last H cell in the corresponding sector sheet
+            if ($sector && isset($sectorOverallAverageRows[$sector->description])) {
+                $overallAverageRow = $sectorOverallAverageRows[$sector->description];
+                $sheet->setCellValue('L' . $row, "='$sector->description'!H" . $overallAverageRow);
+            } else {
+                // Fallback if mapping not found
+                $sheet->setCellValue('L' . $row, 0);
+            }
+
             // Apply Arial Narrow font, size 12 to all cells
-            for ($col = 'A'; $col <= 'M'; $col++) {
+            for ($col = 'A'; $col <= 'L'; $col++) {
                 $sheet->getStyle($col . $row)->getFont()->setName('Arial Narrow');
                 $sheet->getStyle($col . $row)->getFont()->setSize(12);
                 $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
             }
-            
-            // Center align numeric cells (A, C)
+
+            // Center align numeric cells (A, C, D, E, F, G, H, I, J, K)
             $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            
+            $sheet->getStyle('D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('I' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('J' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
             // Format percentage cell L
             $sheet->getStyle('L' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
-            
+
             $row++;
+            $iteration++;
         }
 
         // Style headers with background color
