@@ -605,7 +605,10 @@ class ReportController extends Controller
                 'above_expectation_count' => $performanceCounts['above_expectation'],
                 'meets_expectation_count' => $performanceCounts['meets_expectation'],
                 'needs_improvement_count' => $performanceCounts['needs_improvement'],
-                'below_minimum_count' => $performanceCounts['below_minimum']
+                'below_minimum_count' => $performanceCounts['below_minimum'],
+                'not_assessed_count' => $performanceCounts['not_assessed'],
+                'overall_performance' => $performanceCounts['overall_performance'],
+                'performance_rating' => $performanceCounts['performance_rating']
             ];
         }
         return $result;
@@ -613,7 +616,8 @@ class ReportController extends Controller
 
     private function getSectorPerformanceCounts($sectorName, $year)
     {
-        $performanceData = DB::table('sectors as s')
+        // Get all KPIs for the sector to calculate not assessed count
+        $allKpis = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
@@ -631,20 +635,34 @@ class ReportController extends Controller
             ])
             ->where('s.sector_name', $sectorName)
             ->whereNotNull('kt.target')
-            ->whereNotNull('pt.actual_value')
             ->get();
+
+        // Get performance data for assessed KPIs
+        $performanceData = $allKpis->whereNotNull('actual_value');
 
         $counts = [
             'exceptional' => 0,
             'above_expectation' => 0,
             'meets_expectation' => 0,
             'needs_improvement' => 0,
-            'below_minimum' => 0
+            'below_minimum' => 0,
+            'not_assessed' => 0,
+            'overall_performance' => 0,
+            'performance_rating' => ''
         ];
+
+        // Calculate not assessed count
+        $counts['not_assessed'] = $allKpis->whereNull('actual_value')->count();
+
+        // Calculate performance counts for assessed KPIs
+        $totalAssessed = 0;
+        $totalPerformance = 0;
 
         foreach ($performanceData as $data) {
             if ($data->target > 0 && is_numeric($data->actual_value)) {
                 $ratio = ($data->actual_value / $data->target) * 100;
+                $totalAssessed++;
+                $totalPerformance += $ratio;
 
                 if ($ratio >= 100) {
                     $counts['exceptional']++;
@@ -657,6 +675,24 @@ class ReportController extends Controller
                 } else {
                     $counts['below_minimum']++;
                 }
+            }
+        }
+
+        // Calculate overall performance
+        if ($totalAssessed > 0) {
+            $counts['overall_performance'] = $totalPerformance / $totalAssessed;
+            
+            // Determine performance rating
+            if ($counts['overall_performance'] >= 100) {
+                $counts['performance_rating'] = 'Exceptional';
+            } elseif ($counts['overall_performance'] >= 70) {
+                $counts['performance_rating'] = 'Above Expectation';
+            } elseif ($counts['overall_performance'] >= 60) {
+                $counts['performance_rating'] = 'Meets Expectation';
+            } elseif ($counts['overall_performance'] >= 40) {
+                $counts['performance_rating'] = 'Needs Improvement';
+            } else {
+                $counts['performance_rating'] = 'Below Minimum';
             }
         }
 
@@ -776,7 +812,7 @@ class ReportController extends Controller
         // Get sector summary data
         $sectorSummary = $this->getSectorSummaryData($year);
 
-        $row = 6; // Start data from row 6 after headers
+        $row = 7; // Start data from row 7 after headers
         foreach ($sectorSummary as $sector) {
             $sheet->setCellValue('A' . $row, $sector['sn']);
             $sheet->setCellValue('B' . $row, $sector['sector_name']);
@@ -791,11 +827,29 @@ class ReportController extends Controller
             $sheet->setCellValue('K' . $row, $sector['not_assessed_count'] ?? 0);
             $sheet->setCellValue('L' . $row, $sector['overall_performance'] ?? 0);
             $sheet->setCellValue('M' . $row, $sector['performance_rating'] ?? '');
+            
+            // Apply Arial Narrow font, size 12 to all cells
+            for ($col = 'A'; $col <= 'M'; $col++) {
+                $sheet->getStyle($col . $row)->getFont()->setName('Arial Narrow');
+                $sheet->getStyle($col . $row)->getFont()->setSize(12);
+                $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            }
+            
+            // Center align numeric cells (A, C)
+            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            
+            // Format percentage cell L
+            $sheet->getStyle('L' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+            
             $row++;
         }
 
         // Style headers with background color
         $sheet->getStyle('A3:M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+
+        // Apply the same background color to row 6
+        $sheet->getStyle('A6:M6')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
 
         // Set column widths
         $sheet->getColumnDimension('A')->setWidth(6);   // S/N
@@ -812,12 +866,17 @@ class ReportController extends Controller
         $sheet->getColumnDimension('L')->setWidth(12);  // Performance
         $sheet->getColumnDimension('M')->setWidth(20);  // Rating
 
-        // Add borders
+        // Add borders to header cells (rows 1-5)
+        $sheet->getStyle('A1:M5')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+        // Remove all borders from the summary data rows (row 6 onwards)
         $lastRow = $row - 1;
         if ($lastRow > 5) {
-            $sheet->getStyle('A3:M' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('A6:M' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_NONE);
         }
     }
+
+
 
     private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
     {
@@ -1395,6 +1454,8 @@ class ReportController extends Controller
 
         // Add borders to the header block (A1:N5)
         $sheet->getStyle('A1:N5')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+
     }
 
     private function createIndividualSectorSheets($spreadsheet, $year)
