@@ -423,11 +423,13 @@ class ReportController extends Controller
         // Create Overall Summary sheet
         $this->createOverallSummarySheet($spreadsheet, $year);
 
-        // Create Grand Summary sheet
-        $this->createGrandSummarySheet($spreadsheet, $year);
-
         // Create individual sector sheets and get commitment average row mapping
-        $commitmentAverageRows = $this->createIndividualSectorSheets($spreadsheet, $year);
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year);
+        $commitmentAverageRows = $sectorData['commitmentAverageRows'];
+        $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
+
+        // Create Grand Summary sheet
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
 
         // Create Sector Summary Details sheet
         $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows);
@@ -718,52 +720,188 @@ class ReportController extends Controller
         }
     }
 
-    private function createGrandSummarySheet($spreadsheet, $year)
+    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Grand Summary-Sector_MDAs');
+        $sheet->setTitle('Grand Summary-Sector_MDAs+');
 
-        // Set headers for Grand Summary
-        $sheet->setCellValue('A1', 'S/N');
-        $sheet->setCellValue('B1', 'Sector/MDA');
-        $sheet->setCellValue('C1', 'Total Commitments');
-        $sheet->setCellValue('D1', 'Total Deliverables');
-        $sheet->setCellValue('E1', 'Total KPIs');
-        $sheet->setCellValue('F1', 'Average Performance');
-        $sheet->setCellValue('G1', 'Performance Rating');
+        // Row 1: Top Title
+        $sheet->setCellValue('A1', 'Perfomance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
+        $sheet->mergeCells('A1:H1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A1')->getFont()->setName('Agency FB');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A1')->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension('1')->setRowHeight(30);
+
+        // Row 2: Subtitle
+        $sheet->setCellValue('A2', $year . ' Fiscal Year Snapshot View of MDA/Sector Performance (January to December');
+        $sheet->mergeCells('A2:H2');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A2')->getFont()->setName('Agency FB');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A2')->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension('2')->setRowHeight(30);
+
+        // Row 3: Column headers
+        // Cells A-E span rows 3-4
+        $sheet->setCellValue('A3', 'S/N');
+        $sheet->mergeCells('A3:A4');
+        $sheet->getStyle('A3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('B3', 'Names of MDAs/Sectors');
+        $sheet->mergeCells('B3:B4');
+        $sheet->getStyle('B3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('B3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('C3', 'No. of Commitments');
+        $sheet->mergeCells('C3:C4');
+        $sheet->getStyle('C3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('C3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('C3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('D3', 'No. of Outputs');
+        $sheet->mergeCells('D3:D4');
+        $sheet->getStyle('D3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('D3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('D3')->getAlignment()->setWrapText(true);
+
+        $sheet->setCellValue('E3', 'No of Results to be Delivered');
+        $sheet->mergeCells('E3:E4');
+        $sheet->getStyle('E3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('E3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('E3')->getAlignment()->setWrapText(true);
+
+        // Cells F3-H3 merged for 'Overall Performance'
+        $sheet->setCellValue('F3', 'Overall Performance');
+        $sheet->mergeCells('F3:H3');
+        $sheet->getStyle('F3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('F3')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('F3')->getAlignment()->setWrapText(true);
+
+        // Row 4: Sub-headers for Overall Performance
+        $sheet->setCellValue('F4', 'Performance at Mid-Year');
+        $sheet->setCellValue('G4', 'Fully Performance');
+        $sheet->setCellValue('H4', 'Fully Performance Rating');
+
+        // Set row heights for header rows
+        $sheet->getRowDimension('1')->setRowHeight(30); // Title row
+        $sheet->getRowDimension('2')->setRowHeight(30); // Subtitle row
+        $sheet->getRowDimension('3')->setRowHeight(22); // Header row
+        $sheet->getRowDimension('4')->setRowHeight(30); // Sub-header row
+
+        // Set column widths
+        $sheet->getColumnDimension('A')->setWidth(5);   // S/N
+        $sheet->getColumnDimension('B')->setWidth(45);  // Names of MDAs/Sectors
+        $sheet->getColumnDimension('C')->setWidth(10);  // No. of Commitments
+        $sheet->getColumnDimension('D')->setWidth(10);  // No. of Outputs
+        $sheet->getColumnDimension('E')->setWidth(10);  // No of Results to be Delivered
+        $sheet->getColumnDimension('F')->setWidth(15);  // Performance at Mid-Year
+        $sheet->getColumnDimension('G')->setWidth(15);  // Fully Performance
+        $sheet->getColumnDimension('H')->setWidth(25);  // Fully Performance Rating
+
+        // Apply text wrapping and centering to all header cells
+        for ($col = 'A'; $col <= 'H'; $col++) {
+            for ($row = 3; $row <= 4; $row++) {
+                $sheet->getStyle($col . $row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle($col . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle($col . $row)->getFont()->setName('Agency FB');
+                $sheet->getStyle($col . $row)->getFont()->setSize(10);
+            }
+        }
+
+        // Style headers
+        $sheet->getStyle('A1:H4')->getFont()->setBold(true);
+
+        // Apply background color to all header cells (rows 3-4)
+        $sheet->getStyle('A3:H4')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
+
+        $sheet->getStyle('A3:H4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A3:H4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Get grand summary data
         $grandSummary = $this->getGrandSummaryData($year);
 
-        $row = 2;
+        $row = 5; // Start data from row 5 after headers
+        $iteration = 1; // Loop iteration counter
+
         foreach ($grandSummary as $summary) {
-            $sheet->setCellValue('A' . $row, $summary['sn']);
+            // Cell A: Set the value to the loop iteration number
+            $sheet->setCellValue('A' . $row, $iteration);
+
+            // Cell B: Set the value to the sector name, align the text to the left
             $sheet->setCellValue('B' . $row, $summary['sector_name']);
+            $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+            // Cell C: Set the value to the number of commitments for that sector
             $sheet->setCellValue('C' . $row, $summary['commitment_count']);
+
+            // Cell D: Set the value to the total number of deliverables for all commitments for that sector
             $sheet->setCellValue('D' . $row, $summary['deliverable_count']);
+
+            // Cell E: Set the value to the total number of KPIs for all deliverables for all commitments for that sector
             $sheet->setCellValue('E' . $row, $summary['kpi_count']);
-            $sheet->setCellValue('F' . $row, $summary['average_performance']);
-            $sheet->setCellValue('G' . $row, $summary['performance_rating']);
+
+            // Cell F: Leave empty
+            $sheet->setCellValue('F' . $row, '');
+
+            // Cell G: Insert a formula that references the last H cell in the corresponding sector sheet
+            $sectorSheetName = $summary['sector_name'];
+            
+            // Get the sector description (which is used as the sheet name) from the database
+            $sector = DB::table('sectors')->where('sector_name', $sectorSheetName)->first();
+            if ($sector && isset($sectorOverallAverageRows[$sector->description])) {
+                $overallAverageRow = $sectorOverallAverageRows[$sector->description];
+                $sheet->setCellValue('G' . $row, "='$sector->description'!H" . $overallAverageRow);
+            } else {
+                // Fallback if mapping not found
+                $sheet->setCellValue('G' . $row, 0);
+            }
+
+            // Apply the font "Agency FB" with size 15 to all these cells (A to G)
+            for ($col = 'A'; $col <= 'G'; $col++) {
+                $sheet->getStyle($col . $row)->getFont()->setName('Agency FB');
+                $sheet->getStyle($col . $row)->getFont()->setSize(15);
+                $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            }
+
+            // Center align numeric cells (A, C, D, E)
+            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Format percentage cell G
+            $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+
             $row++;
+            $iteration++;
         }
 
-        // Style headers
-        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:G1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
-
-        // Auto-fit columns
-        foreach (range('A', 'G') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+        // Add borders to the entire data range
+        $lastRow = $row - 1;
+        if ($lastRow > 4) {
+            $sheet->getStyle('A3:H' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
+
+        // Add borders to the header block (A1:H4)
+        $sheet->getStyle('A1:H4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
     private function getGrandSummaryData($year)
     {
-        // Get grand summary data
+        // Get grand summary data - use LEFT JOIN to include all sectors even if they don't have complete data
         $grandSummary = DB::table('sectors as s')
-            ->join('commitments as c', 'c.sector_id', '=', 's.id')
-            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
-            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('commitments as c', 'c.sector_id', '=', 's.id')
+            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
                     ->where('kt.year', '=', $year);
@@ -1045,7 +1183,7 @@ class ReportController extends Controller
                     $sheet->getStyle($col . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     $sheet->getStyle($col . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 }
-                
+
                 // Apply header background color to cells E-J and remove borders
                 $sheet->getStyle('E' . $row . ':J' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
                 $sheet->getStyle('E' . $row . ':J' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_NONE);
@@ -1072,7 +1210,7 @@ class ReportController extends Controller
             $sheet->getStyle('C' . $summaryRow . ':K' . $summaryRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
 
             $row++;
-            
+
             // Add empty row after summary row
             $row++;
         }
@@ -1115,7 +1253,8 @@ class ReportController extends Controller
     {
         $sectors = Sector::all(); // Get all sectors
         $commitmentAverageRows = []; // Track commitment average row numbers
-        
+        $sectorOverallAverageRows = []; // Track sector overall average row numbers
+
         foreach ($sectors as $sector) {
             $sheet = $spreadsheet->createSheet();
 
@@ -1225,7 +1364,7 @@ class ReportController extends Controller
             $commitmentPerformanceData = [];
             $sectorPerformanceData = [];
             $currentCommitmentStartRow = null;
-            
+
             // Track processed commitments to ensure all are handled
             $processedCommitments = [];
 
@@ -1244,7 +1383,7 @@ class ReportController extends Controller
                         $hRange = 'H' . $currentCommitmentStartRow . ':H' . $commitmentEndRow;
                         $sheet->setCellValue('I' . $row, '=AVERAGE(' . $hRange . ')');
                         $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%');
-                        
+
                         // Track this row for the summary sheet using commitment ID for accuracy
                         $commitmentAverageRows[$sector->description][$currentCommitmentId] = $row;
 
@@ -1395,7 +1534,7 @@ class ReportController extends Controller
                 $hRange = 'H' . $currentCommitmentStartRow . ':H' . $commitmentEndRow;
                 $sheet->setCellValue('I' . $row, '=AVERAGE(' . $hRange . ')');
                 $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%');
-                
+
                 // Track this row for the summary sheet using commitment ID for accuracy
                 $commitmentAverageRows[$sector->description][$currentCommitmentId] = $row;
 
@@ -1405,7 +1544,7 @@ class ReportController extends Controller
 
                 $row++;
             }
-            
+
             // Handle commitments with no KPIs (not processed in the main loop)
             $allCommitments = DB::table('commitments')->where('sector_id', $sector->id)->orderBy('id')->get();
             foreach ($allCommitments as $commitment) {
@@ -1421,7 +1560,7 @@ class ReportController extends Controller
                     $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                     $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                     $row++;
-                    
+
                     // Add placeholder row for no data
                     $sheet->setCellValue('C' . $row, 'No KPIs available');
                     $sheet->setCellValue('E' . $row, 0);
@@ -1434,21 +1573,21 @@ class ReportController extends Controller
                     $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setWrapText(true);
                     $sheet->getStyle('A' . $row . ':I' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                     $row++;
-                    
+
                     // Add commitment average performance row
                     $sheet->setCellValue('C' . $row, 'Average Performance');
                     $sheet->getStyle('C' . $row)->getFont()->setBold(true);
                     $sheet->setCellValue('I' . $row, 0);
                     $sheet->getStyle('I' . $row)->getNumberFormat()->setFormatCode('0%;"Not Assessed"');
-                    
+
                     // Track this row for the summary sheet
                     $commitmentAverageRows[$sector->description][$commitment->id] = $row;
-                    
+
                     // Make entire row bold
                     $sheet->getStyle('A' . $row . ':I' . $row)->getFont()->setBold(true);
                     $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                     $row++;
-                    
+
                     $commitmentCounter++;
                 }
             }
@@ -1475,13 +1614,16 @@ class ReportController extends Controller
             $sheet->getStyle('A' . $row . ':I' . $row)->getFont()->setBold(true);
             $sheet->getStyle('A' . $row . ':I' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
+            // Track this overall average row for the grand summary sheet
+            $sectorOverallAverageRows[$sector->description] = $row;
+
             // Add borders to the data range as well
             $lastRow = $row - 1;
             if ($lastRow > 4) {
                 $sheet->getStyle('A5:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             }
         }
-        
-        return $commitmentAverageRows;
+
+        return ['commitmentAverageRows' => $commitmentAverageRows, 'sectorOverallAverageRows' => $sectorOverallAverageRows];
     }
 }
