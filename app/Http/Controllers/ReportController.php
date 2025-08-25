@@ -443,6 +443,9 @@ class ReportController extends Controller
         if ($overallSummarySheet) {
             $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($overallSummarySheet));
             $spreadsheet->addSheet($overallSummarySheet, 0);
+
+            // Set this sheet as the active sheet
+            $spreadsheet->setActiveSheetIndex($spreadsheet->getIndex($overallSummarySheet));
         }
 
         if ($grandSummarySheet) {
@@ -874,9 +877,9 @@ class ReportController extends Controller
                 })
                 ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                     $join->on('pt.kpi_id', '=', 'k.id')
-                        ->where(function($query) use ($year) {
+                        ->where(function ($query) use ($year) {
                             $query->where('pt.year', '=', $year)
-                                  ->orWhere('pt.year', '=', 0); // Include records with year = 0
+                                ->orWhere('pt.year', '=', 0); // Include records with year = 0
                         });
                 })
                 ->select([
