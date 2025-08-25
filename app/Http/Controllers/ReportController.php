@@ -802,12 +802,12 @@ class ReportController extends Controller
         $sheet->getStyle('A1:M5')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle('A1:M5')->getAlignment()->setWrapText(true);
 
-        // Set row heights
+        // Set row heights - minimum 25 for all rows
         $sheet->getRowDimension('1')->setRowHeight(28); // Main title
-        $sheet->getRowDimension('2')->setRowHeight(22); // Subtitle
-        $sheet->getRowDimension('3')->setRowHeight(20); // Merged headers
-        $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers
-        $sheet->getRowDimension('5')->setRowHeight(20); // Sub-labels
+        $sheet->getRowDimension('2')->setRowHeight(25); // Subtitle
+        $sheet->getRowDimension('3')->setRowHeight(25); // Merged headers
+        $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers (keep larger for merged content)
+        $sheet->getRowDimension('5')->setRowHeight(25); // Sub-labels
 
         // Get all sectors for the overall summary
         $sectors = DB::table('sectors')->orderBy('sector_name')->get();
@@ -826,14 +826,14 @@ class ReportController extends Controller
 
             // Cell C: Number of commitments for that sector in the given year
             $commitmentCount = DB::table('commitments')->where('sector_id', $sector->id)->count();
-            $sheet->setCellValue('C' . $row, $commitmentCount);
+            $sheet->setCellValue('C' . $row, $commitmentCount > 0 ? $commitmentCount : '-');
 
             // Cell D: Number of deliverables across all commitments for that sector in that year
             $deliverableCount = DB::table('commitments as c')
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->where('c.sector_id', $sector->id)
                 ->count();
-            $sheet->setCellValue('D' . $row, $deliverableCount);
+            $sheet->setCellValue('D' . $row, $deliverableCount > 0 ? $deliverableCount : '-');
 
             // Cell E: Total number of KPIs across all deliverables and commitments for that sector in that year
             $kpiCount = DB::table('commitments as c')
@@ -841,7 +841,7 @@ class ReportController extends Controller
                 ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
                 ->where('c.sector_id', $sector->id)
                 ->count();
-            $sheet->setCellValue('E' . $row, $kpiCount);
+            $sheet->setCellValue('E' . $row, $kpiCount > 0 ? $kpiCount : '-');
 
             // Get performance data for this sector - aggregate by KPI to avoid duplicates
             $performanceData = DB::table('commitments as c')
@@ -885,7 +885,7 @@ class ReportController extends Controller
             // Variables for calculating average performance
             $totalAssessed = 0;
             $totalPerformance = 0;
-            
+
             // Get total KPIs for this sector to calculate not assessed count
             $totalKpis = DB::table('commitments as c')
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
@@ -903,7 +903,7 @@ class ReportController extends Controller
                 // Convert target and actual_value to numeric values, handling string values
                 $target = is_numeric($data->target) ? (float)$data->target : 0;
                 $actualValue = is_numeric($data->total_actual_value) ? (float)$data->total_actual_value : 0;
-                
+
                 if ($target > 0 && $actualValue >= 0) {
                     $ratio = ($actualValue / $target) * 100;
                     $totalAssessed++;
@@ -925,12 +925,13 @@ class ReportController extends Controller
                 }
             }
 
-            $sheet->setCellValue('F' . $row, $above100Count);
-            $sheet->setCellValue('G' . $row, $between70to100Count);
-            $sheet->setCellValue('H' . $row, $between60to69Count);
-            $sheet->setCellValue('I' . $row, $between40to59Count);
-            $sheet->setCellValue('J' . $row, $below40Count);
-            $sheet->setCellValue('K' . $row, $totalKpis - $totalAssessed); // Not assessed = total KPIs - assessed KPIs
+            $sheet->setCellValue('F' . $row, $above100Count > 0 ? $above100Count : '-');
+            $sheet->setCellValue('G' . $row, $between70to100Count > 0 ? $between70to100Count : '-');
+            $sheet->setCellValue('H' . $row, $between60to69Count > 0 ? $between60to69Count : '-');
+            $sheet->setCellValue('I' . $row, $between40to59Count > 0 ? $between40to59Count : '-');
+            $sheet->setCellValue('J' . $row, $below40Count > 0 ? $below40Count : '-');
+            $notAssessedCount = $totalKpis - $totalAssessed;
+            $sheet->setCellValue('K' . $row, $notAssessedCount > 0 ? $notAssessedCount : '-'); // Not assessed = total KPIs - assessed KPIs
 
             // Cell L: Insert a formula that references the last H cell in the corresponding sector sheet
             if ($sector && isset($sectorOverallAverageRows[$sector->description])) {
@@ -963,9 +964,57 @@ class ReportController extends Controller
             // Format percentage cell L
             $sheet->getStyle('L' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
 
+            // Set minimum row height for summary data rows
+            $sheet->getRowDimension($row)->setRowHeight(25);
+
             $row++;
             $iteration++;
         }
+
+        // Add summary row after all data rows
+        $summaryRow = $row;
+
+        // Cell A: Empty
+        $sheet->setCellValue('A' . $summaryRow, '');
+
+        // Cell B: Summary label
+        $sheet->setCellValue('B' . $summaryRow, '');
+
+        // Cells C-K: Sum formulas
+        $dataStartRow = 7; // First data row
+        $dataEndRow = $row - 1; // Last data row
+
+        $sheet->setCellValue('C' . $summaryRow, "=SUM(C{$dataStartRow}:C{$dataEndRow})");
+        $sheet->setCellValue('D' . $summaryRow, "=SUM(D{$dataStartRow}:D{$dataEndRow})");
+        $sheet->setCellValue('E' . $summaryRow, "=SUM(E{$dataStartRow}:E{$dataEndRow})");
+        $sheet->setCellValue('F' . $summaryRow, "=SUM(F{$dataStartRow}:F{$dataEndRow})");
+        $sheet->setCellValue('G' . $summaryRow, "=SUM(G{$dataStartRow}:G{$dataEndRow})");
+        $sheet->setCellValue('H' . $summaryRow, "=SUM(H{$dataStartRow}:H{$dataEndRow})");
+        $sheet->setCellValue('I' . $summaryRow, "=SUM(I{$dataStartRow}:I{$dataEndRow})");
+        $sheet->setCellValue('J' . $summaryRow, "=SUM(J{$dataStartRow}:J{$dataEndRow})");
+        $sheet->setCellValue('K' . $summaryRow, "=SUM(K{$dataStartRow}:K{$dataEndRow})");
+
+        // Cell L: Average formula
+        $sheet->setCellValue('L' . $summaryRow, "=AVERAGE(L{$dataStartRow}:L{$dataEndRow})");
+
+        // Apply formatting to summary row
+        $sheet->getStyle('A' . $summaryRow . ':L' . $summaryRow)->getFont()->setBold(true);
+        $sheet->getStyle('A' . $summaryRow . ':L' . $summaryRow)->getFont()->setName('Arial Narrow');
+        $sheet->getStyle('A' . $summaryRow . ':L' . $summaryRow)->getFont()->setSize(12);
+
+        // Center align numeric cells (C-K)
+        for ($col = 'C'; $col <= 'K'; $col++) {
+            $sheet->getStyle($col . $summaryRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        }
+
+        // Format percentage cell L
+        $sheet->getStyle('L' . $summaryRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
+
+        // Set row height for summary row
+        $sheet->getRowDimension($summaryRow)->setRowHeight(25);
+
+        // Add background color to summary row
+        $sheet->getStyle('A' . $summaryRow . ':L' . $summaryRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E6F3FF');
 
         // Style headers with background color
         $sheet->getStyle('A3:M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F1');
