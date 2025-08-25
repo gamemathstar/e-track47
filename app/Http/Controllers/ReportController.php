@@ -420,13 +420,13 @@ class ReportController extends Controller
         // Create Excel file
         $spreadsheet = new Spreadsheet();
 
-        // Create Overall Summary sheet
-        $this->createOverallSummarySheet($spreadsheet, $year);
-
         // Create individual sector sheets and get commitment average row mapping
         $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year);
         $commitmentAverageRows = $sectorData['commitmentAverageRows'];
         $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
+
+        // Create Overall Summary sheet
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
 
         // Create Grand Summary sheet
         $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
@@ -699,9 +699,9 @@ class ReportController extends Controller
         return $counts;
     }
 
-    private function createOverallSummarySheet($spreadsheet, $year)
+    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
     {
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Overall Summary ');
 
         // 1. Main Title (Row 1)
@@ -974,7 +974,6 @@ class ReportController extends Controller
             $sheet->getStyle('A6:M' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_NONE);
         }
     }
-
 
 
     private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
@@ -1563,8 +1562,14 @@ class ReportController extends Controller
         $commitmentAverageRows = []; // Track commitment average row numbers
         $sectorOverallAverageRows = []; // Track sector overall average row numbers
 
+        $first = true;
         foreach ($sectors as $sector) {
-            $sheet = $spreadsheet->createSheet();
+            if ($first) {
+                $sheet = $spreadsheet->getActiveSheet();
+                $first = false;
+            } else {
+                $sheet = $spreadsheet->createSheet();
+            }
 
             $sheet->setTitle($sector->description);
 
