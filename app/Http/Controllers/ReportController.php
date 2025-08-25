@@ -843,7 +843,7 @@ class ReportController extends Controller
                 ->count();
             $sheet->setCellValue('E' . $row, $kpiCount);
 
-            // Get performance data for this sector
+            // Get performance data for this sector - aggregate by KPI to avoid duplicates
             $performanceData = DB::table('commitments as c')
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
@@ -853,14 +853,20 @@ class ReportController extends Controller
                 })
                 ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                     $join->on('pt.kpi_id', '=', 'k.id')
-                        ->where('pt.year', '=', $year);
+                        ->where(function($query) use ($year) {
+                            $query->where('pt.year', '=', $year)
+                                  ->orWhere('pt.year', '=', 0); // Include records with year = 0
+                        });
                 })
                 ->select([
+                    'k.id as kpi_id',
                     'kt.target',
-                    'pt.actual_value'
+                    DB::raw('SUM(CAST(pt.actual_value AS DECIMAL(10,2))) as total_actual_value')
                 ])
                 ->where('c.sector_id', $sector->id)
                 ->whereNotNull('kt.target')
+                ->where('kt.target', '!=', '') // Exclude empty targets
+                ->groupBy('k.id', 'kt.target')
                 ->get();
 
             // Cell F: Count of KPIs with performance tracking above 100%
@@ -879,10 +885,27 @@ class ReportController extends Controller
             // Variables for calculating average performance
             $totalAssessed = 0;
             $totalPerformance = 0;
+            
+            // Get total KPIs for this sector to calculate not assessed count
+            $totalKpis = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+                ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                    $join->on('kt.kpi_id', '=', 'k.id')
+                        ->where('kt.year', '=', $year);
+                })
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('kt.target')
+                ->where('kt.target', '!=', '')
+                ->count();
 
             foreach ($performanceData as $data) {
-                if ($data->target > 0 && is_numeric($data->actual_value)) {
-                    $ratio = ($data->actual_value / $data->target) * 100;
+                // Convert target and actual_value to numeric values, handling string values
+                $target = is_numeric($data->target) ? (float)$data->target : 0;
+                $actualValue = is_numeric($data->total_actual_value) ? (float)$data->total_actual_value : 0;
+                
+                if ($target > 0 && $actualValue >= 0) {
+                    $ratio = ($actualValue / $target) * 100;
                     $totalAssessed++;
                     $totalPerformance += $ratio;
 
@@ -907,7 +930,7 @@ class ReportController extends Controller
             $sheet->setCellValue('H' . $row, $between60to69Count);
             $sheet->setCellValue('I' . $row, $between40to59Count);
             $sheet->setCellValue('J' . $row, $below40Count);
-            $sheet->setCellValue('K' . $row, $noTrackingCount);
+            $sheet->setCellValue('K' . $row, $totalKpis - $totalAssessed); // Not assessed = total KPIs - assessed KPIs
 
             // Cell L: Insert a formula that references the last H cell in the corresponding sector sheet
             if ($sector && isset($sectorOverallAverageRows[$sector->description])) {
