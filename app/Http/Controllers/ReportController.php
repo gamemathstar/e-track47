@@ -434,6 +434,27 @@ class ReportController extends Controller
         // Create Sector Summary Details sheet
         $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows);
 
+        //  RE-ORDER THE SHEETS HERE
+        // Reorder sheets: Overall Summary at index 0, Grand Summary at index 1, Sector Summary Details at index 2
+        $overallSummarySheet = $spreadsheet->getSheetByName('Overall Summary');
+        $grandSummarySheet = $spreadsheet->getSheetByName('Grand Summary-Sector_MDAs+');
+        $sectorSummarySheet = $spreadsheet->getSheetByName('Sector_MDAs Summary Details');
+
+        if ($overallSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($overallSummarySheet));
+            $spreadsheet->addSheet($overallSummarySheet, 0);
+        }
+
+        if ($grandSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($grandSummarySheet));
+            $spreadsheet->addSheet($grandSummarySheet, 1);
+        }
+
+        if ($sectorSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($sectorSummarySheet));
+            $spreadsheet->addSheet($sectorSummarySheet, 2);
+        }
+
         // Create the Excel file
         $writer = new Xlsx($spreadsheet);
         $filename = "All_Sectors_MDAs_Full_Year_Assessment_Reporting_{$year}.xlsx";
@@ -702,7 +723,7 @@ class ReportController extends Controller
     private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Overall Summary ');
+        $sheet->setTitle('Overall Summary');
 
         // 1. Main Title (Row 1)
         $sheet->setCellValue('A1', 'Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor');
@@ -1046,7 +1067,6 @@ class ReportController extends Controller
             $sheet->getStyle('A6:M' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_NONE);
         }
     }
-
 
     private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
     {
