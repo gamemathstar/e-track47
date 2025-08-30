@@ -24,7 +24,7 @@
         }
 
         .sector-header {
-            background-color: #4a90e2;
+            background-color: #008751;
             color: white;
             font-weight: bold;
             text-align: center;
