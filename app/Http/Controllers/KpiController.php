@@ -76,7 +76,7 @@ class KpiController extends Controller
 
     public function tracking(Kpi $kpi, $track_id)
     {
-        $track = $kpi->performanceTracking()->where(['id' => $track_id])->first();
+        $track = $kpi->performance_trackings()->where(['id' => $track_id])->first();
         return view('pages.sector.performance', compact('kpi', 'track'));
     }
 

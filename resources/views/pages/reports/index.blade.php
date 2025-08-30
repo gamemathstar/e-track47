@@ -32,7 +32,7 @@
             Reports
         </h2>
         <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
-            <a href="{{ route('reports.comprehensive') }}" class="btn btn-primary">
+            <a href="{{ route('reports.comprehensive') }}" class="btn btn-primary mr-2">
                 <i class="w-4 h-4 mr-2" data-lucide="bar-chart-3"></i>
                 Comprehensive KPI Report
             </a>
