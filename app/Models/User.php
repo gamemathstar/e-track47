@@ -14,6 +14,7 @@ use Laravel\Passport\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
 //    use HasApiTokens, Notifiable;
     /**
      * The attributes that are mass assignable.
@@ -149,7 +150,7 @@ class User extends Authenticatable
 //            ->where('performance_trackings.actual_value', '=', DB::raw('kpis.target_value'))
 //            ->where('performance_trackings.delivery_department_value', '=', DB::raw('kpis.target_value'))
             ->where('performance_trackings.confirmation_status', '=', 'Confirmed')
-            ->select('sectors.sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
+            ->select('sectors.description as sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
             ->groupBy('sectors.id')
             ->get();
 
@@ -157,7 +158,7 @@ class User extends Authenticatable
 
     public function kpiPerformanceRatio()
     {
-        $sectors = Sector::select('sectors.sector_name')
+        $sectors = Sector::select('sectors.description as sector_name')
             ->addSelect(DB::raw('COUNT(DISTINCT kpis.id) as total_kpi_count'))
             ->addSelect(DB::raw('COUNT(DISTINCT CASE WHEN performance_trackings.confirmation_status = "Confirmed" THEN kpis.id END) as confirmed_kpi_count'))
             ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
@@ -182,20 +183,20 @@ class User extends Authenticatable
 
     public function budgetDistribution()
     {
-        return $sectorsWithBudget = Sector::select('sector_name', DB::raw('SUM(commitments.budget) as total_budget'))
+        return $sectorsWithBudget = Sector::select('description as sector_name', DB::raw('SUM(commitments.budget) as total_budget'))
             ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->groupBy('sectors.id')
             ->get();
     }
 
-    public function pendingCompleted($sector_id=0)
+    public function pendingCompleted($sector_id = 0)
     {
         $where = [];
-        if($sector_id){
-            $where[] = ['sectors.id','=',$sector_id];
+        if ($sector_id) {
+            $where[] = ['sectors.id', '=', $sector_id];
         }
         $sectorsWithCommitmentStatus = Sector::leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
-            ->select('sectors.id', 'sectors.sector_name')
+            ->select('sectors.id', 'sectors.description as sector_name')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status = "Completed" THEN commitments.id END) as completed_commitments_count')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status != "Completed" THEN commitments.id END) as pending_commitments_count')
             ->groupBy('sectors.id', 'sectors.sector_name')
@@ -208,32 +209,35 @@ class User extends Authenticatable
     public function isSystemAdmin()
     {
         $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='System';
+        if ($userRole) {
+            return $userRole->target_entity == 'System';
         }
         return false;
     }
+
     public function isGovernor()
     {
         $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='State';
+        if ($userRole) {
+            return $userRole->target_entity == 'State';
         }
         return false;
     }
+
     public function isSectorHead()
     {
         $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='Sector'?Sector::find($userRole->entity_id):0;
+        if ($userRole) {
+            return $userRole->target_entity == 'Sector' ? Sector::find($userRole->entity_id) : 0;
         }
         return false;
     }
+
     public function isDeliveryDepartment()
     {
         $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='Deliverable';
+        if ($userRole) {
+            return $userRole->target_entity == 'Deliverable';
         }
         return false;
     }
