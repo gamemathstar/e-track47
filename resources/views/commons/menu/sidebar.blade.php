@@ -4,6 +4,9 @@
 
 @endphp
 <nav class="side-nav">
+    @auth
+
+
     <ul>
         @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryDepartment())
             <li>
@@ -118,5 +121,6 @@
                 </a>
             </li>
     </ul>
+    @endauth
 </nav>
 <!-- END: Side Menu -->

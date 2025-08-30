@@ -15,6 +15,11 @@ class AuthLoginController extends Controller
         $this->middleware('guest')->except('logout');
     }
 
+    public function index()
+    {
+        return view('welcome');
+    }
+
     public function showLoginForm()
     {
         return view('pages.auth.login');

@@ -24,10 +24,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-//Route::get('/',[AuthLoginController::class, 'showLoginForm']);
+Route::get('/',[AuthLoginController::class, 'index'])->name('home');
 
 //Route::get('/', [AuthLoginController::class, 'showLoginForm']);
-Route::get('/', [CommentController::class, 'index'])->name('home');
+Route::get('/sec-proj', [CommentController::class, 'index'])->name('home2');
 Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthLoginController::class, 'login'])->name('login.process');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
