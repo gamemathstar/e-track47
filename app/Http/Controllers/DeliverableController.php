@@ -114,6 +114,33 @@ class DeliverableController extends Controller
         return ['status' => 0, 'message' => 'Invalid Deliverable'];
     }
 
+    public function update(Request $request)
+    {
+        $request->validate([
+            'deliverable_id' => 'required|exists:deliverables,id',
+            'deliverable' => 'required|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'status' => 'required|string|in:Not Started,In Progress,Completed'
+        ]);
+
+        $deliverable = Deliverable::find($request->deliverable_id);
+        
+        if (!$deliverable) {
+            return redirect()->back()->with('failure', 'Deliverable not found');
+        }
+
+        // Update deliverable fields
+        $deliverable->deliverable = $request->deliverable;
+        $deliverable->start_date = $request->start_date;
+        $deliverable->end_date = $request->end_date;
+        $deliverable->status = $request->status;
+
+        $deliverable->save();
+
+        return redirect()->back()->with('success', 'Deliverable updated successfully');
+    }
+
     public function delete(Deliverable $deliverable)
     {
         if (count($deliverable->kpis()->get()) == 0) {

@@ -106,16 +106,49 @@ class CommitmentController extends Controller
 
     public function update(Request $request)
     {
-        $commitment = Commitment::find($request->commitment_id);
         $request->validate([
-            'commitment_title' => 'required|unique:commitments,commitment_title,' . $commitment->id . '|max:255',
-            'description' => 'required|max:255',
-            // Add other validation rules as needed
+            'commitment_id' => 'required|exists:commitments,id',
+            'name' => 'required|string|max:255',
+            'type' => 'required|string|max:255',
+            'description' => 'required|string',
+            'status' => 'required|string|in:Not Started,In Progress,Completed',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'img_url' => 'nullable|file|mimes:jpg,png,jpeg|max:2048'
         ]);
 
-        $commitment->update($request->all());
+        $commitment = Commitment::find($request->commitment_id);
+        
+        if (!$commitment) {
+            return redirect()->back()->with('failure', 'Commitment not found');
+        }
 
-        return redirect()->route('sectors.view', [$commitment->sector_id, $commitment->id]);
+        // Calculate duration
+        $dt_start = new \DateTime($request->start_date);
+        $dt_end = new \DateTime($request->end_date);
+        $diff = $dt_start->diff($dt_end);
+        $duration = $diff->format('%a');
+
+        // Update commitment fields
+        $commitment->name = $request->name;
+        $commitment->type = $request->type;
+        $commitment->description = $request->description;
+        $commitment->status = $request->status;
+        $commitment->start_date = $request->start_date;
+        $commitment->end_date = $request->end_date;
+        $commitment->duration_in_days = $duration;
+
+        // Handle image upload if provided
+        if ($request->hasFile('img_url')) {
+            $file = $request->file('img_url');
+            $fileName = time() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads'), $fileName);
+            $commitment->img_url = $fileName;
+        }
+
+        $commitment->save();
+
+        return redirect()->back()->with('success', 'Commitment updated successfully');
     }
 
     public function delete(Commitment $commitment)

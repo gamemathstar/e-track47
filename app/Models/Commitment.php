@@ -21,6 +21,7 @@ class Commitment extends Model
         'budget',
         'duration_in_days',
         'sector_id',
+        'img_url',
     ];
 
     public function users()

@@ -1,8 +1,14 @@
 <div class="flex items-center border-b border-slate-200/60 dark:border-darkmode-400 pb-5 mb-5">
     <div class="font-medium text-base truncate">
         <a href="javascript:;" class="flex items-center ml-auto text-primary"
-           id="editCommitmentBtn" com-title="{{$commitment->commitment_title}}"
-           com-description="{{$commitment->description}}" com-id="{{$commitment->id}}"
+           id="editCommitmentBtn" 
+           com-id="{{$commitment->id}}"
+           com-title="{{$commitment->name}}"
+           com-type="{{$commitment->type}}"
+           com-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
+           com-status="{{$commitment->status}}"
+           com-start-date="{{$commitment->start_date ? date('Y-m-d', strtotime($commitment->start_date)) : ''}}"
+           com-end-date="{{$commitment->end_date ? date('Y-m-d', strtotime($commitment->end_date)) : ''}}"
         >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"

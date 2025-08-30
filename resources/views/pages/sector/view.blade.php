@@ -129,8 +129,16 @@
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center text-warning mr-3 tooltip edit" data-theme="dark"
-                                           title="Edit Commitment" href="javascript:;" data-tw-toggle="modal"
-                                           data-tw-target="#edit-photo" data-id="{{$commitment->id}}"
+                                           title="Edit Commitment" href="javascript:;"
+                                           data-tw-toggle="modal"
+                                           data-tw-target="#edit-photo"
+                                           data-id="{{$commitment->id}}"
+                                           data-name="{{$commitment->name}}"
+                                           data-type="{{$commitment->type}}"
+                                           data-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
+                                           data-status="{{$commitment->status}}"
+                                           data-start-date="{{$commitment->start_date ? date('Y-m-d', strtotime($commitment->start_date)) : ''}}"
+                                           data-end-date="{{$commitment->end_date ? date('Y-m-d', strtotime($commitment->end_date)) : ''}}"
                                            data-photo="{{ secure_asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
@@ -212,22 +220,58 @@
                 <div id="edit-photo" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('commitments.change.photo')}}" method="post"
+                            <form action="{{route('commitments.update')}}" method="post"
                                   enctype="multipart/form-data">
                                 @csrf
                                 <input type="hidden" name="commitment_id" id="commitmentId">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Edit Commitment Photo</h2>
+                                    <h2 class="font-medium text-base mr-auto">Edit Commitment</h2>
                                 </div> <!-- END: Modal Header -->
                                 <!-- BEGIN: Modal Body -->
                                 <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-12 sm:col-span-12 h-40 2xl:h-56 image-fit">
-                                        <img class="rounded-md" id="commitmentPhoto"/>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-commitment-title" class="form-label">Commitment Title</label>
+                                        <input id="edit-commitment-title" type="text" class="form-control"
+                                               name="name" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-2" class="form-label">Picture</label>
-                                        <input type="file" name="img_url" id="" class="form-control">
+                                        <label for="edit-commitment-type" class="form-label">Commitment Type</label>
+                                        <input id="edit-commitment-type" type="text" class="form-control"
+                                               name="type" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-commitment-description" class="form-label">Description</label>
+                                        <textarea name="description" id="edit-commitment-description"
+                                                  class="form-control" required></textarea>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-commitment-status" class="form-label">Status</label>
+                                        <select id="edit-commitment-status" class="form-control" name="status" required>
+                                            <option value="">Select</option>
+                                            <option value="Not Started">Not Started</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Completed">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-commitment-start-date" class="form-label">Start Date</label>
+                                        <input id="edit-commitment-start-date" type="date" class="form-control"
+                                               name="start_date" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-commitment-end-date" class="form-label">End Date</label>
+                                        <input id="edit-commitment-end-date" type="date" class="form-control"
+                                               name="end_date" required>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="edit-commitment-photo" class="form-label">Current Photo</label>
+                                        <div class="h-40 2xl:h-56 image-fit mb-3">
+                                            <img class="rounded-md" id="commitmentPhoto"/>
+                                        </div>
+                                        <input type="file" name="img_url" id="edit-commitment-photo"
+                                               class="form-control">
+                                        <small class="text-muted">Leave empty to keep current photo</small>
                                     </div>
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->
@@ -235,7 +279,7 @@
                                     <button type="button" data-tw-dismiss="modal"
                                             class="btn btn-outline-secondary w-20 mr-1">Cancel
                                     </button>
-                                    <button type="submit" class="btn btn-primary w-20">Change</button>
+                                    <button type="submit" class="btn btn-primary w-20">Update</button>
                                 </div> <!-- END: Modal Footer -->
                             </form>
                         </div>
@@ -337,24 +381,31 @@
 
 @endsection
 @section('js')
-    <script src="code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script src="cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         $(function () {
             url = "{{route('sectors.view',['id'=>$sector->id])}}/";
-            // const editCommitmentModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#editCommitmentModal"));
-            // const addDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addDeliverablesModal"));
-            // const viewDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#viewDeliverablesModal"));
-            // const addKPIModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#next-overlapping-modal-preview"));
-
-            // $("#year").on('change', function (e) {
-            //     document.location = url + $(this).val();
-            // });
 
             $('.edit').on('click', function () {
-                //  console.log($(this).data('photo'))
-                $('#commitmentId').val($(this).data('id'))
-                $('#commitmentPhoto').attr('src', $(this).data('photo'))
+                // Populate all fields with current commitment data
+                let commitmentId = $(this).data('id');
+                let commitmentName = $(this).data('name');
+                let commitmentType = $(this).data('type');
+                let commitmentDescription = $(this).data('description');
+                let commitmentStatus = $(this).data('status');
+                let commitmentStartDate = $(this).data('start-date');
+                let commitmentEndDate = $(this).data('end-date');
+                let commitmentPhoto = $(this).data('photo');
+
+                $('#commitmentId').val(commitmentId);
+                $('#edit-commitment-title').val(commitmentName);
+                $('#edit-commitment-type').val(commitmentType);
+                $('#edit-commitment-description').val(commitmentDescription);
+                $('#edit-commitment-status').val(commitmentStatus);
+                $('#edit-commitment-start-date').val(commitmentStartDate);
+                $('#edit-commitment-end-date').val(commitmentEndDate);
+                $('#commitmentPhoto').attr('src', commitmentPhoto);
             })
 
             pendingCompleted()
@@ -371,7 +422,7 @@
                         const completedCounts = data.map(sector => sector.completed_commitments_count);
                         const pendingCounts = data.map(sector => sector.pending_commitments_count);
 
-// Creating a side-by-side bar chart
+                        // Creating a side-by-side bar chart
                         const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
                         const myChart = new Chart(ctx, {
                             type: 'bar',

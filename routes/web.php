@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/',[AuthLoginController::class, 'index'])->name('home');
+Route::get('/', [AuthLoginController::class, 'index'])->name('home');
 
 //Route::get('/', [AuthLoginController::class, 'showLoginForm']);
 Route::get('/sec-proj', [CommentController::class, 'index'])->name('home2');
@@ -37,7 +37,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
-// User Resource
+    // User Resource
     Route::get('users', [UserController::class, 'index'])->name("users.index");
     Route::get('delivery/tracking/awaiting/', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
     Route::get('delivery/tracking/awaiting/comm/{id}/view', [UserController::class, 'awaitingVerificationCommView'])->name("delivery.awaiting.verification.comm.view");
@@ -53,7 +53,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');
     Route::get('chart/sector/budget/distribution', [ChartController::class, 'budgetDistribution'])->name('chart.sector.budget.distribution');
     Route::get('chart/sector/budget/pending', [ChartController::class, 'pendingCompleted'])->name('chart.sector.pending.completed');
-// MDA/Sector Resource
+
+    // MDA/Sector Resource
     Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
     Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
     Route::post('sectors/save', [SectorController::class, 'store'])->name('sectors.save');
@@ -64,7 +65,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
     Route::get('sectors/{id}/details/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
-// MDA/Sector Resource
+    // MDA/Sector Resource
     Route::get('commitment', [CommitmentController::class, 'index'])->name('commitments.index');
     Route::post('commitment/update', [CommitmentController::class, 'update'])->name('commitments.update');
     Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
@@ -76,12 +77,14 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('deliverable/kpi/tracking/save', [DeliverableController::class, 'storeTracking'])->name('deliverable.tracking.save');
     Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
+    Route::post('deliverable/update', [DeliverableController::class, 'update'])->name('deliverable.update');
     Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
     Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');
-//Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+    //Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
     Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
     Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
+    Route::post('kpi/update', [KpiController::class, 'update'])->name('kpi.update');
     Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
     Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
     Route::get('deliverable/kpi/tracking/files/{id}', [PerformanceTracking::class, 'attachments'])->name('deliverable.kpi.tracking.files');

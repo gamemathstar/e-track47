@@ -234,6 +234,25 @@
                                 </td>
                                 <td>
                                     <div class="flex justify-center items-center">
+                                        <a class="flex items-center text-warning mr-3 tooltip edit-kpi" data-theme="dark"
+                                           title="Edit KPI" href="javascript:;" data-tw-toggle="modal"
+                                           data-tw-target="#edit-kpi-modal" 
+                                           data-id="{{$kpi->id}}"
+                                           data-kpi="{{$kpi->kpi}}"
+                                           data-target-value="{{$kpi->target_value}}"
+                                           data-unit-of-measurement="{{$kpi->unit_of_measurement}}"
+                                           data-start-date="{{$kpi->start_date ? date('Y-m-d', strtotime($kpi->start_date)) : ''}}"
+                                           data-end-date="{{$kpi->end_date ? date('Y-m-d', strtotime($kpi->end_date)) : ''}}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                                 viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round"
+                                                 stroke-linejoin="round" icon-name="edit" data-lucide="edit"
+                                                 class="lucide lucide-edit w-4 h-4 mr-1">
+                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                        </a>
                                         <a class="flex items-center text-danger tooltip" data-theme="dark"
                                            title="Delete KPI" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#delete-modal-preview{{ $kpi->id }}">
@@ -529,6 +548,57 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Edit KPI Modal -->
+                <div id="edit-kpi-modal" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form action="{{route('kpi.update')}}" method="post">
+                                @csrf
+                                <input type="hidden" name="kpi_id" id="edit-kpi-id">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">Edit KPI</h2>
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label for="edit-kpi-title" class="form-label">KPI</label>
+                                        <input id="edit-kpi-title" type="text" class="form-control"
+                                               name="kpi" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-kpi-target-value" class="form-label">Baseline Value</label>
+                                        <input id="edit-kpi-target-value" type="number" class="form-control"
+                                               name="target_value" step="any" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-kpi-unit" class="form-label">Unit of Measurement</label>
+                                        <input id="edit-kpi-unit" type="text" class="form-control"
+                                               name="unit_of_measurement" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-kpi-start-date" class="form-label">Start Date</label>
+                                        <input id="edit-kpi-start-date" type="date" class="form-control"
+                                               name="start_date" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-kpi-end-date" class="form-label">End Date</label>
+                                        <input id="edit-kpi-end-date" type="date" class="form-control"
+                                               name="end_date" required>
+                                    </div>
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Update</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div> <!-- END: Modal Content -->
             </div>
         </div>
 
@@ -556,6 +626,33 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
+            // Edit KPI functionality
+            $('.edit-kpi').on('click', function () {
+                var kpiId = $(this).data('id');
+                var kpiTitle = $(this).data('kpi');
+                var kpiTargetValue = $(this).data('target-value');
+                var kpiUnit = $(this).data('unit-of-measurement');
+                var kpiStartDate = $(this).data('start-date');
+                var kpiEndDate = $(this).data('end-date');
+                
+                // Debug logging
+                console.log('KPI Data:', {
+                    id: kpiId,
+                    title: kpiTitle,
+                    targetValue: kpiTargetValue,
+                    unit: kpiUnit,
+                    startDate: kpiStartDate,
+                    endDate: kpiEndDate
+                });
+                
+                $('#edit-kpi-id').val(kpiId);
+                $('#edit-kpi-title').val(kpiTitle);
+                $('#edit-kpi-target-value').val(kpiTargetValue);
+                $('#edit-kpi-unit').val(kpiUnit);
+                $('#edit-kpi-start-date').val(kpiStartDate);
+                $('#edit-kpi-end-date').val(kpiEndDate);
+            });
+
             $('body .add').on('click', function () {
                 $('#kpi').html($(this).data('kpi'))
                 $('#kpi_id').val($(this).data('id'))

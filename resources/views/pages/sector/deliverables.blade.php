@@ -80,6 +80,24 @@
                                 </td>
                                 <td>
                                     <div class="flex justify-center items-center">
+                                        <a class="flex items-center text-warning mr-3 tooltip edit-deliverable" data-theme="dark"
+                                           title="Edit Deliverable" href="javascript:;" data-tw-toggle="modal"
+                                           data-tw-target="#edit-deliverable-modal"
+                                           data-id="{{$deliverable->id}}"
+                                           data-deliverable="{{$deliverable->deliverable}}"
+                                           data-start-date="{{$deliverable->start_date ? date('Y-m-d', strtotime($deliverable->start_date)) : ''}}"
+                                           data-end-date="{{$deliverable->end_date ? date('Y-m-d', strtotime($deliverable->end_date)) : ''}}"
+                                           data-status="{{$deliverable->status}}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                                 viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round"
+                                                 stroke-linejoin="round" icon-name="edit" data-lucide="edit"
+                                                 class="lucide lucide-edit w-4 h-4 mr-1">
+                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                        </a>
                                         <a class="flex items-center mr-3  items-center text-success tooltip"
                                            data-theme="dark" title="View Deliverable"
                                            href="{{ route('deliverable.kpis',[$deliverable->id]) }}">
@@ -94,7 +112,7 @@
                                             </svg>
                                         </a>
                                         <a class="flex items-center text-danger tooltip" data-theme="dark"
-                                           title="Delete Commitment" href="javascript:;" data-tw-toggle="modal"
+                                           title="Delete Deliverable" href="javascript:;" data-tw-toggle="modal"
                                            data-tw-target="#delete-modal-preview{{ $deliverable->id }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
@@ -200,6 +218,56 @@
                         </div>
                     </div>
                 </div> <!-- END: Modal Content -->
+
+                <!-- Edit Deliverable Modal -->
+                <div id="edit-deliverable-modal" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form action="{{route('deliverable.update')}}" method="post">
+                                @csrf
+                                <input type="hidden" name="deliverable_id" id="edit-deliverable-id">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">Edit Deliverable</h2>
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-deliverable-title" class="form-label">Deliverable</label>
+                                        <input id="edit-deliverable-title" type="text" class="form-control"
+                                               name="deliverable" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-deliverable-start-date" class="form-label">Start Date</label>
+                                        <input id="edit-deliverable-start-date" type="date" class="form-control"
+                                               name="start_date" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-deliverable-end-date" class="form-label">End Date</label>
+                                        <input id="edit-deliverable-end-date" type="date" class="form-control"
+                                               name="end_date" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="edit-deliverable-status" class="form-label">Status</label>
+                                        <select id="edit-deliverable-status" class="form-control" name="status" required>
+                                            <option value="">Select</option>
+                                            <option value="Not Started">Not Started</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Completed">Completed</option>
+                                        </select>
+                                    </div>
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Update</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div> <!-- END: Modal Content -->
             </div>
         </div>
 
@@ -230,7 +298,29 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
+            // Edit deliverable functionality
+            $('.edit-deliverable').on('click', function () {
+                var deliverableId = $(this).data('id');
+                var deliverableTitle = $(this).data('deliverable');
+                var deliverableStartDate = $(this).data('start-date');
+                var deliverableEndDate = $(this).data('end-date');
+                var deliverableStatus = $(this).data('status');
 
+                // Debug logging
+                console.log('Deliverable Data:', {
+                    id: deliverableId,
+                    title: deliverableTitle,
+                    startDate: deliverableStartDate,
+                    endDate: deliverableEndDate,
+                    status: deliverableStatus
+                });
+
+                $('#edit-deliverable-id').val(deliverableId);
+                $('#edit-deliverable-title').val(deliverableTitle);
+                $('#edit-deliverable-start-date').val(deliverableStartDate);
+                $('#edit-deliverable-end-date').val(deliverableEndDate);
+                $('#edit-deliverable-status').val(deliverableStatus);
+            });
 
             pendingCompleted()
 
@@ -245,7 +335,7 @@
                         const completedCounts = data.map(sector => sector.completed_commitments_count);
                         const pendingCounts = data.map(sector => sector.pending_commitments_count);
 
-// Creating a side-by-side bar chart
+                        // Creating a side-by-side bar chart
                         const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
                         const myChart = new Chart(ctx, {
                             type: 'bar',

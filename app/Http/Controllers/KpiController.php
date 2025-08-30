@@ -80,6 +80,35 @@ class KpiController extends Controller
         return view('pages.sector.performance', compact('kpi', 'track'));
     }
 
+    public function update(Request $request)
+    {
+        $request->validate([
+            'kpi_id' => 'required|exists:kpis,id',
+            'kpi' => 'required|string|max:255',
+            'target_value' => 'required|numeric',
+            'unit_of_measurement' => 'required|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date'
+        ]);
+
+        $kpi = Kpi::find($request->kpi_id);
+        
+        if (!$kpi) {
+            return redirect()->back()->with('failure', 'KPI not found');
+        }
+
+        // Update KPI fields
+        $kpi->kpi = $request->kpi;
+        $kpi->target_value = $request->target_value;
+        $kpi->unit_of_measurement = $request->unit_of_measurement;
+        $kpi->start_date = $request->start_date;
+        $kpi->end_date = $request->end_date;
+
+        $kpi->save();
+
+        return redirect()->back()->with('success', 'KPI updated successfully');
+    }
+
     public function delete(Kpi $kpi)
     {
         $kpi->delete();
