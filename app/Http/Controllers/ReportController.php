@@ -23,7 +23,10 @@ class ReportController extends Controller
 
     public function index()
     {
-        return view('pages.reports.index');
+        $user = auth()->user();
+        $userSector = $user->isSectorHead();
+
+        return view('pages.reports.index', compact('userSector'));
     }
 
     public function generate(Request $request)
@@ -43,8 +46,12 @@ class ReportController extends Controller
         $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
         $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
 
+        // Check if user is a sector head
+        $user = auth()->user();
+        $userSector = $user->isSectorHead();
+
         // Get sectors with commitments that have deliverables within the specified date range
-        $sectors = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+        $sectorsQuery = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
             $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
@@ -56,7 +63,16 @@ class ReportController extends Controller
                         ->whereYear('end_date', $year)
                         ->whereBetween('end_date', [$startDate, $endDate]);
                 }]);
-        }])->get();
+        }]);
+
+        // Filter sectors based on user role
+        if ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = $sectorsQuery->where('id', $userSector->id)->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = $sectorsQuery->get();
+        }
 
         $snapshotData = [];
         foreach ($sectors->sortBy('id') as $sector) {
@@ -287,7 +303,11 @@ class ReportController extends Controller
         $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
         $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
 
-        $sectors = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+        // Check if user is a sector head
+        $user = auth()->user();
+        $userSector = $user->isSectorHead();
+
+        $sectorsQuery = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
             $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
@@ -299,7 +319,16 @@ class ReportController extends Controller
                         ->whereYear('end_date', $year)
                         ->whereBetween('end_date', [$startDate, $endDate]);
                 }]);
-        }])->get();
+        }]);
+
+        // Filter sectors based on user role
+        if ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = $sectorsQuery->where('id', $userSector->id)->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = $sectorsQuery->get();
+        }
 
         $spreadsheet = new Spreadsheet();
 

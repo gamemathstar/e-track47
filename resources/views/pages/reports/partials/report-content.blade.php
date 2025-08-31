@@ -119,14 +119,14 @@
     </div>
 </div>
 
-<form action="{{ route('reports.download') }}" method="POST" class="mt-3">
-    @csrf
-    <div class="grid grid-cols-12 gap-4 gap-y-3 mt-3">
-        <input type="hidden" name="start_month" value="{{ $startMonth }}">
-        <input type="hidden" name="end_month" value="{{ $endMonth }}">
-        <input type="hidden" name="year" value="{{ $year }}">
-        <div class="col-span-3 sm:col-span-3 mt-5">
-            <input type="submit" class="btn btn-primary w-52" value="Download Report">
-        </div>
-    </div>
-</form>
+{{--<form action="{{ route('reports.download') }}" method="POST" class="mt-3">--}}
+{{--    @csrf--}}
+{{--    <div class="grid grid-cols-12 gap-4 gap-y-3 mt-3">--}}
+{{--        <input type="hidden" name="start_month" value="{{ $startMonth }}">--}}
+{{--        <input type="hidden" name="end_month" value="{{ $endMonth }}">--}}
+{{--        <input type="hidden" name="year" value="{{ $year }}">--}}
+{{--        <div class="col-span-3 sm:col-span-3 mt-5">--}}
+{{--            <input type="submit" class="btn btn-primary w-52" value="Download Report">--}}
+{{--        </div>--}}
+{{--    </div>--}}
+{{--</form>--}}
