@@ -51,7 +51,9 @@
                             <label for="start_month" class="form-label">Start Month</label>
                             <select name="start_month" id="start_month" class="form-control">
                                 @for ($i = 1; $i <= 12; $i++)
-                                    <option value="{{ $i }}">{{ date('F', mktime(0, 0, 0, $i, 1)) }}</option>
+                                    <option value="{{ $i }}" {{ (request('start_month', 1) == $i) ? 'selected' : '' }}>
+                                        {{ date('F', mktime(0, 0, 0, $i, 1)) }}
+                                    </option>
                                 @endfor
                             </select>
                         </div>
@@ -59,7 +61,9 @@
                             <label for="end_month" class="form-label">End Month</label>
                             <select name="end_month" id="end_month" class="form-control">
                                 @for ($i = 1; $i <= 12; $i++)
-                                    <option value="{{ $i }}">{{ date('F', mktime(0, 0, 0, $i, 1)) }}</option>
+                                    <option value="{{ $i }}" {{ (request('end_month', 12) == $i) ? 'selected' : '' }}>
+                                        {{ date('F', mktime(0, 0, 0, $i, 1)) }}
+                                    </option>
                                 @endfor
                             </select>
                         </div>
@@ -127,6 +131,35 @@
 @section('js')
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
+        // Ensure End Month is always greater than or equal to Start Month
+        document.getElementById('start_month').addEventListener('change', function () {
+            const startMonth = parseInt(this.value);
+            const endMonthSelect = document.getElementById('end_month');
+            const endMonth = parseInt(endMonthSelect.value);
+
+            if (endMonth < startMonth) {
+                endMonthSelect.value = startMonth;
+            }
+        });
+
+        document.getElementById('end_month').addEventListener('change', function () {
+            const endMonth = parseInt(this.value);
+            const startMonthSelect = document.getElementById('start_month');
+            const startMonth = parseInt(startMonthSelect.value);
+
+            if (startMonth > endMonth) {
+                startMonthSelect.value = endMonth;
+            }
+        });
+
+        // Set default values for year if not already set
+        document.addEventListener('DOMContentLoaded', function () {
+            const yearSelect = document.getElementById('year');
+            if (!yearSelect.value) {
+                yearSelect.value = new Date().getFullYear();
+            }
+        });
+
         $(function () {
             // Handle form submission
             $('#reportForm').on('submit', function (e) {
