@@ -584,26 +584,41 @@ class ReportController extends Controller
     public function comprehensiveReport(Request $request)
     {
         $year = $request->input('year', date('Y'));
+        $startMonth = $request->input('start_month', 1);
+        $endMonth = $request->input('end_month', 12);
 
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year);
+            $reportData = [];   //  $this->getComprehensiveReportData($year);
         } catch (Exception $e) {
             // Handle database errors gracefully
             $reportData = [];
             session()->flash('error', 'Database tables not found. Please run database migrations first.');
         }
 
-        return view('pages.reports.comprehensive', compact('reportData', 'year'));
+        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startMonth', 'endMonth'));
     }
 
     public function downloadComprehensiveReport(Request $request)
     {
+        // Validate input
+        $request->validate([
+            'start_month' => 'required|integer|between:1,12',
+            'end_month' => 'required|integer|between:1,12|gte:start_month',
+            'year' => 'required|integer|digits:4',
+        ]);
+
+        $startMonth = $request->input('start_month');
+        $endMonth = $request->input('end_month');
         $year = $request->input('year', date('Y'));
+
+        // Create date range for filtering
+        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
 
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year);
+            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate);
         } catch (Exception $e) {
             // Handle database errors gracefully
             return redirect()->back()->with('error', 'Database tables not found. Please run database migrations first.');
@@ -613,18 +628,18 @@ class ReportController extends Controller
         $spreadsheet = new Spreadsheet();
 
         // Create individual sector sheets and get commitment average row mapping
-        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year);
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate);
         $commitmentAverageRows = $sectorData['commitmentAverageRows'];
         $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
 
         // Create Overall Summary sheet
-        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate);
 
         // Create Grand Summary sheet
-        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate);
 
         // Create Sector Summary Details sheet
-        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows);
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate);
 
         //  RE-ORDER THE SHEETS HERE
         // Reorder sheets: Overall Summary at index 0, Grand Summary at index 1, Sector Summary Details at index 2
@@ -652,7 +667,9 @@ class ReportController extends Controller
 
         // Create the Excel file
         $writer = new Xlsx($spreadsheet);
-        $filename = "All_Sectors_MDAs_Full_Year_Assessment_Reporting_{$year}.xlsx";
+        $startMonthName = date('F', mktime(0, 0, 0, $startMonth, 1));
+        $endMonthName = date('F', mktime(0, 0, 0, $endMonth, 1));
+        $filename = "All_Sectors_MDAs_Assessment_Reporting_{$startMonthName}_to_{$endMonthName}_{$year}.xlsx";
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment;filename="' . $filename . '"');
@@ -662,7 +679,7 @@ class ReportController extends Controller
         exit;
     }
 
-    private function getComprehensiveReportData($year)
+    private function getComprehensiveReportData($year, $startDate, $endDate)
     {
         // Get main report data with the correct structure
         $reportData = DB::table('sectors as s')
@@ -677,6 +694,9 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->whereBetween('d.end_date', [$startDate, $endDate])
             ->select([
                 's.sector_name',
                 'c.name as commitment_name',
@@ -781,7 +801,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorSummaryData($year)
+    private function getSectorSummaryData($year, $startDate = null, $endDate = null)
     {
         // Get sector summary data with performance counts
         $sectorSummary = DB::table('sectors as s')
@@ -796,6 +816,11 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
             ->select([
                 's.sector_name',
                 DB::raw('COUNT(DISTINCT c.id) as commitment_count'),
@@ -809,7 +834,7 @@ class ReportController extends Controller
         $sn = 1;
         foreach ($sectorSummary as $sector) {
             // Calculate performance counts for this sector
-            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year);
+            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year, $startDate, $endDate);
 
             $result[] = [
                 'sn' => $sn++,
@@ -830,7 +855,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorPerformanceCounts($sectorName, $year)
+    private function getSectorPerformanceCounts($sectorName, $year, $startDate = null, $endDate = null)
     {
         // Get all KPIs for the sector to calculate not assessed count
         $allKpis = DB::table('sectors as s')
@@ -845,12 +870,17 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->where('s.sector_name', $sectorName)
+            ->whereNotNull('kt.target')
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
             ->select([
                 'kt.target',
                 'pt.actual_value'
             ])
-            ->where('s.sector_name', $sectorName)
-            ->whereNotNull('kt.target')
             ->get();
 
         // Get performance data for assessed KPIs
@@ -915,7 +945,7 @@ class ReportController extends Controller
         return $counts;
     }
 
-    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
+    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Overall Summary');
@@ -931,7 +961,13 @@ class ReportController extends Controller
         $sheet->getRowDimension('1')->setRowHeight(30);
 
         // 2. Subtitle (Row 2)
-        $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        if ($startDate && $endDate) {
+            $startMonthName = date('F', mktime(0, 0, 0, $startDate->month, 1));
+            $endMonthName = date('F', mktime(0, 0, 0, $endDate->month, 1));
+            $sheet->setCellValue('A2', $startMonthName . ' to ' . $endMonthName . ' ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        } else {
+            $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        }
         $sheet->mergeCells('A2:M2');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getFont()->setName('Arial Narrow');
@@ -1041,13 +1077,27 @@ class ReportController extends Controller
             $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
             // Cell C: Number of commitments for that sector in the given year
-            $commitmentCount = DB::table('commitments')->where('sector_id', $sector->id)->count();
+            $commitmentCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
+                ->distinct('c.id')
+                ->count('c.id');
             $sheet->setCellValue('C' . $row, $commitmentCount > 0 ? $commitmentCount : '-');
 
             // Cell D: Number of deliverables across all commitments for that sector in that year
             $deliverableCount = DB::table('commitments as c')
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->count();
             $sheet->setCellValue('D' . $row, $deliverableCount > 0 ? $deliverableCount : '-');
 
@@ -1056,6 +1106,11 @@ class ReportController extends Controller
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
                 ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->count();
             $sheet->setCellValue('E' . $row, $kpiCount > 0 ? $kpiCount : '-');
 
@@ -1074,14 +1129,19 @@ class ReportController extends Controller
                                 ->orWhere('pt.year', '=', 0); // Include records with year = 0
                         });
                 })
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('kt.target')
+                ->where('kt.target', '!=', '') // Exclude empty targets
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->select([
                     'k.id as kpi_id',
                     'kt.target',
                     DB::raw('SUM(CAST(pt.actual_value AS DECIMAL(10,2))) as total_actual_value')
                 ])
-                ->where('c.sector_id', $sector->id)
-                ->whereNotNull('kt.target')
-                ->where('kt.target', '!=', '') // Exclude empty targets
                 ->groupBy('k.id', 'kt.target')
                 ->get();
 
@@ -1113,6 +1173,11 @@ class ReportController extends Controller
                 ->where('c.sector_id', $sector->id)
                 ->whereNotNull('kt.target')
                 ->where('kt.target', '!=', '')
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->count();
 
             foreach ($performanceData as $data) {
@@ -1263,7 +1328,7 @@ class ReportController extends Controller
         }
     }
 
-    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
+    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Grand Summary-Sector_MDAs+');
@@ -1279,7 +1344,13 @@ class ReportController extends Controller
         $sheet->getRowDimension('1')->setRowHeight(30);
 
         // Row 2: Subtitle
-        $sheet->setCellValue('A2', $year . ' Fiscal Year Snapshot View of MDA/Sector Performance (January to December');
+        if ($startDate && $endDate) {
+            $startMonthName = date('F', mktime(0, 0, 0, $startDate->month, 1));
+            $endMonthName = date('F', mktime(0, 0, 0, $endDate->month, 1));
+            $sheet->setCellValue('A2', $year . ' Fiscal Year Snapshot View of MDA/Sector Performance (' . $startMonthName . ' to ' . $endMonthName . ')');
+        } else {
+            $sheet->setCellValue('A2', $year . ' Fiscal Year Snapshot View of MDA/Sector Performance (January to December)');
+        }
         $sheet->mergeCells('A2:H2');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(16);
         $sheet->getStyle('A2')->getFont()->setName('Agency FB');
@@ -1369,7 +1440,7 @@ class ReportController extends Controller
         $sheet->getStyle('A3:H4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Get grand summary data
-        $grandSummary = $this->getGrandSummaryData($year);
+        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate);
 
         $row = 5; // Start data from row 5 after headers
         $iteration = 1; // Loop iteration counter
@@ -1482,7 +1553,7 @@ class ReportController extends Controller
         $sheet->getStyle('A1:H4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
-    private function getGrandSummaryData($year)
+    private function getGrandSummaryData($year, $startDate = null, $endDate = null)
     {
         // Get grand summary data - use LEFT JOIN to include all sectors even if they don't have complete data
         $grandSummary = DB::table('sectors as s')
@@ -1496,6 +1567,11 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+            })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
             ->select([
                 's.sector_name',
@@ -1566,7 +1642,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [])
+    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Sector_MDAs Summary Details');
@@ -1582,7 +1658,13 @@ class ReportController extends Controller
         $sheet->getRowDimension('1')->setRowHeight(30);
 
         // Row 2: Merged cells A-N
-        $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        if ($startDate && $endDate) {
+            $startMonthName = date('F', mktime(0, 0, 0, $startDate->month, 1));
+            $endMonthName = date('F', mktime(0, 0, 0, $endDate->month, 1));
+            $sheet->setCellValue('A2', $startMonthName . ' to ' . $endMonthName . ' ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        } else {
+            $sheet->setCellValue('A2', 'January to December ' . $year . ' MDA/Sector Summary of Performance on Commitments');
+        }
         $sheet->mergeCells('A2:N2');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -1704,6 +1786,11 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+            })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
             ->select([
                 's.id as sector_id',
@@ -1843,7 +1930,7 @@ class ReportController extends Controller
 
     }
 
-    private function createIndividualSectorSheets($spreadsheet, $year)
+    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate)
     {
         $sectors = Sector::all(); // Get all sectors
         $commitmentAverageRows = []; // Track commitment average row numbers
@@ -1869,7 +1956,13 @@ class ReportController extends Controller
             $sheet->getRowDimension('1')->setRowHeight(28);
 
             // Row 2: Merged cells A-I
-            $sheet->setCellValue('A2', 'FULL YEAR  [JANUARY TO DECEMBER ' . $year . '] PERFORMANCE ASSESSMENT');
+            if ($startDate && $endDate) {
+                $startMonthName = strtoupper(date('F', mktime(0, 0, 0, $startDate->month, 1)));
+                $endMonthName = strtoupper(date('F', mktime(0, 0, 0, $endDate->month, 1)));
+                $sheet->setCellValue('A2', 'PERIOD [' . $startMonthName . ' TO ' . $endMonthName . ' ' . $year . '] PERFORMANCE ASSESSMENT');
+            } else {
+                $sheet->setCellValue('A2', 'FULL YEAR  [JANUARY TO DECEMBER ' . $year . '] PERFORMANCE ASSESSMENT');
+            }
             $sheet->mergeCells('A2:I2');
             $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
             $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -1934,6 +2027,10 @@ class ReportController extends Controller
                     $join->on('pt.kpi_id', '=', 'k.id')
                         ->where('pt.year', '=', $year);
                 })
+                ->where('s.id', '=', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->whereBetween('d.end_date', [$startDate, $endDate])
                 ->select([
                     'c.id as commitment_id',
                     'c.name as commitment_name',
@@ -1945,7 +2042,6 @@ class ReportController extends Controller
                     'kt.target as target_value',
                     DB::raw('COALESCE(SUM(pt.actual_value), 0) as total_actual_value')
                 ])
-                ->where('s.id', '=', $sector->id)
                 ->groupBy('c.id', 'c.name', 'd.id', 'd.deliverable', 'k.id', 'k.kpi', 'k.unit_of_measurement', 'kt.target')
                 ->orderBy('c.id')
                 ->orderBy('d.id')

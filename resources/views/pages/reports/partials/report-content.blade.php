@@ -20,18 +20,18 @@
                 </tr>
                 </thead>
                 <tbody>
-                                 @foreach ($snapshotData as $data)
-                     <tr>
-                         <td>{{ $data['s_n'] }}</td>
-                         <td>{{ $data['sector_name'] }}</td>
-                         <td>{{ $data['no_of_commitments'] }}</td>
-                         <td>{{ $data['no_of_outputs'] }}</td>
-                         <td>{{ $data['no_of_kpis'] ?? 0 }}</td>
-                         <td>{{ $data['performance'] ?? 0 }}%</td>
-                         <td>{{ $data['rating'] }}</td>
-                         <td></td> <!-- Check placeholder -->
-                     </tr>
-                 @endforeach
+                @foreach ($snapshotData as $data)
+                    <tr>
+                        <td>{{ $data['s_n'] }}</td>
+                        <td>{{ $data['sector_name'] }}</td>
+                        <td>{{ $data['no_of_commitments'] }}</td>
+                        <td>{{ $data['no_of_outputs'] }}</td>
+                        <td>{{ $data['no_of_kpis'] ?? 0 }}</td>
+                        <td>{{ $data['performance'] ?? 0 }}%</td>
+                        <td>{{ $data['rating'] }}</td>
+                        <td></td> <!-- Check placeholder -->
+                    </tr>
+                @endforeach
                 </tbody>
             </table>
         </div>

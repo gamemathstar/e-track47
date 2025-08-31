@@ -113,9 +113,9 @@
     </div>
 
 
-        <div class="tab-content mt-5" id="reportTabContent">
-            <!-- Tab content will be loaded here via AJAX -->
-        </div>
+    <div class="tab-content mt-5" id="reportTabContent">
+        <!-- Tab content will be loaded here via AJAX -->
+    </div>
     </div>
     <!-- Error Alert Container -->
     <div id="errorAlert" class="mt-3 alert alert-danger" style="display: none;">
@@ -129,18 +129,18 @@
     <script>
         $(function () {
             // Handle form submission
-            $('#reportForm').on('submit', function(e) {
+            $('#reportForm').on('submit', function (e) {
                 e.preventDefault();
-                
+
                 // Show loading state
                 $('#generateBtn .btn-text').hide();
                 $('#generateBtn .btn-loading').show();
                 $('#generateBtn').prop('disabled', true);
-                
+
                 // Hide previous results and errors
                 $('#reportResults').hide();
                 $('#errorAlert').hide();
-                
+
                 // Get form data
                 var formData = {
                     start_month: $('#start_month').val(),
@@ -148,23 +148,23 @@
                     year: $('#year').val(),
                     _token: $('input[name="_token"]').val()
                 };
-                
+
                 // Make AJAX request
                 $.ajax({
                     url: '{{ route("reports.generate") }}',
                     type: 'POST',
                     data: formData,
-                    success: function(response) {
+                    success: function (response) {
                         // Hide loading state
                         $('#generateBtn .btn-text').show();
                         $('#generateBtn .btn-loading').hide();
                         $('#generateBtn').prop('disabled', false);
-                        
+
                         if (response.success) {
                             // Display the report content
                             $('#reportTabContent').html(response.html);
                             $('#reportResults').show();
-                            
+
                             // Scroll to results
                             $('html, body').animate({
                                 scrollTop: $('#reportResults').offset().top - 100
@@ -174,12 +174,12 @@
                             showError(response.message || 'An error occurred while generating the report.');
                         }
                     },
-                    error: function(xhr) {
+                    error: function (xhr) {
                         // Hide loading state
                         $('#generateBtn .btn-text').show();
                         $('#generateBtn .btn-loading').hide();
                         $('#generateBtn').prop('disabled', false);
-                        
+
                         if (xhr.status === 422) {
                             // Validation errors
                             var errors = xhr.responseJSON.errors;
@@ -195,22 +195,22 @@
                     }
                 });
             });
-            
+
             // Function to show error messages
             function showError(messages) {
                 var errorList = $('#errorList');
                 errorList.empty();
-                
+
                 if (Array.isArray(messages)) {
-                    messages.forEach(function(message) {
+                    messages.forEach(function (message) {
                         errorList.append('<li>' + message + '</li>');
                     });
                 } else {
                     errorList.append('<li>' + messages + '</li>');
                 }
-                
+
                 $('#errorAlert').show();
-                
+
                 // Scroll to error
                 $('html, body').animate({
                     scrollTop: $('#errorAlert').offset().top - 100
