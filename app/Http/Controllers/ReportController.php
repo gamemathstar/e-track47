@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sector;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,26 +39,55 @@ class ReportController extends Controller
         $endMonth = $request->input('end_month');
         $year = $request->input('year');
 
-        $sectors = Sector::with(['commitments' => function ($query) use ($startMonth, $endMonth, $year) {
-            $query->withCount(['deliverables' => function ($q) use ($startMonth, $endMonth, $year) {
+        // Create date range for filtering
+        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+
+        // Get sectors with commitments that have deliverables within the specified date range
+        $sectors = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+            $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
                     ->whereYear('end_date', $year)
-                    ->whereMonth('end_date', '>=', $startMonth)
-                    ->whereMonth('end_date', '<=', $endMonth);
+                    ->whereBetween('end_date', [$startDate, $endDate]);
+            }])
+            ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                $q->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate]);
             }]);
         }])->get();
 
         $snapshotData = [];
         foreach ($sectors->sortBy('id') as $sector) {
-            $totalCommitments = $sector->commitments->count();
-            $totalOutputs = $sector->commitments->sum('deliverables_count');
-            $outputsDelivered = $sector->commitments->sum(function ($commitment) {
-                return $commitment->deliverables_count;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
             });
 
+            $totalCommitments = $filteredCommitments->count();
+            $totalOutputs = $filteredCommitments->sum('total_deliverables');
+            $outputsDelivered = $filteredCommitments->sum('deliverables_count');
+
+            // Calculate total KPIs for all deliverables in the date range
+            $totalKpis = 0;
+            foreach ($filteredCommitments as $commitment) {
+                $kpiCount = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+                $totalKpis += $kpiCount;
+            }
+
             $performancePercentage = ($totalOutputs > 0)
-                ? ($totalCommitments > 0 ? ($outputsDelivered / $totalOutputs) * 100 : 0)
+                ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
             $rating = $this->calculatePerformanceRating($performancePercentage);
 
@@ -66,6 +96,7 @@ class ReportController extends Controller
                 'sector_name' => $sector->sector_name,
                 'no_of_commitments' => $totalCommitments,
                 'no_of_outputs' => $totalOutputs,
+                'no_of_kpis' => $totalKpis,
                 'outputs_delivered' => $outputsDelivered,
                 'rating' => $rating,
             ];
@@ -73,24 +104,42 @@ class ReportController extends Controller
 
         $summaryData = [];
         foreach ($sectors as $sector) {
-            $commitments = $sector->commitments;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
+            });
+
             $ministryCommitments = [];
             $totalDeliverables = 0;
             $completedDeliverables = 0;
 
-            foreach ($commitments as $index => $commitment) {
-                $totalDeliverables += $commitment->deliverables_count ?? 0;
+            foreach ($filteredCommitments as $index => $commitment) {
+                $totalDeliverables += $commitment->total_deliverables ?? 0;
                 $completedDeliverables += $commitment->deliverables_count ?? 0;
 
-                $performancePercentage = ($commitment->deliverables_count > 0)
-                    ? ($commitment->deliverables_count / $commitment->deliverables_count) * 100
+                // Calculate KPIs for this commitment
+                $commitmentKpis = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+
+                $performancePercentage = ($commitment->total_deliverables > 0)
+                    ? ($commitment->deliverables_count / $commitment->total_deliverables) * 100
                     : 0;
                 $performanceRating = $this->calculatePerformanceRating($performancePercentage);
 
                 $ministryCommitments[] = [
                     's_n' => $index + 1,
                     'commitment' => $commitment->description ?? 'N/A',
-                    'no_of_outputs' => $commitment->deliverables_count ?? 0,
+                    'no_of_outputs' => $commitment->total_deliverables ?? 0,
+                    'no_of_kpis' => $commitmentKpis,
                     'no_results_to_be_delivered' => $commitment->deliverables_count ?? 0,
                     'exceptional' => ($performancePercentage > 150) ? $commitment->deliverables_count : 0,
                     'above_expectation' => ($performancePercentage >= 50 && $performancePercentage <= 150) ? $commitment->deliverables_count : 0,
@@ -104,6 +153,9 @@ class ReportController extends Controller
                 ];
             }
 
+            // Calculate total KPIs for the sector
+            $totalSectorKpis = array_sum(array_column($ministryCommitments, 'no_of_kpis'));
+
             $overallPerformance = ($totalDeliverables > 0)
                 ? ($completedDeliverables / $totalDeliverables) * 100
                 : 0;
@@ -115,6 +167,7 @@ class ReportController extends Controller
                     's_n' => '',
                     'commitment' => 'Total',
                     'no_of_outputs' => $totalDeliverables,
+                    'no_of_kpis' => $totalSectorKpis,
                     'no_results_to_be_delivered' => $completedDeliverables,
                     'exceptional' => array_sum(array_column($ministryCommitments, 'exceptional')),
                     'above_expectation' => array_sum(array_column($ministryCommitments, 'above_expectation')),
@@ -134,6 +187,27 @@ class ReportController extends Controller
         $title = "$startMonthName to $endMonthName $year Snapshot View of MDA/Sector Performance";
         $summaryTitle = "$startMonthName to $endMonthName $year MDA/Sector Summary of Performance on Commitments";
 
+        // Check if this is an AJAX request
+        if ($request->ajax()) {
+            // Generate HTML content for AJAX response
+            $html = view('pages.reports.partials.report-content', compact(
+                'snapshotData', 
+                'summaryData', 
+                'title', 
+                'summaryTitle', 
+                'startMonth', 
+                'endMonth', 
+                'year'
+            ))->render();
+
+            return response()->json([
+                'success' => true,
+                'html' => $html,
+                'title' => $title,
+                'summaryTitle' => $summaryTitle
+            ]);
+        }
+
         return view('pages.reports.index', compact('request', 'snapshotData', 'summaryData', 'title', 'summaryTitle', 'startMonth', 'endMonth', 'year'));
     }
 
@@ -150,13 +224,21 @@ class ReportController extends Controller
         $endMonth = $request->input('end_month');
         $year = $request->input('year');
 
-        $sectors = Sector::with(['commitments' => function ($query) use ($startMonth, $endMonth, $year) {
-            $query->withCount(['deliverables' => function ($q) use ($startMonth, $endMonth, $year) {
+        // Create date range for filtering
+        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+
+        $sectors = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+            $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
                     ->whereYear('end_date', $year)
-                    ->whereMonth('end_date', '>=', $startMonth)
-                    ->whereMonth('end_date', '<=', $endMonth);
+                    ->whereBetween('end_date', [$startDate, $endDate]);
+            }])
+            ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                $q->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate]);
             }]);
         }])->get();
 
@@ -201,14 +283,34 @@ class ReportController extends Controller
 
         $row = 3;
         foreach ($sectors->sortBy('id') as $sector) {
-            $totalCommitments = $sector->commitments->count();
-            $totalOutputs = $sector->commitments->sum('deliverables_count');
-            $outputsDelivered = $sector->commitments->sum(function ($commitment) {
-                return $commitment->deliverables_count;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
             });
 
+            $totalCommitments = $filteredCommitments->count();
+            $totalOutputs = $filteredCommitments->sum('total_deliverables');
+            $outputsDelivered = $filteredCommitments->sum('deliverables_count');
+
+            // Calculate total KPIs for all deliverables in the date range
+            $totalKpis = 0;
+            foreach ($filteredCommitments as $commitment) {
+                $kpiCount = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+                $totalKpis += $kpiCount;
+            }
+
             $performancePercentage = ($totalOutputs > 0)
-                ? ($totalCommitments > 0 ? ($outputsDelivered / $totalOutputs) * 100 : 0)
+                ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
             $rating = $this->calculatePerformanceRating($performancePercentage);
 
@@ -216,8 +318,8 @@ class ReportController extends Controller
             $sheet1->setCellValue('B' . $row, $sector->sector_name);
             $sheet1->setCellValue('C' . $row, $totalCommitments);
             $sheet1->setCellValue('D' . $row, $totalOutputs);
-            $sheet1->setCellValue('E' . $row, $outputsDelivered);
-            $sheet1->setCellValue('F' . $row, '');
+            $sheet1->setCellValue('E' . $row, $totalKpis);
+            $sheet1->setCellValue('F' . $row, $outputsDelivered);
             $sheet1->setCellValue('G' . $row, $rating);
             $sheet1->setCellValue('H' . $row, '');
 
