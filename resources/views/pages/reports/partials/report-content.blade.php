@@ -27,7 +27,7 @@
                          <td>{{ $data['no_of_commitments'] }}</td>
                          <td>{{ $data['no_of_outputs'] }}</td>
                          <td>{{ $data['no_of_kpis'] ?? 0 }}</td>
-                         <td></td>
+                         <td>{{ $data['performance'] ?? 0 }}%</td>
                          <td>{{ $data['rating'] }}</td>
                          <td></td> <!-- Check placeholder -->
                      </tr>

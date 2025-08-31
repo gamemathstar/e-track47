@@ -51,11 +51,11 @@ class ReportController extends Controller
                     ->whereYear('end_date', $year)
                     ->whereBetween('end_date', [$startDate, $endDate]);
             }])
-            ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
-                $q->whereNotNull('end_date')
-                    ->whereYear('end_date', $year)
-                    ->whereBetween('end_date', [$startDate, $endDate]);
-            }]);
+                ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                    $q->whereNotNull('end_date')
+                        ->whereYear('end_date', $year)
+                        ->whereBetween('end_date', [$startDate, $endDate]);
+                }]);
         }])->get();
 
         $snapshotData = [];
@@ -86,10 +86,40 @@ class ReportController extends Controller
                 $totalKpis += $kpiCount;
             }
 
+            // Calculate KPI performance tracking ratio for the sector
+            $totalKpiRatios = 0;
+            $validKpiCount = 0;
+
+            foreach ($filteredCommitments as $commitment) {
+                $kpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($kpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $totalKpiRatios += $ratio;
+                    $validKpiCount++;
+                }
+            }
+
+            // Calculate average performance ratio
+            $averagePerformanceRatio = ($validKpiCount > 0) ? ($totalKpiRatios / $validKpiCount) * 100 : 0;
+
             $performancePercentage = ($totalOutputs > 0)
                 ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
-            $rating = $this->calculatePerformanceRating($performancePercentage);
+            $rating = $this->calculatePerformanceRating(round($averagePerformanceRatio, 2));
 
             $snapshotData[] = [
                 's_n' => $sector->id,
@@ -98,6 +128,7 @@ class ReportController extends Controller
                 'no_of_outputs' => $totalOutputs,
                 'no_of_kpis' => $totalKpis,
                 'outputs_delivered' => $outputsDelivered,
+                'performance' => round($averagePerformanceRatio, 2),
                 'rating' => $rating,
             ];
         }
@@ -130,6 +161,34 @@ class ReportController extends Controller
                     ->whereBetween('d.end_date', [$startDate, $endDate])
                     ->count();
 
+                // Calculate KPI performance tracking ratio for this commitment
+                $commitmentKpiRatios = 0;
+                $commitmentValidKpiCount = 0;
+
+                $commitmentKpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($commitmentKpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $commitmentKpiRatios += $ratio;
+                    $commitmentValidKpiCount++;
+                }
+
+                // Calculate average performance ratio for this commitment
+                $commitmentAveragePerformanceRatio = ($commitmentValidKpiCount > 0) ? ($commitmentKpiRatios / $commitmentValidKpiCount) * 100 : 0;
+
                 $performancePercentage = ($commitment->total_deliverables > 0)
                     ? ($commitment->deliverables_count / $commitment->total_deliverables) * 100
                     : 0;
@@ -146,7 +205,7 @@ class ReportController extends Controller
                     'meets_expectation' => ($performancePercentage >= 30 && $performancePercentage < 50) ? $commitment->deliverables_count : 0,
                     'needs_improvement' => ($performancePercentage >= 20 && $performancePercentage < 30) ? $commitment->deliverables_count : 0,
                     'below_minimum' => ($performancePercentage < 20) ? $commitment->deliverables_count : 0,
-                    'overall_performance' => $performancePercentage . '%',
+                    'overall_performance' => round($commitmentAveragePerformanceRatio, 2) . '%',
                     'rating' => $performanceRating,
                     'remarks' => '',
                     'check' => '',
@@ -191,12 +250,12 @@ class ReportController extends Controller
         if ($request->ajax()) {
             // Generate HTML content for AJAX response
             $html = view('pages.reports.partials.report-content', compact(
-                'snapshotData', 
-                'summaryData', 
-                'title', 
-                'summaryTitle', 
-                'startMonth', 
-                'endMonth', 
+                'snapshotData',
+                'summaryData',
+                'title',
+                'summaryTitle',
+                'startMonth',
+                'endMonth',
                 'year'
             ))->render();
 
@@ -235,11 +294,11 @@ class ReportController extends Controller
                     ->whereYear('end_date', $year)
                     ->whereBetween('end_date', [$startDate, $endDate]);
             }])
-            ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
-                $q->whereNotNull('end_date')
-                    ->whereYear('end_date', $year)
-                    ->whereBetween('end_date', [$startDate, $endDate]);
-            }]);
+                ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                    $q->whereNotNull('end_date')
+                        ->whereYear('end_date', $year)
+                        ->whereBetween('end_date', [$startDate, $endDate]);
+                }]);
         }])->get();
 
         $spreadsheet = new Spreadsheet();
@@ -309,6 +368,36 @@ class ReportController extends Controller
                 $totalKpis += $kpiCount;
             }
 
+            // Calculate KPI performance tracking ratio for the sector
+            $totalKpiRatios = 0;
+            $validKpiCount = 0;
+
+            foreach ($filteredCommitments as $commitment) {
+                $kpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($kpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $totalKpiRatios += $ratio;
+                    $validKpiCount++;
+                }
+            }
+
+            // Calculate average performance ratio
+            $averagePerformanceRatio = ($validKpiCount > 0) ? ($totalKpiRatios / $validKpiCount) * 100 : 0;
+
             $performancePercentage = ($totalOutputs > 0)
                 ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
@@ -320,8 +409,9 @@ class ReportController extends Controller
             $sheet1->setCellValue('D' . $row, $totalOutputs);
             $sheet1->setCellValue('E' . $row, $totalKpis);
             $sheet1->setCellValue('F' . $row, $outputsDelivered);
-            $sheet1->setCellValue('G' . $row, $rating);
-            $sheet1->setCellValue('H' . $row, '');
+            $sheet1->setCellValue('G' . $row, round($averagePerformanceRatio, 2));
+            $sheet1->setCellValue('H' . $row, $rating);
+            $sheet1->setCellValue('I' . $row, '');
 
             $row++;
         }
