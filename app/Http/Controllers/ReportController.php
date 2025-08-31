@@ -616,6 +616,10 @@ class ReportController extends Controller
         $startMonth = $request->input('start_month', 1);
         $endMonth = $request->input('end_month', 12);
 
+        // Check if user is a sector head
+        $user = auth()->user();
+        $userSector = $user->isSectorHead();
+
         try {
             // Get comprehensive KPI tracking data
             $reportData = [];   //  $this->getComprehensiveReportData($year);
@@ -625,7 +629,7 @@ class ReportController extends Controller
             session()->flash('error', 'Database tables not found. Please run database migrations first.');
         }
 
-        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startMonth', 'endMonth'));
+        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startMonth', 'endMonth', 'userSector'));
     }
 
     public function downloadComprehensiveReport(Request $request)
@@ -645,9 +649,13 @@ class ReportController extends Controller
         $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
         $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
 
+        // Check if user is a sector head
+        $user = auth()->user();
+        $userSector = $user->isSectorHead();
+
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate);
+            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate, $userSector);
         } catch (Exception $e) {
             // Handle database errors gracefully
             return redirect()->back()->with('error', 'Database tables not found. Please run database migrations first.');
@@ -657,18 +665,18 @@ class ReportController extends Controller
         $spreadsheet = new Spreadsheet();
 
         // Create individual sector sheets and get commitment average row mapping
-        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate);
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector);
         $commitmentAverageRows = $sectorData['commitmentAverageRows'];
         $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
 
         // Create Overall Summary sheet
-        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate);
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector);
 
         // Create Grand Summary sheet
-        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate);
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector);
 
         // Create Sector Summary Details sheet
-        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate);
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate, $userSector);
 
         //  RE-ORDER THE SHEETS HERE
         // Reorder sheets: Overall Summary at index 0, Grand Summary at index 1, Sector Summary Details at index 2
@@ -708,7 +716,7 @@ class ReportController extends Controller
         exit;
     }
 
-    private function getComprehensiveReportData($year, $startDate, $endDate)
+    private function getComprehensiveReportData($year, $startDate, $endDate, $userSector = null)
     {
         // Get main report data with the correct structure
         $reportData = DB::table('sectors as s')
@@ -726,6 +734,9 @@ class ReportController extends Controller
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
             ->whereBetween('d.end_date', [$startDate, $endDate])
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 's.sector_name',
                 'c.name as commitment_name',
@@ -830,7 +841,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorSummaryData($year, $startDate = null, $endDate = null)
+    private function getSectorSummaryData($year, $startDate = null, $endDate = null, $userSector = null)
     {
         // Get sector summary data with performance counts
         $sectorSummary = DB::table('sectors as s')
@@ -850,6 +861,9 @@ class ReportController extends Controller
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 's.sector_name',
                 DB::raw('COUNT(DISTINCT c.id) as commitment_count'),
@@ -863,7 +877,7 @@ class ReportController extends Controller
         $sn = 1;
         foreach ($sectorSummary as $sector) {
             // Calculate performance counts for this sector
-            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year, $startDate, $endDate);
+            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year, $startDate, $endDate, $userSector);
 
             $result[] = [
                 'sn' => $sn++,
@@ -884,7 +898,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorPerformanceCounts($sectorName, $year, $startDate = null, $endDate = null)
+    private function getSectorPerformanceCounts($sectorName, $year, $startDate = null, $endDate = null, $userSector = null)
     {
         // Get all KPIs for the sector to calculate not assessed count
         $allKpis = DB::table('sectors as s')
@@ -905,6 +919,9 @@ class ReportController extends Controller
             ->whereYear('d.end_date', $year)
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
             })
             ->select([
                 'kt.target',
@@ -974,7 +991,7 @@ class ReportController extends Controller
         return $counts;
     }
 
-    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null)
+    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Overall Summary');
@@ -1090,8 +1107,14 @@ class ReportController extends Controller
         $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers (keep larger for merged content)
         $sheet->getRowDimension('5')->setRowHeight(25); // Sub-labels
 
-        // Get all sectors for the overall summary
-        $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+        // Get sectors for the overall summary based on user role
+        if ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = DB::table('sectors')->where('id', $userSector->id)->orderBy('sector_name')->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+        }
 
         $row = 7; // Start data from row 7 after headers
         $iteration = 1; // Loop iteration counter
@@ -1357,7 +1380,7 @@ class ReportController extends Controller
         }
     }
 
-    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null)
+    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Grand Summary-Sector_MDAs+');
@@ -1469,7 +1492,7 @@ class ReportController extends Controller
         $sheet->getStyle('A3:H4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Get grand summary data
-        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate);
+        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector);
 
         $row = 5; // Start data from row 5 after headers
         $iteration = 1; // Loop iteration counter
@@ -1582,7 +1605,7 @@ class ReportController extends Controller
         $sheet->getStyle('A1:H4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
-    private function getGrandSummaryData($year, $startDate = null, $endDate = null)
+    private function getGrandSummaryData($year, $startDate = null, $endDate = null, $userSector = null)
     {
         // Get grand summary data - use LEFT JOIN to include all sectors even if they don't have complete data
         $grandSummary = DB::table('sectors as s')
@@ -1601,6 +1624,9 @@ class ReportController extends Controller
             ->whereYear('d.end_date', $year)
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
             })
             ->select([
                 's.sector_name',
@@ -1671,7 +1697,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null)
+    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Sector_MDAs Summary Details');
@@ -1821,6 +1847,9 @@ class ReportController extends Controller
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 's.id as sector_id',
                 's.sector_name',
@@ -1959,9 +1988,16 @@ class ReportController extends Controller
 
     }
 
-    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate)
+    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector = null)
     {
-        $sectors = Sector::all(); // Get all sectors
+        // Filter sectors based on user role
+        if ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = Sector::where('id', $userSector->id)->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = Sector::all();
+        }
         $commitmentAverageRows = []; // Track commitment average row numbers
         $sectorOverallAverageRows = []; // Track sector overall average row numbers
 
