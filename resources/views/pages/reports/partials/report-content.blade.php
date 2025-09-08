@@ -22,7 +22,7 @@
                 <tbody>
                 @foreach ($snapshotData as $data)
                     <tr>
-                        <td>{{ $data['s_n'] }}</td>
+                        <td>{{ $loop->iteration }}</td>
                         <td>{{ $data['sector_name'] }}</td>
                         <td>{{ $data['no_of_commitments'] }}</td>
                         <td>{{ $data['no_of_outputs'] }}</td>

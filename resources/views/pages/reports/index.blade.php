@@ -30,9 +30,9 @@
     <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
             Reports
-            @if($userSector)
-                <span class="text-sm text-gray-500 ml-2">({{ $userSector->sector_name }} Sector)</span>
-            @endif
+{{--            @if($userSector)--}}
+{{--                <span class="text-sm text-gray-500 ml-2">({{ $userSector->sector_name }} Sector)</span>--}}
+{{--            @endif--}}
         </h2>
         <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
             <a href="{{ route('reports.comprehensive') }}" class="btn btn-primary mr-2">
@@ -47,18 +47,18 @@
                 <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
                     <div class="text-primary text-2xl">Generate Report</div>
                 </div>
-                @if($userSector)
-                    <div class="alert alert-info mt-3">
-                        <i class="w-4 h-4 mr-2" data-lucide="info"></i>
-                        <strong>Sector Head Access:</strong> This report will show data for your sector
-                        ({{ $userSector->sector_name }}) only.
-                    </div>
-                @else
-                    <div class="alert alert-info mt-3">
-                        <i class="w-4 h-4 mr-2" data-lucide="info"></i>
-                        <strong>Full Access:</strong> This report will show data for all sectors.
-                    </div>
-                @endif
+{{--                @if($userSector)--}}
+{{--                    <div class="alert alert-info mt-3">--}}
+{{--                        <i class="w-4 h-4 mr-2" data-lucide="info"></i>--}}
+{{--                        <strong>Sector Head Access:</strong> This report will show data for your sector--}}
+{{--                        ({{ $userSector->sector_name }}) only.--}}
+{{--                    </div>--}}
+{{--                @else--}}
+{{--                    <div class="alert alert-info mt-3">--}}
+{{--                        <i class="w-4 h-4 mr-2" data-lucide="info"></i>--}}
+{{--                        <strong>Full Access:</strong> This report will show data for all sectors.--}}
+{{--                    </div>--}}
+{{--                @endif--}}
                 <form id="reportForm">
                     @csrf
                     <div class="grid grid-cols-12 gap-4 gap-y-3 mt-3">
