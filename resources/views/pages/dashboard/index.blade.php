@@ -2,7 +2,7 @@
 @section('content')
     @php
         $user = auth()->user();
-        $year = date('Y');//\App\Models\StateBudget::currentYear();
+        $year = $year ?? date('Y');//\App\Models\StateBudget::currentYear();
         $stateBudget = \App\Models\Commitment::sum('budget');//\App\Models\StateBudget::activeBudget();
         $releasedAmount = 40000;//\App\Models\StateBudget::releases();
         $releasedIncomplete = 8;//\App\Models\StateBudget::releaseCount();
@@ -23,9 +23,6 @@
 
             <div class="col-span-12 lg:col-span-10 xl:col-span-9 mt-2">
 
-                @php
-                    $year = date("Y");
-                @endphp
                 <div class="bg-white p-5 rounded">
                     <table class="table table-bordered" style="font-size: 12px;">
                         <tr>
@@ -39,47 +36,47 @@
                             <th>3rd</th>
                             <th>4th</th>
                         </tr>
-
-                        @foreach(\App\Models\Sector::get() as $sector)
-                            @php
-                                $commitmentIds = $sector->commitments->pluck('id');
-                                $deliverableIds = \App\Models\Deliverable::whereIn('commitment_id',$commitmentIds)->pluck('id');
-                                $kpiIds = \App\Models\Kpi::whereIn('deliverable_id',$deliverableIds)->pluck('id');
-                                $perf = \App\Models\PerformanceTracking::whereIn('kpi_id',$kpiIds)
-                                ->select([
-                                    'quarter',
-                                    \Illuminate\Support\Facades\DB::raw("SUM( IF( delivery_department_value > 0 AND milestone > 0, (delivery_department_value / milestone) * 100, 0 )) /COUNT(delivery_department_value) AS performance",
-                                    )])->where('year',$year)->whereIn('quarter',[1,2,3,4])->groupBy('quarter')->orderBy('quarter')->get();
-                            @endphp
+                        @php
+                            $rows = $sectorQuarterPerf ?? [];
+                        @endphp
+                        @foreach($rows as $idx => $row)
                             <tr>
-                                <th>{{$loop->iteration}}</th>
-                                <th>{{$sector->sector_name}}</th>
+                                <th>{{ $loop->iteration }}</th>
+                                <th>{{ $row['sector_name'] }}</th>
                                 <th>
-                                    @if(isset($perf[0]) && $perf[0]->quarter==1)
-                                        <img style="display: inline; height: 16px;"
-                                             src="{{ asset('dist/images/arrow-' . ($perf[0]->performance >= 50? 'up':'down') . '.png') }}">
-                                        {{ number_format($perf[0]->performance,1)."%" }}
+                                    @php $v = $row[1] ?? null; @endphp
+                                    @if(!is_null($v))
+                                        <img style="display: inline; height: 16px;" src="{{ asset('dist/images/arrow-' . ($v >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($v,1) }}%
+                                    @else
+                                        -
                                     @endif
                                 </th>
                                 <th>
-                                    @if(isset($perf[1]) && $perf[1]->quarter==2)
-                                        <img style="display: inline; height: 16px;"
-                                             src="{{ asset('dist/images/arrow-' . ($perf[1]->performance >= 50? 'up':'down') . '.png') }}">
-                                        {{ number_format($perf[1]->performance,1)."%" }}
+                                    @php $v = $row[2] ?? null; @endphp
+                                    @if(!is_null($v))
+                                        <img style="display: inline; height: 16px;" src="{{ asset('dist/images/arrow-' . ($v >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($v,1) }}%
+                                    @else
+                                        -
                                     @endif
                                 </th>
                                 <th>
-                                    @if(isset($perf[2]) && $perf[2]->quarter==3)
-                                        <img style="display: inline; height: 16px;"
-                                             src="{{ asset('dist/images/arrow-' . ($perf[2]->performance >= 50? 'up':'down') . '.png') }}">
-                                        {{ number_format($perf[2]->performance,1)."%" }}
+                                    @php $v = $row[3] ?? null; @endphp
+                                    @if(!is_null($v))
+                                        <img style="display: inline; height: 16px;" src="{{ asset('dist/images/arrow-' . ($v >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($v,1) }}%
+                                    @else
+                                        -
                                     @endif
                                 </th>
                                 <th>
-                                    @if(isset($perf[3]) && $perf[3]->quarter==4)
-                                        <img style="display: inline; height: 16px;"
-                                             src="{{ asset('dist/images/arrow-' . ($perf[3]->performance >= 50? 'up':'down') . '.png') }}">
-                                        {{ number_format($perf[3]->performance,1)."%" }}
+                                    @php $v = $row[4] ?? null; @endphp
+                                    @if(!is_null($v))
+                                        <img style="display: inline; height: 16px;" src="{{ asset('dist/images/arrow-' . ($v >= 50? 'up':'down') . '.png') }}">
+                                        {{ number_format($v,1) }}%
+                                    @else
+                                        -
                                     @endif
                                 </th>
                             </tr>
