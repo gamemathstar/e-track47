@@ -64,8 +64,8 @@
                     <div class="text-primary text-2xl">{{ $sector->sector_name }}</div>
                 </div>
                 {{ $sector->description }}
-                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}"
-                   target="_blank">Download Report</a>
+                {{--                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}"--}}
+                {{--                   target="_blank">Download Report</a>--}}
                 <br><br>
             </div>
         </div>
