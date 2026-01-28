@@ -6,7 +6,9 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliverableController;
+use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\KpiController;
+use App\Http\Controllers\PublicGalleryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\UserController;
@@ -31,6 +33,10 @@ Route::get('/sec-proj', [CommentController::class, 'index'])->name('home2');
 Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthLoginController::class, 'login'])->name('login.process');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
+
+// Public Gallery Routes (No authentication required - must be before auth routes)
+Route::get('gallery', [PublicGalleryController::class, 'index'])->name('public.gallery.index');
+Route::get('gallery/{gallery}', [PublicGalleryController::class, 'show'])->name('public.gallery.show');
 
 Route::middleware(['auth'])->group(function () {
 
@@ -100,6 +106,12 @@ Route::middleware(['auth'])->group(function () {
     // Comprehensive KPI Report
     Route::get('reports/comprehensive', [ReportController::class, 'comprehensiveReport'])->name('reports.comprehensive');
     Route::post('reports/comprehensive/download', [ReportController::class, 'downloadComprehensiveReport'])->name('reports.comprehensive.download');
+    Route::post('reports/comprehensive/print', [ReportController::class, 'printComprehensiveReport'])->name('reports.comprehensive.print');
+
+    // Gallery Management (Admin only)
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('gallery', GalleryController::class);
+    });
 });
 
 Route::get('mdas/{commitment}/details', [CommentController::class, 'mda'])->name('public.mda.details');

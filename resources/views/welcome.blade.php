@@ -38,6 +38,12 @@
                 </a>
             </li>
             <li>
+                <a href="{{ route('public.gallery.index') }}" class="menu">
+                    <div class="menu__icon"><i data-lucide="image"></i></div>
+                    <div class="menu__title"> Gallery</div>
+                </a>
+            </li>
+            <li>
                 <a href="{{ route('login') }}" class="menu">
                     <div class="menu__icon"><i data-lucide="lock"></i></div>
                     <div class="menu__title"> Login</div>
@@ -67,6 +73,12 @@
             <a href="{{ route('home') }}" class="top-menu top-menu--active">
                 <div class="top-menu__icon"><i data-lucide="home"></i></div>
                 <div class="top-menu__title"> Home</div>
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('public.gallery.index') }}" class="top-menu">
+                <div class="top-menu__icon"><i data-lucide="image"></i></div>
+                <div class="top-menu__title"> Gallery</div>
             </a>
         </li>
         <li>

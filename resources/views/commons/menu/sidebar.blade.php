@@ -74,6 +74,15 @@
                     </div>
                 </a>
             </li>
+            <li>
+                <a href="{{route('admin.gallery.index')}}"
+                   class="side-menu {{ Request::is('admin/gallery*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="image"></i></div>
+                    <div class="side-menu__title">
+                        Gallery Management
+                    </div>
+                </a>
+            </li>
         @endif
         @if($sector = $user->isSectorHead())
             <li>

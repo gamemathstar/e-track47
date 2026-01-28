@@ -112,14 +112,14 @@
         <div class="intro-x dropdown w-8 h-8">
             <div class="dropdown-toggle w-8 h-8 rounded-full overflow-hidden shadow-lg image-fit zoom-in scale-110" role="button" aria-expanded="false" data-tw-toggle="dropdown">
                 <img alt="User Photo" class="rounded-full"
-                     src="{{ asset($user->image_url? 'uploads/users/' . $user->image_url: 'dist/images/profile-5.jpg') }}">
+                     src="{{ asset($user && $user->image_url ? 'uploads/users/' . $user->image_url : 'dist/images/profile-5.jpg') }}">
             </div>
             <div class="dropdown-menu w-56">
                 <ul class="dropdown-content bg-primary/80 before:block before:absolute before:bg-black before:inset-0 before:rounded-md before:z-[-1] text-white">
                     <li class="p-2">
-                        @php $sector = $user->sector(); @endphp
-                        <div class="font-medium">{{$user->full_name}}</div>
-                        <div class="text-xs text-white/60 mt-0.5 dark:text-slate-500">{{$sector?$sector->name:""}}</div>
+                        @php $sector = $user ? $user->sector() : null; @endphp
+                        <div class="font-medium">{{ $user ? $user->full_name : 'Guest' }}</div>
+                        <div class="text-xs text-white/60 mt-0.5 dark:text-slate-500">{{ $sector ? $sector->sector_name : '' }}</div>
                     </li>
 {{--                    <li>--}}
 {{--                        <hr class="dropdown-divider border-white/[0.08]">--}}

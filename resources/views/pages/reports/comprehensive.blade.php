@@ -149,6 +149,10 @@
                                     <i class="w-4 h-4 mr-2" data-lucide="download"></i>
                                     Export to Excel
                                 </button>
+                                <button type="button" onclick="printReport()" class="btn btn-secondary w-52 mt-2">
+                                    <i class="w-4 h-4 mr-2" data-lucide="printer"></i>
+                                    Print Report
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -247,5 +251,36 @@
                 yearSelect.value = new Date().getFullYear();
             }
         });
+
+        function printReport() {
+            const form = document.querySelector('form[method="POST"]');
+            const formData = new FormData(form);
+            
+            // Create a temporary form for print
+            const printForm = document.createElement('form');
+            printForm.method = 'POST';
+            printForm.action = '{{ route("reports.comprehensive.print") }}';
+            printForm.target = '_blank';
+            
+            // Add CSRF token
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = '{{ csrf_token() }}';
+            printForm.appendChild(csrfInput);
+            
+            // Add form fields
+            ['start_month', 'end_month', 'year'].forEach(field => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = field;
+                input.value = formData.get(field);
+                printForm.appendChild(input);
+            });
+            
+            document.body.appendChild(printForm);
+            printForm.submit();
+            document.body.removeChild(printForm);
+        }
     </script>
 @endsection
