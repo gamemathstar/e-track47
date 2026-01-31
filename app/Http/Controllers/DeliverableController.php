@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeliverableController extends Controller
 {
@@ -44,20 +45,41 @@ class DeliverableController extends Controller
     public function storeTracking(Request $request)
     {
         $request->validate([
+            'id' => 'required|exists:performance_trackings,id',
             'delivery_department_value' => "required",
             'delivery_department_remark' => "required",
             'confirmation_status' => "required",
         ]);
+        
         $pt = PerformanceTracking::find($request->id);
-        if ($pt) {
-            $pt->delivery_department_value = $request->delivery_department_value;
-            $pt->delivery_department_remark = $request->delivery_department_remark;
-            $pt->confirmation_status = $request->confirmation_status;
-            $pt->save();
+        if (!$pt) {
+            return redirect()->back()->with('failure', 'Performance tracking record not found');
+        }
+        
+        $user = Auth::user();
+        if (!$user) {
+            return redirect()->back()->with('failure', 'User not authenticated');
+        }
+        
+        $userRole = $user->role();
+        if (!$userRole) {
+            return redirect()->back()->with('failure', 'User role not found');
+        }
+        
+        $pt->delivery_department_value = $request->delivery_department_value;
+        $pt->delivery_department_remark = $request->delivery_department_remark;
+        $pt->confirmation_status = $request->confirmation_status;
+        $pt->save();
 
-            Auth::user()->role()->role == "Delivery Department" ?
-                Notification::submitTrackingReview($pt)
-                : Notification::submitTrackingForRewiew($pt);
+        try {
+            if ($userRole->role == "Delivery Department") {
+                Notification::submitTrackingReview($pt);
+            } else {
+                Notification::submitTrackingForRewiew($pt);
+            }
+        } catch (\Exception $e) {
+            // Log the error but don't fail the request
+            Log::error('Notification error in storeTracking: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Delivery ' . $request->confirmation_status);
