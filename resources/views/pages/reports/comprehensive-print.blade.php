@@ -139,7 +139,7 @@
     <!-- Sheet 1: Overall Summary -->
     <div class="sheet">
         <div class="sheet-title">Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor</div>
-        <div class="sheet-subtitle">January to December {{ $year }} MDA/Sector Summary of Performance on Commitments</div>
+        <div class="sheet-subtitle">{{ $startQuarterName }} to {{ $endQuarterName }} {{ $year }} MDA/Sector Summary of Performance on Commitments</div>
         
         <table class="report-table">
             <thead>
@@ -187,7 +187,7 @@
     <!-- Sheet 2: Grand Summary -->
     <div class="sheet">
         <div class="sheet-title">Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor</div>
-        <div class="sheet-subtitle">{{ $year }} Fiscal Year Snapshot View of MDA/Sector Performance (January to December)</div>
+        <div class="sheet-subtitle">{{ $year }} Fiscal Year Snapshot View of MDA/Sector Performance ({{ $startQuarterName }} to {{ $endQuarterName }})</div>
         
         <table class="report-table">
             <thead>
@@ -220,7 +220,7 @@
     <!-- Sheet 3: Sector Summary Details -->
     <div class="sheet">
         <div class="sheet-title">Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor</div>
-        <div class="sheet-subtitle">January to December {{ $year }} MDA/Sector Summary of Performance on Commitments</div>
+        <div class="sheet-subtitle">{{ $startQuarterName }} to {{ $endQuarterName }} {{ $year }} MDA/Sector Summary of Performance on Commitments</div>
         
         <table class="report-table">
             <thead>
@@ -289,7 +289,7 @@
         @if($sector->description && isset($individualSectorData[$sector->id]))
             <div class="sheet">
                 <div class="sheet-title">Performance Delivery Coordination Unit (PDCU), Office of the Executive Governor</div>
-                <div class="sheet-subtitle">FULL YEAR  [JANUARY TO DECEMBER {{ $year }}] PERFORMANCE ASSESSMENT</div>
+                <div class="sheet-subtitle">PERFORMANCE ASSESSMENT [{{ $startQuarterName }} to {{ $endQuarterName }} {{ $year }}]</div>
                 
                 <table class="report-table">
                     <thead>

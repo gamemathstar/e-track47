@@ -600,12 +600,18 @@ class ReportController extends Controller
     public function comprehensiveReport(Request $request)
     {
         $year = $request->input('year', date('Y'));
-        $startMonth = $request->input('start_month', 1);
-        $endMonth = $request->input('end_month', 12);
+        $startQuarter = $request->input('start_quarter', 1);
+        $endQuarter = $request->input('end_quarter', 4);
 
         // Check if user is a sector head
         $user = auth()->user();
         $userSector = $user->isSectorHead();
+
+        // Get all sectors for the dropdown (only if not a sector head)
+        $sectors = [];
+        if (!$userSector) {
+            $sectors = Sector::orderBy('sector_name')->get();
+        }
 
         try {
             // Get comprehensive KPI tracking data
@@ -616,41 +622,112 @@ class ReportController extends Controller
             session()->flash('error', 'Database tables not found. Please run database migrations first.');
         }
 
-        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startMonth', 'endMonth', 'userSector'));
+        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startQuarter', 'endQuarter', 'userSector', 'sectors'));
+    }
+
+    /**
+     * Convert quarter to date range
+     * 
+     * @param int $quarter Quarter number (1-4)
+     * @param int $year Year
+     * @return array ['start' => Carbon, 'end' => Carbon]
+     */
+    private function quarterToDateRange($quarter, $year)
+    {
+        switch ($quarter) {
+            case 1:
+                return [
+                    'start' => Carbon::createFromDate($year, 1, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 3, 31)->endOfMonth()
+                ];
+            case 2:
+                return [
+                    'start' => Carbon::createFromDate($year, 4, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 6, 30)->endOfMonth()
+                ];
+            case 3:
+                return [
+                    'start' => Carbon::createFromDate($year, 7, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 9, 30)->endOfMonth()
+                ];
+            case 4:
+                return [
+                    'start' => Carbon::createFromDate($year, 10, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 12, 31)->endOfMonth()
+                ];
+            default:
+                return [
+                    'start' => Carbon::createFromDate($year, 1, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 12, 31)->endOfMonth()
+                ];
+        }
+    }
+
+    /**
+     * Get date range from start and end quarters
+     * 
+     * @param int $startQuarter Start quarter (1-4)
+     * @param int $endQuarter End quarter (1-4)
+     * @param int $year Year
+     * @return array ['start' => Carbon, 'end' => Carbon]
+     */
+    private function getQuarterDateRange($startQuarter, $endQuarter, $year)
+    {
+        $startRange = $this->quarterToDateRange($startQuarter, $year);
+        $endRange = $this->quarterToDateRange($endQuarter, $year);
+        
+        return [
+            'start' => $startRange['start'],
+            'end' => $endRange['end']
+        ];
     }
 
     public function printComprehensiveReport(Request $request)
     {
         // Validate input
         $request->validate([
-            'start_month' => 'required|integer|between:1,12',
-            'end_month' => 'required|integer|between:1,12|gte:start_month',
+            'start_quarter' => 'required|integer|between:1,4',
+            'end_quarter' => 'required|integer|between:1,4|gte:start_quarter',
             'year' => 'required|integer|digits:4',
+            'sectors' => 'nullable|array',
+            'sectors.*' => 'exists:sectors,id',
         ]);
 
-        $startMonth = $request->input('start_month');
-        $endMonth = $request->input('end_month');
+        $startQuarter = $request->input('start_quarter');
+        $endQuarter = $request->input('end_quarter');
         $year = $request->input('year', date('Y'));
+        $selectedSectorIds = $request->input('sectors', []);
 
-        // Create date range for filtering
-        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
-        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+        // Create date range for filtering from quarters
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         // Check if user is a sector head
         $user = auth()->user();
         $userSector = $user->isSectorHead();
 
-        // Get all sectors (filtered if sector head)
+        // Determine which sectors to include
+        $sectorIds = [];
         if ($userSector) {
+            // Sector head can only see their sector
+            $sectorIds = [$userSector->id];
             $sectors = DB::table('sectors')->where('id', $userSector->id)->orderBy('sector_name')->get();
         } else {
-            $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+            // Non-sector head: use selected sectors or all sectors
+            if (!empty($selectedSectorIds)) {
+                $sectorIds = $selectedSectorIds;
+                $sectors = DB::table('sectors')->whereIn('id', $sectorIds)->orderBy('sector_name')->get();
+            } else {
+                $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+                $sectorIds = $sectors->pluck('id')->toArray();
+            }
         }
 
         // Get data for each sheet
-        $overallSummaryData = $this->getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector);
-        $grandSummaryData = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector);
-        $sectorSummaryData = $this->getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector);
+        $overallSummaryData = $this->getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
+        $grandSummaryData = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds);
+        $sectorSummaryData = $this->getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
         
         // Get individual sector data
         $individualSectorData = [];
@@ -660,15 +737,22 @@ class ReportController extends Controller
             }
         }
 
-        $startMonthName = date('F', mktime(0, 0, 0, $startMonth, 1));
-        $endMonthName = date('F', mktime(0, 0, 0, $endMonth, 1));
+        // Get quarter names for display
+        $quarterNames = [
+            1 => 'Q1 (Jan - Mar)',
+            2 => 'Q2 (Apr - Jun)',
+            3 => 'Q3 (Jul - Sep)',
+            4 => 'Q4 (Oct - Dec)'
+        ];
+        $startQuarterName = $quarterNames[$startQuarter];
+        $endQuarterName = $quarterNames[$endQuarter];
 
         return view('pages.reports.comprehensive-print', compact(
             'year', 
-            'startMonth', 
-            'endMonth', 
-            'startMonthName', 
-            'endMonthName',
+            'startQuarter', 
+            'endQuarter', 
+            'startQuarterName', 
+            'endQuarterName',
             'startDate', 
             'endDate',
             'userSector',
@@ -684,26 +768,42 @@ class ReportController extends Controller
     {
         // Validate input
         $request->validate([
-            'start_month' => 'required|integer|between:1,12',
-            'end_month' => 'required|integer|between:1,12|gte:start_month',
+            'start_quarter' => 'required|integer|between:1,4',
+            'end_quarter' => 'required|integer|between:1,4|gte:start_quarter',
             'year' => 'required|integer|digits:4',
+            'sectors' => 'nullable|array',
+            'sectors.*' => 'exists:sectors,id',
         ]);
 
-        $startMonth = $request->input('start_month');
-        $endMonth = $request->input('end_month');
+        $startQuarter = $request->input('start_quarter');
+        $endQuarter = $request->input('end_quarter');
         $year = $request->input('year', date('Y'));
+        $selectedSectorIds = $request->input('sectors', []);
 
-        // Create date range for filtering
-        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
-        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+        // Create date range for filtering from quarters
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         // Check if user is a sector head
         $user = auth()->user();
         $userSector = $user->isSectorHead();
 
+        // Determine which sectors to include
+        $sectorIds = [];
+        if ($userSector) {
+            // Sector head can only see their sector
+            $sectorIds = [$userSector->id];
+        } else {
+            // Non-sector head: use selected sectors or all sectors
+            if (!empty($selectedSectorIds)) {
+                $sectorIds = $selectedSectorIds;
+            }
+        }
+
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate, $userSector);
+            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate, $userSector, $sectorIds);
         } catch (Exception $e) {
             // Handle database errors gracefully
             return redirect()->back()->with('error', 'Database tables not found. Please run database migrations first.');
@@ -713,18 +813,18 @@ class ReportController extends Controller
         $spreadsheet = new Spreadsheet();
 
         // Create individual sector sheets and get commitment average row mapping
-        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector);
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector, $sectorIds);
         $commitmentAverageRows = $sectorData['commitmentAverageRows'];
         $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
 
         // Create Overall Summary sheet
-        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector);
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         // Create Grand Summary sheet
-        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector);
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         // Create Sector Summary Details sheet
-        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate, $userSector);
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         //  RE-ORDER THE SHEETS HERE
         // Reorder sheets: Overall Summary at index 0, Grand Summary at index 1, Sector Summary Details at index 2
@@ -762,7 +862,7 @@ class ReportController extends Controller
         exit;
     }
 
-    private function getComprehensiveReportData($year, $startDate, $endDate, $userSector = null)
+    private function getComprehensiveReportData($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
         // Get main report data with the correct structure
         $reportData = DB::table('sectors as s')
@@ -780,7 +880,10 @@ class ReportController extends Controller
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
             ->whereBetween('d.end_date', [$startDate, $endDate])
-            ->when($userSector, function ($query) use ($userSector) {
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
                 return $query->where('s.id', $userSector->id);
             })
             ->select([
@@ -1037,7 +1140,7 @@ class ReportController extends Controller
         return $counts;
     }
 
-    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
+    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Overall Summary');
@@ -1147,8 +1250,10 @@ class ReportController extends Controller
         $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers (keep larger for merged content)
         $sheet->getRowDimension('5')->setRowHeight(25); // Sub-labels
 
-        // Get sectors for the overall summary based on user role
-        if ($userSector) {
+        // Get sectors for the overall summary based on user role and selected sectors
+        if (!empty($sectorIds)) {
+            $sectors = DB::table('sectors')->whereIn('id', $sectorIds)->orderBy('sector_name')->get();
+        } elseif ($userSector) {
             // User is a sector head - only show their sector
             $sectors = DB::table('sectors')->where('id', $userSector->id)->orderBy('sector_name')->get();
         } else {
@@ -1415,7 +1520,7 @@ class ReportController extends Controller
         }
     }
 
-    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
+    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Grand Summary-Sector_MDAs+');
@@ -1521,7 +1626,7 @@ class ReportController extends Controller
         $sheet->getStyle('A3:H4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Get grand summary data
-        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector);
+        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds);
 
         $row = 5; // Start data from row 5 after headers
         $iteration = 1; // Loop iteration counter
@@ -1634,7 +1739,7 @@ class ReportController extends Controller
         $sheet->getStyle('A1:H4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
-    private function getGrandSummaryData($year, $startDate = null, $endDate = null, $userSector = null)
+    private function getGrandSummaryData($year, $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         // Get grand summary data - use LEFT JOIN to include all sectors even if they don't have complete data
         $grandSummary = DB::table('sectors as s')
@@ -1656,7 +1761,10 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
-            ->when($userSector, function ($query) use ($userSector) {
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
                 return $query->where('s.id', $userSector->id);
             })
             ->select([
@@ -1728,11 +1836,14 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector = null)
+    private function getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
         // Get overall summary data similar to createOverallSummarySheet
         $sectors = DB::table('sectors as s')
-            ->when($userSector, function ($query) use ($userSector) {
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
                 return $query->where('s.id', $userSector->id);
             })
             ->orderBy('s.sector_name')
@@ -1794,7 +1905,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector = null)
+    private function getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
         // Get sector summary data with commitments grouped by sector (matching Excel structure)
         $sectorSummary = DB::table('sectors as s')
@@ -1814,7 +1925,10 @@ class ReportController extends Controller
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
-            ->when($userSector, function ($query) use ($userSector) {
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
                 return $query->where('s.id', $userSector->id);
             })
             ->select([
@@ -1962,7 +2076,7 @@ class ReportController extends Controller
         return $sectorData;
     }
 
-    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null, $userSector = null)
+    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Sector_MDAs Summary Details');
@@ -2106,7 +2220,10 @@ class ReportController extends Controller
             ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
                 return $query->whereBetween('d.end_date', [$startDate, $endDate]);
             })
-            ->when($userSector, function ($query) use ($userSector) {
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
                 return $query->where('s.id', $userSector->id);
             })
             ->select([
@@ -2247,10 +2364,12 @@ class ReportController extends Controller
 
     }
 
-    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector = null)
+    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
-        // Filter sectors based on user role
-        if ($userSector) {
+        // Filter sectors based on user role and selected sectors
+        if (!empty($sectorIds)) {
+            $sectors = Sector::whereIn('id', $sectorIds)->get();
+        } elseif ($userSector) {
             // User is a sector head - only show their sector
             $sectors = Sector::where('id', $userSector->id)->get();
         } else {

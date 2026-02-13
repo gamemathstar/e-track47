@@ -106,32 +106,40 @@
                     @else
                         <div class="alert alert-info mt-3">
                             <i class="w-4 h-4 mr-2" data-lucide="info"></i>
-                            <strong>Full Access:</strong> This report will show data for all sectors.
+                            <strong>Full Access:</strong> Select one or more sectors to filter the report, or leave empty to view all sectors.
                         </div>
                     @endif
                     <form method="POST" action="{{ route('reports.comprehensive.download') }}">
                         @csrf
                         <div class="grid grid-cols-12 gap-4 gap-y-3 mt-3">
-                            <div class="col-span-3 sm:col-span-3">
-                                <label for="start_month" class="form-label">Start Month</label>
-                                <select name="start_month" id="start_month" class="form-control">
-                                    @for ($i = 1; $i <= 12; $i++)
-                                        <option
-                                            value="{{ $i }}" {{ (request('start_month', 1) == $i) ? 'selected' : '' }}>
-                                            {{ date('F', mktime(0, 0, 0, $i, 1)) }}
+                            @if(!$userSector)
+                            <div class="col-span-12 sm:col-span-12">
+                                <label for="sectors" class="form-label">Select Sector(s) <span class="text-gray-500 text-xs">(Leave empty for all sectors)</span></label>
+                                <select name="sectors[]" id="sectors" class="form-control tom-select" multiple>
+                                    @foreach($sectors as $sector)
+                                        <option value="{{ $sector->id }}" {{ (is_array(request('sectors')) && in_array($sector->id, request('sectors'))) ? 'selected' : '' }}>
+                                            {{ $sector->sector_name }}
                                         </option>
-                                    @endfor
+                                    @endforeach
+                                </select>
+                            </div>
+                            @endif
+                            <div class="col-span-3 sm:col-span-3">
+                                <label for="start_quarter" class="form-label">Start Quarter</label>
+                                <select name="start_quarter" id="start_quarter" class="form-control">
+                                    <option value="1" {{ (request('start_quarter', 1) == 1) ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
+                                    <option value="2" {{ (request('start_quarter', 1) == 2) ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
+                                    <option value="3" {{ (request('start_quarter', 1) == 3) ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
+                                    <option value="4" {{ (request('start_quarter', 1) == 4) ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
                                 </select>
                             </div>
                             <div class="col-span-3 sm:col-span-3">
-                                <label for="end_month" class="form-label">End Month</label>
-                                <select name="end_month" id="end_month" class="form-control">
-                                    @for ($i = 1; $i <= 12; $i++)
-                                        <option
-                                            value="{{ $i }}" {{ (request('end_month', 12) == $i) ? 'selected' : '' }}>
-                                            {{ date('F', mktime(0, 0, 0, $i, 1)) }}
-                                        </option>
-                                    @endfor
+                                <label for="end_quarter" class="form-label">End Quarter</label>
+                                <select name="end_quarter" id="end_quarter" class="form-control">
+                                    <option value="1" {{ (request('end_quarter', 4) == 1) ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
+                                    <option value="2" {{ (request('end_quarter', 4) == 2) ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
+                                    <option value="3" {{ (request('end_quarter', 4) == 3) ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
+                                    <option value="4" {{ (request('end_quarter', 4) == 4) ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
                                 </select>
                             </div>
                             <div class="col-span-3 sm:col-span-3">
@@ -223,24 +231,24 @@
 
 @section('js')
     <script>
-        // Ensure End Month is always greater than or equal to Start Month
-        document.getElementById('start_month').addEventListener('change', function () {
-            const startMonth = parseInt(this.value);
-            const endMonthSelect = document.getElementById('end_month');
-            const endMonth = parseInt(endMonthSelect.value);
+        // Ensure End Quarter is always greater than or equal to Start Quarter
+        document.getElementById('start_quarter').addEventListener('change', function () {
+            const startQuarter = parseInt(this.value);
+            const endQuarterSelect = document.getElementById('end_quarter');
+            const endQuarter = parseInt(endQuarterSelect.value);
 
-            if (endMonth < startMonth) {
-                endMonthSelect.value = startMonth;
+            if (endQuarter < startQuarter) {
+                endQuarterSelect.value = startQuarter;
             }
         });
 
-        document.getElementById('end_month').addEventListener('change', function () {
-            const endMonth = parseInt(this.value);
-            const startMonthSelect = document.getElementById('start_month');
-            const startMonth = parseInt(startMonthSelect.value);
+        document.getElementById('end_quarter').addEventListener('change', function () {
+            const endQuarter = parseInt(this.value);
+            const startQuarterSelect = document.getElementById('start_quarter');
+            const startQuarter = parseInt(startQuarterSelect.value);
 
-            if (startMonth > endMonth) {
-                startMonthSelect.value = endMonth;
+            if (startQuarter > endQuarter) {
+                startQuarterSelect.value = endQuarter;
             }
         });
 
@@ -270,12 +278,32 @@
             printForm.appendChild(csrfInput);
             
             // Add form fields
-            ['start_month', 'end_month', 'year'].forEach(field => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = field;
-                input.value = formData.get(field);
-                printForm.appendChild(input);
+            const fields = ['start_quarter', 'end_quarter', 'year'];
+            @if(!$userSector)
+            fields.push('sectors');
+            @endif
+            
+            fields.forEach(field => {
+                if (field === 'sectors') {
+                    // Handle multi-select sectors
+                    const sectorsSelect = document.getElementById('sectors');
+                    if (sectorsSelect) {
+                        const selectedSectors = Array.from(sectorsSelect.selectedOptions);
+                        selectedSectors.forEach(option => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'sectors[]';
+                            input.value = option.value;
+                            printForm.appendChild(input);
+                        });
+                    }
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = field;
+                    input.value = formData.get(field);
+                    printForm.appendChild(input);
+                }
             });
             
             document.body.appendChild(printForm);
