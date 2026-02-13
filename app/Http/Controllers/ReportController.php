@@ -967,7 +967,8 @@ class ReportController extends Controller
 
             if ($target > 0 && is_numeric($actual)) {
                 $performanceRatio = ($actual / $target) * 100;
-                $adjustedPerformance = $performanceRatio;
+                // Cap adjusted performance at 101% if it exceeds 100%
+                $adjustedPerformance = $performanceRatio > 100 ? 101 : $performanceRatio;
             }
 
             // Add KPI data row
@@ -2611,8 +2612,8 @@ class ReportController extends Controller
                     $sheet->setCellValue('G' . $row, '=F' . $row . '/E' . $row);
                     $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
 
-                    // Set adjusted performance formula in column H: =G
-                    $sheet->setCellValue('H' . $row, '=G' . $row);
+                    // Set adjusted performance formula in column H: =MIN(G, 1.01) to cap at 101%
+                    $sheet->setCellValue('H' . $row, '=MIN(G' . $row . ', 1.01)');
                     $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
                 } else {
                     // No performance data available - use 0 for computation but display 'Not Assessed'
