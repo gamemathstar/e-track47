@@ -25,8 +25,7 @@ class KpiController extends Controller
     {
         $request->validate([
             'kpi' => 'required',
-            'end_date' => 'required',
-            'start_date' => 'required',
+            'year' => 'required|integer|min:2000|max:2100',
             'target_value' => 'required',
             'deliverable_id' => 'required',
             'unit_of_measurement' => 'required',
@@ -87,8 +86,7 @@ class KpiController extends Controller
             'kpi' => 'required|string|max:255',
             'target_value' => 'required|numeric',
             'unit_of_measurement' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date'
+            'year' => 'required|integer|min:2000|max:2100'
         ]);
 
         $kpi = Kpi::find($request->kpi_id);
@@ -101,8 +99,7 @@ class KpiController extends Controller
         $kpi->kpi = $request->kpi;
         $kpi->target_value = $request->target_value;
         $kpi->unit_of_measurement = $request->unit_of_measurement;
-        $kpi->start_date = $request->start_date;
-        $kpi->end_date = $request->end_date;
+        $kpi->year = $request->year;
 
         $kpi->save();
 

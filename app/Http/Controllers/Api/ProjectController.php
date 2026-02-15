@@ -132,13 +132,10 @@ class ProjectController extends Controller
 
             $projects = [];
             foreach ($commitments as $commitment) {
-                $date = date_create($commitment->start_date);
                 $projects[] = [
                     'id' => $commitment->id, 'sector_id' => $commitment->sector_id,
                     'name' => $commitment->name, 'description' => $commitment->description,
                     'budget' => '₦' . number_format($commitment->budget, 2),
-                    'start_date' => date_format($date, "d M, Y"),
-                    'duration_in_days' => $commitment->duration_in_days,
                 ];
             }
 
@@ -366,24 +363,14 @@ class ProjectController extends Controller
                 'name' => 'required',
                 'type' => "required",
                 'description' => 'required',
-                'start_date' => 'required',
-                'end_date' => 'required',
                 'status' => 'required',
                 'budget' => 'required',
             ]);
-
-            $dt_start = new DateTime($request->start_date);
-            $dt_end = new DateTime($request->end_date);
-            $diff = $dt_start->diff($dt_end);
-            $duration = $diff->format('%a');
 
             $commitment = new Commitment();
             $commitment->sector_id = $request->sector_id;
             $commitment->name = $request->name;
             $commitment->type = $request->type;
-            $commitment->start_date = $request->start_date;
-            $commitment->end_date = $request->end_date;
-            $commitment->duration_in_days = $duration;
             $commitment->description = $request->description;
             $commitment->status = $request->status;
             $commitment->budget = $request->budget;
@@ -431,8 +418,7 @@ class ProjectController extends Controller
                 'deliverable_id' => 'required',
                 'kpi' => 'required',
                 'target_value' => 'required',
-                'start_date' => 'required',
-                'end_date' => 'required',
+                'year' => 'required|integer|min:2000|max:2100',
                 'unit_of_measurement' => 'required',
             ]);
 
@@ -440,8 +426,7 @@ class ProjectController extends Controller
             $kpi->deliverable_id = $request->deliverable_id;
             $kpi->kpi = $request->kpi;
             $kpi->target_value = $request->target_value;
-            $kpi->start_date = $request->start_date;
-            $kpi->end_date = $request->end_date;
+            $kpi->year = $request->year;
             $kpi->unit_of_measurement = $request->unit_of_measurement;
             if ($kpi->save()) {
                 return response()->json(['success' => true, 'message' => 'KPI created']);
@@ -479,8 +464,7 @@ class ProjectController extends Controller
                     'kpi' => $kpi->kpi,
                     'role' => $user->isSectorHead() ? 'sh' : ($user->isDeliveryDepartment() ? 'dd' : ''),
                     'target_value' => $kpi->target_value,
-                    'start_date' => date_format(date_create($kpi->start_date), "d M, Y"),
-                    'end_date' => date_format(date_create($kpi->end_date), "d M, Y"),
+                    'year' => $kpi->year ?? null,
                     'unit_of_measurement' => $kpi->unit_of_measurement,
                     'target' => $target, 'tracks' => $kpi->performanceTracking()->get()
                 ];

@@ -90,8 +90,6 @@
             </h2>
             <div
                 class="intro-y text-slate-600 dark:text-slate-500 mt-3 text-xs sm:text-sm">
-                {{ Carbon::parse($commitment->start_date)->format('jS F Y') }}
-                <span class="mx-1"> - </span> {{  Carbon::parse($commitment->end_date)->format('jS F Y')  }}
             </div>
             <div class="intro-y mt-6">
                 <div class="news__preview image-fit">

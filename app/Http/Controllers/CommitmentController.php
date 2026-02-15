@@ -43,8 +43,6 @@ class CommitmentController extends Controller
             'name' => "required",
             'type' => "required",
             'description' => "required",
-            'start_date' => 'required',
-            'end_date' => 'required',
             'status' => 'required',
 //            'budget' => 'required',
             'img_url' => 'required|file|mimes:jpg,png|max:2048'
@@ -58,19 +56,11 @@ class CommitmentController extends Controller
 
 //        }
 
-        $dt_start = new \DateTime($request->start_date);
-        $dt_end = new \DateTime($request->end_date);
-        $diff = $dt_start->diff($dt_end);
-        $duration = $diff->format('%a');
-
         $commitment = new Commitment();
         $commitment->sector_id = $request->sector_id;
         $commitment->name = $request->name;
         $commitment->type = $request->type;
         $commitment->description = $request->description;
-        $commitment->duration_in_days = $duration;
-        $commitment->start_date = $request->start_date;
-        $commitment->end_date = $request->end_date;
         $commitment->status = $request->status;
 //        $commitment->budget = $request->budget;
         $commitment->img_url = $fileName;
@@ -112,8 +102,6 @@ class CommitmentController extends Controller
             'type' => 'required|string|max:255',
             'description' => 'required|string',
             'status' => 'required|string|in:Not Started,In Progress,Completed',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
             'img_url' => 'nullable|file|mimes:jpg,png,jpeg|max:2048'
         ]);
 
@@ -123,20 +111,11 @@ class CommitmentController extends Controller
             return redirect()->back()->with('failure', 'Commitment not found');
         }
 
-        // Calculate duration
-        $dt_start = new \DateTime($request->start_date);
-        $dt_end = new \DateTime($request->end_date);
-        $diff = $dt_start->diff($dt_end);
-        $duration = $diff->format('%a');
-
         // Update commitment fields
         $commitment->name = $request->name;
         $commitment->type = $request->type;
         $commitment->description = $request->description;
         $commitment->status = $request->status;
-        $commitment->start_date = $request->start_date;
-        $commitment->end_date = $request->end_date;
-        $commitment->duration_in_days = $duration;
 
         // Handle image upload if provided
         if ($request->hasFile('img_url')) {

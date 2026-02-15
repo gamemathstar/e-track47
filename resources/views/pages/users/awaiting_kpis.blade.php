@@ -38,7 +38,7 @@
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">KPI</th>
                             <th class="whitespace-nowrap">Target</th>
-                            <th class="whitespace-nowrap">Start Date</th>
+                            <th class="whitespace-nowrap">Year</th>
                             <th class="whitespace-nowrap">1<sup>st</sup> QPT</th>
                             <th class="whitespace-nowrap">2<sup>nd</sup> QPT</th>
                             <th class="whitespace-nowrap">3<sup>rd</sup> QPT</th>
@@ -57,7 +57,7 @@
                                     {{ $kpi->kpi }}
                                 </td>
                                 <td>{{ $kpi->target_value }} ({{ $kpi->unit_of_measurement }})</td>
-                                <td>{{ Carbon::parse($kpi->start_date)->format('d M, Y') }}</td>
+                                <td>{{ $kpi->year ?? '---' }}</td>
                                 <td>
                                     @if(count($tracks)>0)
                                         @php $track = $tracks[0]; @endphp
@@ -194,14 +194,9 @@
                                                name="unit_of_measurement" required>
                                     </div>
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Start Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="start_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">End Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="end_date" required>
+                                        <label for="modal-form-1" class="form-label">Year</label>
+                                        <input id="modal-form-1" type="number" class="form-control"
+                                               name="year" min="2000" max="2100" value="{{ date('Y') }}" required>
                                     </div>
                                 </div> <!-- END: Modal Body -->
                                 <!-- BEGIN: Modal Footer -->

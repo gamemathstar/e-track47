@@ -109,8 +109,6 @@
                             <th class="whitespace-nowrap">#</th>
                             <th class="whitespace-nowrap">Commitment</th>
                             {{--                            <th class="whitespace-nowrap">Budget</th>--}}
-                            <th class="whitespace-nowrap">Start Date</th>
-                            <th class="whitespace-nowrap">Duration</th>
                             <th class="text-center whitespace-nowrap">Action</th>
                         </tr>
                         </thead>
@@ -124,8 +122,6 @@
                                     <a href="javascript:;" class="ml-1">{{$commitment->title(48)}}</a>
                                 </td>
                                 {{--                                <td>&#8358;{{ number_format($commitment->budget) }}</td>--}}
-                                <td>{{ $commitment->start_date?Carbon::parse($commitment->start_date)->format('d M, Y'):'---' }}</td>
-                                <td>{{ $commitment->duration_in_days? $commitment->duration_in_days.' day(s)':'---' }}</td>
                                 <td>
                                     <div class="flex justify-center items-center">
                                         <a class="flex items-center text-warning mr-3 tooltip edit" data-theme="dark"
@@ -137,8 +133,6 @@
                                            data-type="{{$commitment->type}}"
                                            data-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
                                            data-status="{{$commitment->status}}"
-                                           data-start-date="{{$commitment->start_date ? date('Y-m-d', strtotime($commitment->start_date)) : ''}}"
-                                           data-end-date="{{$commitment->end_date ? date('Y-m-d', strtotime($commitment->end_date)) : ''}}"
                                            data-photo="{{ secure_asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                                                  viewBox="0 0 24 24"
@@ -254,16 +248,6 @@
                                             <option value="Completed">Completed</option>
                                         </select>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="edit-commitment-start-date" class="form-label">Start Date</label>
-                                        <input id="edit-commitment-start-date" type="date" class="form-control"
-                                               name="start_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="edit-commitment-end-date" class="form-label">End Date</label>
-                                        <input id="edit-commitment-end-date" type="date" class="form-control"
-                                               name="end_date" required>
-                                    </div>
                                     <div class="col-span-12 sm:col-span-12">
                                         <label for="edit-commitment-photo" class="form-label">Current Photo</label>
                                         <div class="h-40 2xl:h-56 image-fit mb-3">
@@ -326,16 +310,6 @@
                                             <option value="In Progress">In Progress</option>
                                         </select>
                                     </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Start Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="start_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">End Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="end_date" required>
-                                    </div>
                                     {{--                                    <div class="col-span-6 sm:col-span-6">--}}
                                     {{--                                        <label for="modal-form-1" class="form-label">Budget</label>--}}
                                     {{--                                        <input id="modal-form-1" type="text" class="form-control"--}}
@@ -394,8 +368,6 @@
                 let commitmentType = $(this).data('type');
                 let commitmentDescription = $(this).data('description');
                 let commitmentStatus = $(this).data('status');
-                let commitmentStartDate = $(this).data('start-date');
-                let commitmentEndDate = $(this).data('end-date');
                 let commitmentPhoto = $(this).data('photo');
 
                 $('#commitmentId').val(commitmentId);
@@ -403,8 +375,6 @@
                 $('#edit-commitment-type').val(commitmentType);
                 $('#edit-commitment-description').val(commitmentDescription);
                 $('#edit-commitment-status').val(commitmentStatus);
-                $('#edit-commitment-start-date').val(commitmentStartDate);
-                $('#edit-commitment-end-date').val(commitmentEndDate);
                 $('#commitmentPhoto').attr('src', commitmentPhoto);
             })
 

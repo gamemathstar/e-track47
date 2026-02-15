@@ -380,16 +380,6 @@
                                 <option value="Completed">Completed</option>
                             </select>
                         </div>
-                        <div class="col-span-6 sm:col-span-6">
-                            <label for="comm-start-date" class="form-label">Start Date</label>
-                            <input type="date" class="form-control"
-                                   name="start_date" id="comm-start-date" required>
-                        </div>
-                        <div class="col-span-6 sm:col-span-6">
-                            <label for="comm-end-date" class="form-label">End Date</label>
-                            <input type="date" class="form-control"
-                                   name="end_date" id="comm-end-date" required>
-                        </div>
                         <div class="col-span-12 sm:col-span-12">
                             <label for="comm-photo" class="form-label">Photo</label>
                             <input type="file" name="img_url" id="comm-photo" class="form-control">
@@ -476,16 +466,12 @@
                 com_type = $(this).attr('com-type');
                 com_description = $(this).attr('com-description');
                 com_status = $(this).attr('com-status');
-                com_start_date = $(this).attr('com-start-date');
-                com_end_date = $(this).attr('com-end-date');
                 
                 $("#comm-id").val(com_id);
                 $("#comm-title").val(com_title);
                 $("#comm-type").val(com_type);
                 $("#comm-desc").val(com_description);
                 $("#comm-status").val(com_status);
-                $("#comm-start-date").val(com_start_date);
-                $("#comm-end-date").val(com_end_date);
                 editCommitmentModal.show();
             });
 

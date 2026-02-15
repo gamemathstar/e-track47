@@ -13,9 +13,8 @@ class Kpi extends Model
         'deliverable_id',
         'kpi',
         'target_value',
-        'start_date',
-        'end_date',
         'unit_of_measurement',
+        'year',
     ];
 
     public function deliverable()
