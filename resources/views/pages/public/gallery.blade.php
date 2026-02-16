@@ -151,7 +151,7 @@
 
     @if($galleries->count() > 0)
         <!-- Image Gallery Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             @foreach($galleries as $gallery)
                 <div class="gallery-card group relative bg-white rounded-xl overflow-hidden shadow-sm border border-primary/10 flex flex-col cursor-pointer"
                      onclick="window.location.href='{{ route('public.gallery.show', $gallery->id) }}'">

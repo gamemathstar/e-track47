@@ -81,7 +81,7 @@
 
         <!-- Gallery Grid -->
         @if($galleries->count() > 0)
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 @foreach($galleries as $gallery)
                     <div class="group bg-white rounded-xl border border-primary/10 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
                         <div class="relative aspect-video overflow-hidden bg-slate-100">
