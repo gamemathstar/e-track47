@@ -10,6 +10,7 @@
     <title>Performance Delivery Coordination Unit (PDCU)</title>
     <!-- BEGIN: CSS Assets-->
     <link rel="stylesheet" href="{{asset('dist/css/app.css')}}" />
+    @yield('css')
     <!-- END: CSS Assets-->
 </head>
 <!-- END: Head -->

@@ -6,17 +6,68 @@
     <link href="{{asset('jg_logo.png')}}" rel="shortcut icon">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description"
-          content="Enigma admin is super flexible, powerful, clean & modern responsive tailwind admin template with unlimited possibilities.">
+          content="Photo Gallery - Performance Delivery Coordination Unit (PDCU)">
     <meta name="keywords"
-          content="admin template, Enigma Admin Template, dashboard template, flat admin template, responsive admin template, web app">
-    <meta name="author" content="LEFT4CODE">
+          content="gallery, photos, images, PDCU, Performance Delivery Coordination Unit">
+    <meta name="author" content="PDCU">
     <title>Photo Gallery - Performance Delivery Coordination Unit (PDCU)</title>
     <!-- BEGIN: CSS Assets-->
     <link rel="stylesheet" href="{{asset('dist/css/app.css')}}"/>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&amp;display=swap"
+          rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#008751",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <style>
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .gallery-card:hover .overlay {
+            opacity: 1;
+        }
+
+        .gallery-card:hover img {
+            transform: scale(1.05);
+        }
+
+        body {
+            font-family: 'Public Sans', sans-serif;
+        }
+    </style>
     <!-- END: CSS Assets-->
 </head>
 <!-- END: Head -->
-<body class="py-5 md:py-0">
+<body class="py-5 md:py-0 bg-background-light">
 <!-- BEGIN: Mobile Menu -->
 <div class="mobile-menu md:hidden">
     <div class="mobile-menu-bar">
@@ -55,7 +106,7 @@
 <!-- END: Mobile Menu -->
 <!-- BEGIN: Top Bar -->
 <div
-    class="top-bar-boxed top-bar-boxed--top-menu h-[70px] md:h-[65px] z-[51] border-b border-white/[0.08] mt-12 md:mt-0 -mx-3 sm:-mx-8 md:-mx-0 px-3 md:border-b-0 relative md:fixed md:inset-x-0 md:top-0 sm:px-8 md:px-10 md:pt-10 md:bg-gradient-to-b md:from-slate-100 md:to-transparent dark:md:from-darkmode-700">
+    class="top-bar-boxed top-bar-boxed--top-menu h-[70px] md:h-[65px] z-[51] border-b border-white/[0.08] mt-12 md:mt-0 -mx-3 sm:-mx-8 md:-mx-0 px-3 md:border-b-0 relative md:fixed md:inset-x-0 md:top-0 sm:px-8 md:px-10 md:pt-10 md:bg-gradient-to-b md:from-slate-100 md:to-transparent">
     <div class="h-full flex items-center">
         <!-- BEGIN: Logo -->
         <a href="" class="logo -intro-x hidden md:flex xl:w-[180px] block">
@@ -92,79 +143,105 @@
 <!-- END: Top Menu -->
 <!-- BEGIN: Content -->
 <div class="content content--top-nav">
-    <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
-        <h2 class="text-lg font-medium mr-auto">
-            Photo Gallery
-        </h2>
+    <!-- Page Introduction -->
+    <div class="mb-12 text-center">
+        <h2 class="text-3xl font-bold text-slate-900 mb-3">Photo Gallery</h2>
+        <p class="text-slate-600 max-w-2xl mx-auto">Explore our collection of images showcasing the work and achievements of the Performance Delivery Coordination Unit.</p>
     </div>
 
-    <div class="intro-y mt-5">
-        @if($galleries->count() > 0)
-            <div class="gallery-container" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
-                @foreach($galleries as $gallery)
-                    <div class="box p-3 cursor-pointer hover:shadow-lg transition-shadow" 
-                         onclick="window.location.href='{{ route('public.gallery.show', $gallery->id) }}'">
-                        <div class="relative overflow-hidden rounded-lg mb-3" style="padding-bottom: 75%;">
-                            <img src="{{ asset($gallery->image_path) }}" 
-                                 alt="{{ $gallery->title ?? 'Gallery Image' }}" 
-                                 class="absolute inset-0 w-full h-full object-cover">
+    @if($galleries->count() > 0)
+        <!-- Image Gallery Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            @foreach($galleries as $gallery)
+                <div class="gallery-card group relative bg-white rounded-xl overflow-hidden shadow-sm border border-primary/10 flex flex-col cursor-pointer"
+                     onclick="window.location.href='{{ route('public.gallery.show', $gallery->id) }}'">
+                    <div class="relative aspect-video overflow-hidden">
+                        <img class="w-full h-full object-cover transition-transform duration-500 ease-in-out"
+                             alt="{{ $gallery->title ?? 'Gallery Image' }}"
+                             src="{{ asset($gallery->image_path) }}"/>
+                        <div class="overlay absolute inset-0 bg-primary/40 opacity-0 transition-opacity duration-300 flex items-center justify-center">
+                            <button class="bg-white text-slate-900 px-6 py-2 rounded-full font-bold shadow-lg flex items-center gap-2">
+                                <span class="material-icons text-sm">visibility</span>
+                                View Image
+                            </button>
                         </div>
-                        @if($gallery->title)
-                            <h3 class="font-medium text-sm mb-1">{{ $gallery->title }}</h3>
-                        @endif
-                        @if($gallery->caption)
-                            <p class="text-xs text-gray-600 line-clamp-2">{{ Str::limit($gallery->caption, 80) }}</p>
+                        @if($gallery->status === 'active')
+                            <div class="absolute top-4 left-4">
+                                <span class="bg-primary text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Active</span>
+                            </div>
                         @endif
                     </div>
-                @endforeach
-            </div>
-
-            @if($galleries->hasPages())
-                <div class="mt-8">
-                    {{ $galleries->links() }}
+                    <div class="p-6 flex justify-between items-center">
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-slate-900 mb-1">{{ $gallery->title ?? 'Untitled' }}</h3>
+                            @if($gallery->caption)
+                                <p class="text-sm text-slate-500 flex items-center gap-1 line-clamp-2">
+                                    <span class="material-icons text-xs">description</span>
+                                    {{ Str::limit($gallery->caption, 80) }}
+                                </p>
+                            @endif
+                            @if($gallery->created_at)
+                                <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                                    <span class="material-icons text-xs">calendar_today</span>
+                                    {{ $gallery->created_at->format('M d, Y') }}
+                                </p>
+                            @endif
+                        </div>
+                    </div>
                 </div>
-            @endif
-        @else
-            <div class="box p-10 text-center">
-                <i data-lucide="image" class="w-20 h-20 mx-auto mb-4 text-gray-400"></i>
-                <h3 class="text-lg font-medium mb-2">No Images Available</h3>
-                <p class="text-gray-600">The gallery is currently empty. Please check back later.</p>
+            @endforeach
+        </div>
+
+        <!-- Pagination -->
+        @if($galleries->hasPages())
+            <div class="flex flex-col items-center gap-4 py-8">
+                <div class="flex items-center gap-2">
+                    @if($galleries->onFirstPage())
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
+                            <span class="material-icons">chevron_left</span>
+                        </button>
+                    @else
+                        <a href="{{ $galleries->previousPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">
+                            <span class="material-icons">chevron_left</span>
+                        </a>
+                    @endif
+
+                    @foreach($galleries->getUrlRange(1, $galleries->lastPage()) as $page => $url)
+                        @if($page == $galleries->currentPage())
+                            <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white font-bold">{{ $page }}</button>
+                        @else
+                            <a href="{{ $url }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">{{ $page }}</a>
+                        @endif
+                    @endforeach
+
+                    @if($galleries->hasMorePages())
+                        <a href="{{ $galleries->nextPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">
+                            <span class="material-icons">chevron_right</span>
+                        </a>
+                    @else
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
+                            <span class="material-icons">chevron_right</span>
+                        </button>
+                    @endif
+                </div>
+                <p class="text-sm text-slate-500">Showing {{ $galleries->firstItem() }} to {{ $galleries->lastItem() }} of {{ $galleries->total() }} images</p>
             </div>
         @endif
-    </div>
+    @else
+        <!-- Empty State -->
+        <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-12 text-center">
+            <div class="w-20 h-20 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
+                <span class="material-icons text-4xl text-primary">image</span>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">No Images Available</h3>
+            <p class="text-slate-600 mb-6">The gallery is currently empty. Please check back later.</p>
+        </div>
+    @endif
 </div>
 <!-- END: Content -->
 
 <!-- BEGIN: JS Assets-->
 <script src="{{ asset('dist/js/app.js') }}"></script>
 <!-- END: JS Assets-->
-
-<style>
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    
-    .gallery-container {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 1.5rem !important;
-        width: 100% !important;
-    }
-    
-    @media (max-width: 640px) {
-        .gallery-container {
-            grid-template-columns: repeat(1, 1fr) !important;
-        }
-    }
-    
-    @media (min-width: 641px) {
-        .gallery-container {
-            grid-template-columns: repeat(2, 1fr) !important;
-        }
-    }
-</style>
 </body>
 </html>

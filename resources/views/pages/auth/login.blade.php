@@ -1,83 +1,198 @@
-<html lang="en" class="light">
-<!-- BEGIN: Head -->
+<!DOCTYPE html>
+<html class="light" lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8"/>
     <link href="{{asset('jg_logo.png')}}" rel="shortcut icon">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description"
-          content="Enigma admin is super flexible, powerful, clean & modern responsive tailwind admin template with unlimited possibilities.">
-    <meta name="keywords"
-          content="admin template, Enigma Admin Template, dashboard template, flat admin template, responsive admin template, web app">
-    <meta name="author" content="LEFT4CODE">
-    <title>Login - Performance Delivery Coordination Unit (PDCU)</title>
-    <!-- BEGIN: CSS Assets-->
-    <link rel="stylesheet" href="/dist/css/app.css"/>
-    <!-- END: CSS Assets-->
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Login - PDCU Management System | Jigawa State</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&amp;display=swap"
+          rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#008751",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Public Sans', sans-serif;
+        }
+    </style>
 </head>
-<!-- END: Head -->
-<body class="login">
-<div class="container sm:px-10">
-    <div class="block xl:grid grid-cols-2 gap-4">
-        <!-- BEGIN: Login Info -->
-        <div class="hidden xl:flex flex-col min-h-screen">
-            <a href="" class="-intro-x flex items-center pt-5">
-                <img alt="Midone - HTML Admin Template" class="w-6" src="{{asset('jg_logo.png')}}">
-                <span class="text-white text-lg ml-3"> Performance Delivery Coordination Unit (PDCU) </span>
-            </a>
-            <div class="my-auto">
-                <img alt="Midone - HTML Admin Template" class="-intro-x w-1/2 -mt-16"
-                     src="{{asset('jigawa3_map.png')}}">
-
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased font-display">
+<div class="min-h-screen flex">
+    <!-- Left Side - Branding & Image -->
+    <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-primary/80 relative overflow-hidden">
+        <div
+            class="absolute inset-0 bg-gradient-to-r from-background-dark/90 via-background-dark/60 to-transparent z-10"></div>
+        <img alt="Jigawa State" class="absolute inset-0 w-full h-full object-cover opacity-30"
+             src="{{asset('jigawa3_map.png')}}">
+        <div class="relative z-20 flex flex-col justify-between p-12 text-white">
+            <div>
+                <a href="{{ route('home') }}" class="flex items-center gap-3 mb-8">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                        <img alt="Jigawa State Crest" class="h-10 w-10 object-contain"
+                             src="{{asset('jg_logo.png')}}">
+                    </div>
+                    <div class="flex flex-col">
+                        <h1 class="text-xl font-bold tracking-tight leading-none">PDCU</h1>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-white/90">Performance
+                            Delivery
+                            Unit</p>
+                    </div>
+                </a>
             </div>
-        </div>
-        <!-- END: Login Info -->
-        <!-- BEGIN: Login Form -->
-        <div class="h-screen xl:h-auto flex py-5 xl:py-0 my-10 xl:my-0">
-            <div
-                class="my-auto mx-auto xl:ml-20 bg-white dark:bg-darkmode-600 xl:bg-transparent px-5 sm:px-8 py-8 xl:p-0 rounded-md shadow-md xl:shadow-none w-full sm:w-3/4 lg:w-2/4 xl:w-auto">
-                <h2 class="intro-x font-bold text-2xl xl:text-3xl text-center xl:text-left">
-                    Sign In
-                </h2>
-                <div class="intro-x mt-2 text-slate-400  text-center">
+            <div class="max-w-md">
+                <div
+                    class="mb-4 inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 backdrop-blur-sm">
+                    <span class="h-2 w-2 rounded-full bg-white"></span>
+                    <span class="text-xs font-bold uppercase tracking-wider">Secure Access</span>
                 </div>
-                <form method="POST" action="{{ route('login.process') }}">
-                    <div class="intro-x mt-8">
-                        @csrf
-                        <input type="email" name="email" class="intro-x login__input form-control py-3 px-4 block"
-                               placeholder="Email" value="{{ old('email') }}" required autofocus>
-                        @error('email')
-                        <span>{{ $message }}</span>
-                        @enderror
-                        <input type="password" class="intro-x login__input form-control py-3 px-4 block mt-4"
-                               placeholder="Password" name="password" required>
-                        @error('password')
-                        <span>{{ $message }}</span>
-                        @enderror
-                    </div>
-                    <div class="intro-x flex text-slate-600 dark:text-slate-500 text-xs sm:text-sm mt-4">
-                        <div class="flex items-center mr-auto">
-                            <input type="checkbox" class="form-check-input border mr-2"
-                                   id="remember" {{ old('remember') ? 'checked' : '' }}>
-                            <label class="cursor-pointer select-none" for="remember-me">Remember me</label>
-                        </div>
-                        <a href="">Forgot Password?</a>
-                    </div>
-                    <div class="intro-x mt-5 xl:mt-8 text-center xl:text-left">
-                        <button class="btn btn-primary py-3 px-4 w-full xl:w-32 xl:mr-3 align-top">Login</button>
-                        {{--                        <button class="btn btn-outline-secondary py-3 px-4 w-full xl:w-32 mt-3 xl:mt-0 align-top">Register</button>--}}
-                    </div>
-                    <div class="intro-x mt-10 xl:mt-24 text-slate-600 dark:text-slate-500 text-center xl:text-left"> By
-                        signin up, you agree to our <a class="text-primary dark:text-slate-200" href="">Terms and
-                            Conditions</a> & <a class="text-primary dark:text-slate-200" href="">Privacy Policy</a>
-                    </div>
-                </form>
+                <h2 class="text-4xl font-extrabold leading-tight mb-4">
+                    Welcome to <span class="text-white">PDCU</span> Portal
+                </h2>
+                <p class="text-lg text-white/90 leading-relaxed">
+                    Access your dashboard to manage performance metrics, submit reports, and track departmental KPIs for
+                    Jigawa State.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 text-sm text-white/80">
+                <span class="material-icons text-sm">security</span>
+                <span>Secure & Encrypted</span>
             </div>
         </div>
-        <!-- END: Login Form -->
+    </div>
+
+    <!-- Right Side - Login Form -->
+    <div class="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div class="w-full max-w-md">
+            <!-- Mobile Logo -->
+            <div class="lg:hidden mb-8 text-center">
+                <a href="{{ route('home') }}" class="inline-flex items-center gap-3">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                        <img alt="Jigawa State Crest" class="h-10 w-10 object-contain"
+                             src="{{asset('jg_logo.png')}}">
+                    </div>
+                    <div class="flex flex-col">
+                        <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+                            PDCU</h1>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-primary">Performance Delivery
+                            Unit</p>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Login Form Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 lg:p-10">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Sign In</h2>
+                    <p class="text-sm text-slate-600 dark:text-slate-400">Enter your credentials to access your
+                        account</p>
+                </div>
+
+                <form method="POST" action="{{ route('login.process') }}">
+                    @csrf
+
+                    <!-- Email Field -->
+                    <div class="mb-6">
+                        <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Email Address
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                <span class="material-icons text-xl">email</span>
+                            </span>
+                            <input type="email" id="email" name="email"
+                                   class="w-full pl-12 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-slate-700 dark:text-white transition-all"
+                                   placeholder="Enter your email" value="{{ old('email') }}" required autofocus>
+                        </div>
+                        @error('email')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="mb-6">
+                        <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                <span class="material-icons text-xl">lock</span>
+                            </span>
+                            <input type="password" id="password" name="password"
+                                   class="w-full pl-12 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-slate-700 dark:text-white transition-all"
+                                   placeholder="Enter your password" required>
+                        </div>
+                        @error('password')
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Remember Me & Forgot Password -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="remember" name="remember"
+                                   class="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary dark:bg-slate-700 dark:border-slate-600"
+                                {{ old('remember') ? 'checked' : '' }}>
+                            <label for="remember"
+                                   class="ml-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+                                Remember me
+                            </label>
+                        </div>
+                        {{--                        <a href="#" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">--}}
+                        {{--                            Forgot Password?--}}
+                        {{--                        </a>--}}
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit"
+                            class="w-full rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                        <span class="flex items-center justify-center gap-2">
+                            <span>Sign In</span>
+                            <span class="material-icons text-sm">arrow_forward</span>
+                        </span>
+                    </button>
+                </form>
+
+                <!-- Footer Links -->
+                {{--                <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">--}}
+                {{--                    <p class="text-xs text-center text-slate-500 dark:text-slate-400">--}}
+                {{--                        By signing in, you agree to our--}}
+                {{--                        <a href="#" class="text-primary hover:text-primary/80 transition-colors">Terms and--}}
+                {{--                            Conditions</a>--}}
+                {{--                        & <a href="#" class="text-primary hover:text-primary/80 transition-colors">Privacy Policy</a>--}}
+                {{--                    </p>--}}
+                {{--                </div>--}}
+
+                <!-- Back to Home -->
+                <div class="mt-6 text-center">
+                    <a href="{{ route('home') }}"
+                       class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 hover:text-primary transition-colors">
+                        <span class="material-icons text-sm">arrow_back</span>
+                        <span>Back to Home</span>
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-<!-- BEGIN: JS Assets-->
-<script src="dist/js/app.js"></script>
-<!-- END: JS Assets-->
 </body>
 </html>
