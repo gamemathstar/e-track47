@@ -252,6 +252,151 @@
                 </div>
             </div>
         </div>
+
+        <!-- Comments Section -->
+        <div class="w-full max-w-7xl mx-auto mt-8 relative z-10">
+            <div class="bg-white rounded-xl shadow-lg ring-1 ring-primary/10 p-6 lg:p-8">
+                <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <span class="material-icons text-primary">comment</span>
+                    Comments ({{ $comments->count() }})
+                </h2>
+
+                <!-- Success/Error Messages -->
+                @if(session('success'))
+                    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                        <span class="material-icons text-green-600">check_circle</span>
+                        <p class="text-green-800 text-sm font-medium">{{ session('success') }}</p>
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                        <span class="material-icons text-red-600">error</span>
+                        <p class="text-red-800 text-sm font-medium">{{ session('error') }}</p>
+                    </div>
+                @endif
+
+                <!-- Two Column Layout: Comments (Left) and Form (Right) -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                    <!-- Comments List (Left Column) -->
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <span class="material-icons text-primary text-xl">forum</span>
+                            Recent Comments
+                        </h3>
+                        @forelse($comments as $comment)
+                            <div class="p-5 bg-background-light rounded-lg border border-primary/10 hover:shadow-md transition-shadow">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                            <span class="material-icons text-primary text-lg">person</span>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-slate-900">{{ $comment->commenter_name }}</p>
+                                            <p class="text-xs text-slate-500">
+                                                {{ $comment->created_at->format('M d, Y \a\t h:i A') }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if($comment->email)
+                                        <div class="flex items-center gap-1 text-xs text-slate-500">
+                                            <span class="material-icons text-sm">email</span>
+                                            {{ $comment->email }}
+                                        </div>
+                                    @endif
+                                </div>
+                                <p class="text-slate-700 leading-relaxed ml-13">{{ $comment->comment }}</p>
+                                @if($comment->phone_number)
+                                    <div class="mt-3 flex items-center gap-1 text-xs text-slate-500 ml-13">
+                                        <span class="material-icons text-sm">phone</span>
+                                        {{ $comment->phone_number }}
+                                    </div>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="text-center py-12 text-slate-500">
+                                <span class="material-icons text-4xl mb-3 text-slate-300">comment</span>
+                                <p class="font-medium">No comments yet. Be the first to comment!</p>
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <!-- Comment Form (Right Column) -->
+                    <div class="lg:sticky lg:top-6 h-fit">
+                        <div class="p-6 bg-background-light rounded-lg border border-primary/10">
+                            <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <span class="material-icons text-primary text-xl">edit</span>
+                                Leave a Comment
+                            </h3>
+                            <form action="{{ route('public.gallery.comments.store', $gallery->id) }}" method="POST" class="space-y-4">
+                                @csrf
+                                <div>
+                                    <label for="commenter_name" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" 
+                                           id="commenter_name" 
+                                           name="commenter_name" 
+                                           required
+                                           value="{{ old('commenter_name') }}"
+                                           class="w-full px-4 py-2.5 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all @error('commenter_name') border-red-500 @enderror">
+                                    @error('commenter_name')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label for="phone_number" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        Phone Number <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" 
+                                           id="phone_number" 
+                                           name="phone_number" 
+                                           required
+                                           value="{{ old('phone_number') }}"
+                                           class="w-full px-4 py-2.5 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all @error('phone_number') border-red-500 @enderror">
+                                    @error('phone_number')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        Email Address <span class="text-slate-400 text-xs">(Optional)</span>
+                                    </label>
+                                    <input type="email" 
+                                           id="email" 
+                                           name="email" 
+                                           value="{{ old('email') }}"
+                                           class="w-full px-4 py-2.5 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all @error('email') border-red-500 @enderror">
+                                    @error('email')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label for="comment" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        Comment <span class="text-red-500">*</span>
+                                    </label>
+                                    <textarea id="comment" 
+                                              name="comment" 
+                                              required
+                                              rows="4"
+                                              class="w-full px-4 py-2.5 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none @error('comment') border-red-500 @enderror">{{ old('comment') }}</textarea>
+                                    @error('comment')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div class="flex justify-end">
+                                    <button type="submit" 
+                                            class="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center gap-2">
+                                        <span class="material-icons text-sm">send</span>
+                                        Submit Comment
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 </div>
 <!-- END: Content -->

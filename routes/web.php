@@ -37,6 +37,7 @@ Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
 // Public Gallery Routes (No authentication required - must be before auth routes)
 Route::get('gallery', [PublicGalleryController::class, 'index'])->name('public.gallery.index');
 Route::get('gallery/{gallery}', [PublicGalleryController::class, 'show'])->name('public.gallery.show');
+Route::post('gallery/{gallery}/comments', [PublicGalleryController::class, 'storeComment'])->name('public.gallery.comments.store');
 
 Route::middleware(['auth'])->group(function () {
 

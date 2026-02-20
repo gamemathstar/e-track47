@@ -45,4 +45,12 @@ class Gallery extends Model
     {
         return $query->orderBy('display_order', 'asc')->orderBy('created_at', 'desc');
     }
+
+    /**
+     * Get all comments for this gallery item
+     */
+    public function comments()
+    {
+        return $this->hasMany(GalleryComment::class)->orderBy('created_at', 'desc');
+    }
 }
