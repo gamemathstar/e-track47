@@ -5,12 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\DeliveryKpi;
-use App\Models\File;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\Notification;
 use App\Models\PerformanceTracking;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -50,22 +48,22 @@ class DeliverableController extends Controller
             'delivery_department_remark' => "required",
             'confirmation_status' => "required",
         ]);
-        
+
         $pt = PerformanceTracking::find($request->id);
         if (!$pt) {
             return redirect()->back()->with('failure', 'Performance tracking record not found');
         }
-        
+
         $user = Auth::user();
         if (!$user) {
             return redirect()->back()->with('failure', 'User not authenticated');
         }
-        
+
         $userRole = $user->role();
         if (!$userRole) {
             return redirect()->back()->with('failure', 'User role not found');
         }
-        
+
         $pt->delivery_department_value = $request->delivery_department_value;
         $pt->delivery_department_remark = $request->delivery_department_remark;
         $pt->confirmation_status = $request->confirmation_status;
@@ -147,7 +145,7 @@ class DeliverableController extends Controller
         ]);
 
         $deliverable = Deliverable::find($request->deliverable_id);
-        
+
         if (!$deliverable) {
             return redirect()->back()->with('failure', 'Deliverable not found');
         }

@@ -114,33 +114,79 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        // Validate and store user data
-//        return $request;
-        $roles = ['Governor' => 'State', 'System Admin' => 'System', 'Sector Head' => 'Sector', 'Sector Admin' => 'Sector', 'Delivery Department' => 'Deliverable'];
-        if (isset($request->id))
-            $user = User::find($request->id);
-        else
-            $user = new User();
-        $user->full_name = $request->full_name;
-        $user->email = $request->email;
-        $user->phone_number = $request->phone_number;
-        if (!isset($request->id))
-            $user->password = bcrypt('JSUSER321');
+        // Validate the request
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . ($request->id ?? 'NULL'),
+            'phone_number' => 'nullable|string|max:20',
+            'role' => 'required|in:' . implode(',', [
+                UserRole::ROLE_GOVERNOR,
+                UserRole::ROLE_SYSTEM_ADMIN,
+                UserRole::ROLE_SECTOR_HEAD,
+                UserRole::ROLE_SECTOR_ADMIN,
+                UserRole::ROLE_DELIVERY_DEPARTMENT,
+            ]),
+            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . '|exists:sectors,id',
+        ], [
+            'sector_id.required_if' => 'Please select a sector for this role.',
+            'sector_id.exists' => 'The selected sector does not exist.',
+        ]);
 
-        if ($user->save()) {
-            $userRole = UserRole::where(['user_id' => $user->id])->first();
-            if (is_null($userRole))
+        try {
+            // Create or update user
+            if (isset($request->id)) {
+                $user = User::findOrFail($request->id);
+            } else {
+                $user = new User();
+                $user->password = bcrypt('JSUSER321'); // Default password
+            }
+
+            $user->full_name = $validated['full_name'];
+            $user->email = $validated['email'];
+            $user->phone_number = $validated['phone_number'] ?? null;
+
+            if ($user->save()) {
+                // Get role to entity mapping
+                $roleMapping = UserRole::getRoleToEntityMapping();
+                $targetEntity = $roleMapping[$validated['role']] ?? null;
+
+                if (!$targetEntity) {
+                    return back()->with('failure', 'Invalid role specified.');
+                }
+
+                // Determine entity_id
+                $entityId = 0;
+                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN])) {
+                    $entityId = $validated['sector_id'] ?? 0;
+                }
+
+                // Check if user already has an active role
+                $existingRole = UserRole::where('user_id', $user->id)
+                    ->where('role_status', UserRole::STATUS_ACTIVE)
+                    ->first();
+
+                if ($existingRole) {
+                    // Revoke existing active role
+                    $existingRole->revoke();
+                }
+
+                // Create new role assignment
                 $userRole = new UserRole();
+                $userRole->user_id = $user->id;
+                $userRole->role = $validated['role'];
+                $userRole->target_entity = $targetEntity;
+                $userRole->entity_id = $entityId;
+                $userRole->role_status = UserRole::STATUS_ACTIVE;
+                $userRole->save();
 
+                $message = isset($request->id) ? 'User updated successfully.' : 'User created successfully.';
+                return back()->with('success', $message);
+            }
 
-            $userRole->user_id = $user->id;
-            $userRole->role = $request->role;
-            $userRole->target_entity = $roles[$request->role];
-            $userRole->entity_id = $roles[$request->role] == 'Sector' ? $request->sector_id : 0;
-            $userRole->role_status = 'Active';
-            $userRole->save();
+            return back()->with('failure', 'Failed to save user.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred: ' . $e->getMessage());
         }
-        return back();
     }
 
     public function view(User $user)
@@ -161,32 +207,167 @@ class UserController extends Controller
 
     public function changePassword(Request $request)
     {
-        $user = User::find($request->id);
-        if ($request->password == $request->confirm_password) {
-            $user->password = bcrypt($request->password);
-            $user->save();
-        }
+        $validated = $request->validate([
+            'id' => 'required|exists:users,id',
+            'password' => 'required|string|min:6',
+            'confirm_password' => 'required|same:password',
+        ], [
+            'confirm_password.same' => 'The password confirmation does not match.',
+            'password.min' => 'The password must be at least 6 characters.',
+        ]);
 
-        return back();
+        try {
+            $user = User::findOrFail($validated['id']);
+            
+            if ($validated['password'] === $validated['confirm_password']) {
+                $user->password = bcrypt($validated['password']);
+                $user->save();
+                return back()->with('success', 'Password changed successfully.');
+            }
+
+            return back()->with('failure', 'Password confirmation does not match.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred while changing the password: ' . $e->getMessage());
+        }
     }
 
     public function uploadPhoto(Request $request)
     {
-        $request->validate(['img_url' => 'required|file|mimes:jpg,png|max:2048']);
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'img_url' => 'required|file|mimes:jpg,png,jpeg|max:2048'
+        ]);
 
-        $user = User::find($request->user_id);
-        $file = $request->file('img_url');
-        $fileName = $user->id . '.' . $file->getClientOriginalExtension();
-        $file->move(public_path('uploads/users'), $fileName);
+        try {
+            $user = User::findOrFail($validated['user_id']);
+            $file = $request->file('img_url');
+            $fileName = $user->id . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads/users'), $fileName);
 
-        $user->image_url = $fileName;
-        $user->save();
+            $user->image_url = $fileName;
+            $user->save();
 
-        return back();
+            return back()->with('success', 'Profile photo updated successfully.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred while uploading the photo: ' . $e->getMessage());
+        }
     }
 
     public function destroy(User $user)
     {
         // Delete the user
+    }
+
+    /**
+     * Update user role
+     */
+    public function updateRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role' => 'required|in:' . implode(',', [
+                UserRole::ROLE_GOVERNOR,
+                UserRole::ROLE_SYSTEM_ADMIN,
+                UserRole::ROLE_SECTOR_HEAD,
+                UserRole::ROLE_SECTOR_ADMIN,
+                UserRole::ROLE_DELIVERY_DEPARTMENT,
+            ]),
+            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . '|exists:sectors,id',
+        ], [
+            'sector_id.required_if' => 'Please select a sector for this role.',
+            'sector_id.exists' => 'The selected sector does not exist.',
+        ]);
+
+        try {
+            // Get role to entity mapping
+            $roleMapping = UserRole::getRoleToEntityMapping();
+            $targetEntity = $roleMapping[$validated['role']] ?? null;
+
+            if (!$targetEntity) {
+                return back()->with('failure', 'Invalid role specified.');
+            }
+
+            // Determine entity_id
+            $entityId = 0;
+            if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN])) {
+                $entityId = $validated['sector_id'] ?? 0;
+            }
+
+            // Revoke all existing active roles
+            UserRole::where('user_id', $user->id)
+                ->where('role_status', UserRole::STATUS_ACTIVE)
+                ->update(['role_status' => UserRole::STATUS_REVOKED]);
+
+            // Create new role assignment
+            $userRole = new UserRole();
+            $userRole->user_id = $user->id;
+            $userRole->role = $validated['role'];
+            $userRole->target_entity = $targetEntity;
+            $userRole->entity_id = $entityId;
+            $userRole->role_status = UserRole::STATUS_ACTIVE;
+            $userRole->save();
+
+            return back()->with('success', 'User role updated successfully.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Revoke user role
+     */
+    public function revokeRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role_id' => 'required|exists:user_roles,id',
+        ]);
+
+        try {
+            $userRole = UserRole::where('id', $validated['role_id'])
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+
+            if ($userRole->isRevoked()) {
+                return back()->with('failure', 'This role is already revoked.');
+            }
+
+            $userRole->revoke();
+
+            return back()->with('success', 'User role revoked successfully.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reactivate a revoked role
+     */
+    public function reactivateRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role_id' => 'required|exists:user_roles,id',
+        ]);
+
+        try {
+            $userRole = UserRole::where('id', $validated['role_id'])
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+
+            if ($userRole->isActive()) {
+                return back()->with('failure', 'This role is already active.');
+            }
+
+            // Revoke all other active roles for this user
+            UserRole::where('user_id', $user->id)
+                ->where('role_status', UserRole::STATUS_ACTIVE)
+                ->where('id', '!=', $userRole->id)
+                ->update(['role_status' => UserRole::STATUS_REVOKED]);
+
+            // Activate the selected role
+            $userRole->activate();
+
+            return back()->with('success', 'User role reactivated successfully.');
+        } catch (\Exception $e) {
+            return back()->with('failure', 'An error occurred: ' . $e->getMessage());
+        }
     }
 }

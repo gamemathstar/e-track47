@@ -4,13 +4,122 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UserRole extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
+    protected $fillable = [
+        'user_id',
+        'role',
+        'target_entity',
+        'entity_id',
+        'role_status',
+    ];
+
+    protected $casts = [
+        'entity_id' => 'integer',
+    ];
+
+    // Role constants
+    const ROLE_GOVERNOR = 'Governor';
+    const ROLE_SYSTEM_ADMIN = 'System Admin';
+    const ROLE_SECTOR_HEAD = 'Sector Head';
+    const ROLE_SECTOR_ADMIN = 'Sector Admin';
+    const ROLE_DELIVERY_DEPARTMENT = 'Delivery Department';
+
+    // Target entity constants
+    const ENTITY_SYSTEM = 'System';
+    const ENTITY_STATE = 'State';
+    const ENTITY_SECTOR = 'Sector';
+    const ENTITY_PROJECT = 'Project';
+    const ENTITY_DELIVERABLE = 'Deliverable';
+
+    // Role status constants
+    const STATUS_ACTIVE = 'Active';
+    const STATUS_REVOKED = 'Revoked';
+
+    /**
+     * Get the user that owns this role
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the sector associated with this role (if applicable)
+     */
     public function sector()
     {
-        return Sector::where(['id' => $this->entity_id])->first();
+        if ($this->target_entity === self::ENTITY_SECTOR) {
+            return $this->belongsTo(Sector::class, 'entity_id');
+        }
+        return null;
+    }
+
+    /**
+     * Scope to get only active roles
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('role_status', self::STATUS_ACTIVE);
+    }
+
+    /**
+     * Scope to get only revoked roles
+     */
+    public function scopeRevoked($query)
+    {
+        return $query->where('role_status', self::STATUS_REVOKED);
+    }
+
+    /**
+     * Check if the role is active
+     */
+    public function isActive()
+    {
+        return $this->role_status === self::STATUS_ACTIVE;
+    }
+
+    /**
+     * Check if the role is revoked
+     */
+    public function isRevoked()
+    {
+        return $this->role_status === self::STATUS_REVOKED;
+    }
+
+    /**
+     * Revoke this role
+     */
+    public function revoke()
+    {
+        $this->role_status = self::STATUS_REVOKED;
+        return $this->save();
+    }
+
+    /**
+     * Activate this role
+     */
+    public function activate()
+    {
+        $this->role_status = self::STATUS_ACTIVE;
+        return $this->save();
+    }
+
+    /**
+     * Get role to target entity mapping
+     */
+    public static function getRoleToEntityMapping()
+    {
+        return [
+            self::ROLE_GOVERNOR => self::ENTITY_STATE,
+            self::ROLE_SYSTEM_ADMIN => self::ENTITY_SYSTEM,
+            self::ROLE_SECTOR_HEAD => self::ENTITY_SECTOR,
+            self::ROLE_SECTOR_ADMIN => self::ENTITY_SECTOR,
+            self::ROLE_DELIVERY_DEPARTMENT => self::ENTITY_DELIVERABLE,
+        ];
     }
 }

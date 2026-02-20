@@ -94,12 +94,28 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-primary/10">
+                        <div class="mt-4 pt-4 border-t border-primary/10 space-y-2">
                             <a href="{{route('users.view',[$user->id])}}"
                                class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 text-sm font-medium">
                                 <span class="material-icons text-sm">visibility</span>
                                 View Details
                             </a>
+                            @php
+                                $currentUser = \Illuminate\Support\Facades\Auth::user();
+                                $userCurrentRole = $user->getCurrentRole();
+                            @endphp
+                            @if($currentUser && $currentUser->isSystemAdmin() && $userCurrentRole && $userCurrentRole->isActive())
+                                <form action="{{ route('users.role.revoke', $user) }}" method="post" class="w-full">
+                                    @csrf
+                                    <input type="hidden" name="role_id" value="{{ $userCurrentRole->id }}">
+                                    <button type="submit" 
+                                            onclick="return confirm('Are you sure you want to revoke {{ $user->full_name }}\'s role ({{ $userCurrentRole->role }})?')"
+                                            class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-sm font-medium">
+                                        <span class="material-icons text-sm">block</span>
+                                        Revoke Role
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 </div>

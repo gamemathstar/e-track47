@@ -41,6 +41,7 @@ Route::get('gallery/{gallery}', [PublicGalleryController::class, 'show'])->name(
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/statistics', [DashboardController::class, 'statistics'])->name('dashboard.statistics');
     Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
     // User Resource
@@ -54,6 +55,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
     Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");
     Route::post('users/update-photo', [UserController::class, 'uploadPhoto'])->name("users.upload.photo");
+    Route::post('users/{user}/role/update', [UserController::class, 'updateRole'])->name("users.role.update");
+    Route::post('users/{user}/role/revoke', [UserController::class, 'revokeRole'])->name("users.role.revoke");
+    Route::post('users/{user}/role/reactivate', [UserController::class, 'reactivateRole'])->name("users.role.reactivate");
 
     Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
     Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');

@@ -7,6 +7,24 @@
         </h2>
     </div>
 
+    <!-- Success/Error Messages -->
+    @if(session('success'))
+        <div class="alert alert-success-soft show flex items-center mb-2 mt-5" role="alert">
+            <i data-lucide="check-circle" class="w-6 h-6 mr-2"></i> {{ session('success') }}
+            <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    @endif
+    @if(session('failure'))
+        <div class="alert alert-danger-soft show flex items-center mb-2 mt-5" role="alert">
+            <i data-lucide="alert-octagon" class="w-6 h-6 mr-2"></i> {{ session('failure') }}
+            <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    @endif
+
     <!-- BEGIN: Profile Info -->
     <div class="intro-y box px-5 pt-5 mt-5">
         <div class="flex flex-col lg:flex-row border-b border-slate-200/60 dark:border-darkmode-400 pb-5 -mx-5">
@@ -16,11 +34,14 @@
                          src="{{ asset($user->image_url? 'uploads/users/' . $user->image_url: 'dist/images/profile-5.jpg') }}">
                 </div>
                 <div class="ml-5">
-                    @php $sector = $user->sector(); @endphp
+                    @php 
+                        $sector = $user->sector();
+                        $userRole = $user->getCurrentRole();
+                    @endphp
                     <div
                         class="w-24 sm:w-40 truncate sm:whitespace-normal font-medium text-lg">{{ $user->full_name }}</div>
                     <div
-                        class="text-slate-500">{{ $user->role()->role }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
+                        class="text-slate-500">{{ $userRole ? $userRole->role : 'No Role' }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
                 </div>
             </div>
             <div
@@ -189,26 +210,30 @@
 
                             @php
                                 $sector = $user->sector();
+                                $userRole = $user->getCurrentRole();
                             @endphp
                             <div class="grid grid-cols-12 mt-4">
                                 <div class="col-span-12 lg:col-span-4 mr-">
-                                    <label for="regular-form-2" class="form-label">Sector</label>
+                                    <label for="regular-form-2" class="form-label">Role</label>
                                     <select name="role" id="" class="form-control">
                                         <option value="">Select</option>
                                         <option
-                                            {{ $user->role()->role == 'Governor'? 'selected' : '' }}
+                                            {{ $userRole && $userRole->role == 'Governor'? 'selected' : '' }}
                                             value="Governor"> Governor
                                         </option>
                                         <option
-                                            {{ $user->role()->role == 'System Admin'? 'selected' : '' }}
+                                            {{ $userRole && $userRole->role == 'System Admin'? 'selected' : '' }}
                                             value="System Admin"> System Admin
                                         </option>
                                         <option
-                                            {{ $user->role()->role == 'Sector Head'? 'selected' : '' }}
+                                            {{ $userRole && $userRole->role == 'Sector Head'? 'selected' : '' }}
                                             value="Sector Head"> Sector Head
                                         </option>
-                                        <option {{ $user->role()->role == 'Sector Admin'? 'selected' : '' }}
+                                        <option {{ $userRole && $userRole->role == 'Sector Admin'? 'selected' : '' }}
                                                 value="Sector Admin">Sector Admin
+                                        </option>
+                                        <option {{ $userRole && $userRole->role == 'Delivery Department'? 'selected' : '' }}
+                                                value="Delivery Department">Delivery Department
                                         </option>
                                     </select>
                                 </div>
@@ -242,19 +267,138 @@
 
         <div id="settings" class="tab-pane" role="tabpanel" aria-labelledby="settings-tab">
             <div class="grid grid-cols-12 gap-6">
-                <!-- BEGIN: Latest Uploads -->
-                <div class="intro-y box col-span-12 lg:col-span-4">
-                    {{--                    <div class="p-5">--}}
-                    {{--                        <div class="flex items-center">--}}
-                    {{--                            <div class="file"><a href="" class="w-12 file__icon file__icon--directory"></a></div>--}}
-                    {{--                            <div class="ml-4">--}}
-                    {{--                                <a class="font-medium" href="">Documenta678tion</a>--}}
-                    {{--                                <div class="text-slate-500 text-xs mt-0.5">40 KB</div>--}}
-                    {{--                            </div>--}}
-                    {{--                        </div>--}}
-                    {{--                    </div>--}}
+                <!-- Role Management Section -->
+                <div class="intro-y box col-span-12">
+                    <div class="p-8">
+                        <h3 class="text-lg font-bold mb-4">Role Management</h3>
+                        
+                        <!-- Current Active Role -->
+                        @php
+                            $currentRole = $user->getCurrentRole();
+                            // Sort roles: Active first, then Revoked, then by created_at DESC
+                            $allRoles = $user->roles()
+                                ->orderByRaw("CASE WHEN role_status = 'Active' THEN 0 ELSE 1 END")
+                                ->orderBy('created_at', 'DESC')
+                                ->get();
+                        @endphp
+                        
+                        @if($currentRole)
+                            <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-semibold text-emerald-900">Current Active Role</h4>
+                                        <p class="text-sm text-emerald-700 mt-1">
+                                            <strong>Role:</strong> {{ $currentRole->role }}<br>
+                                            <strong>Entity:</strong> {{ $currentRole->target_entity }}
+                                            @if($currentRole->target_entity === 'Sector' && $currentRole->sector)
+                                                - {{ $currentRole->sector->sector_name }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <span class="px-3 py-1 bg-emerald-600 text-white rounded-full text-xs font-bold">
+                                        Active
+                                    </span>
+                                </div>
+                            </div>
+                        @else
+                            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p class="text-amber-800">No active role assigned to this user.</p>
+                            </div>
+                        @endif
+
+                        <!-- Update Role Form -->
+                        <div class="mb-6">
+                            <h4 class="font-semibold mb-3">Update Role</h4>
+                            <form action="{{ route('users.role.update', $user) }}" method="post">
+                                @csrf
+                                <div class="grid grid-cols-12 gap-4">
+                                    <div class="col-span-12 lg:col-span-4">
+                                        <label for="update_role" class="form-label">New Role</label>
+                                        <select name="role" id="update_role" class="form-control" required>
+                                            <option value="">Select Role</option>
+                                            <option value="Governor">Governor</option>
+                                            <option value="System Admin">System Admin</option>
+                                            <option value="Sector Head">Sector Head</option>
+                                            <option value="Sector Admin">Sector Admin</option>
+                                            <option value="Delivery Department">Delivery Department</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-12 lg:col-span-4" id="update_sector_area" style="display: none;">
+                                        <label for="update_sector_id" class="form-label">Sector</label>
+                                        <select name="sector_id" id="update_sector_id" class="form-control">
+                                            <option value="">Select Sector</option>
+                                            @foreach($sectors as $sektor)
+                                                <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-span-12 lg:col-span-4 flex items-end">
+                                        <button type="submit" class="btn btn-primary w-full">Update Role</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Role History -->
+                        @if($allRoles && $allRoles->count() > 0)
+                            <div>
+                                <h4 class="font-semibold mb-3">Role History</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Role</th>
+                                                <th>Target Entity</th>
+                                                <th>Sector</th>
+                                                <th>Status</th>
+                                                <th>Assigned Date</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($allRoles as $role)
+                                                <tr>
+                                                    <td>{{ $role->role }}</td>
+                                                    <td>{{ $role->target_entity }}</td>
+                                                    <td>
+                                                        @if($role->target_entity === 'Sector' && $role->sector)
+                                                            {{ $role->sector->sector_name }}
+                                                        @else
+                                                            N/A
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($role->isActive())
+                                                            <span class="badge bg-success">Active</span>
+                                                        @else
+                                                            <span class="badge bg-danger">Revoked</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ $role->created_at ? $role->created_at->format('Y-m-d H:i') : 'N/A' }}</td>
+                                                    <td>
+                                                        @if($role->isRevoked())
+                                                            <form action="{{ route('users.role.reactivate', $user) }}" method="post" class="d-inline">
+                                                                @csrf
+                                                                <input type="hidden" name="role_id" value="{{ $role->id }}">
+                                                                <button type="submit" class="btn btn-sm btn-success">Reactivate</button>
+                                                            </form>
+                                                        @elseif($role->isActive() && $allRoles->where('role_status', 'Active')->count() > 1)
+                                                            <form action="{{ route('users.role.revoke', $user) }}" method="post" class="d-inline">
+                                                                @csrf
+                                                                <input type="hidden" name="role_id" value="{{ $role->id }}">
+                                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to revoke this role?')">Revoke</button>
+                                                            </form>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
-                <!-- END: Latest Uploads -->
             </div>
         </div>
     </div>
@@ -264,12 +408,23 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
-            $(".role").on('change', function () {
-                console.log($(this).val());
-                if ($(this).val() == '2') {
+            // Role change handler for edit profile
+            $("select[name='role']").on('change', function () {
+                if ($(this).val() === 'Sector Head' || $(this).val() === 'Sector Admin') {
                     $("#sectorArea").show();
                 } else {
                     $("#sectorArea").hide();
+                }
+            });
+
+            // Role change handler for role update form
+            $("#update_role").on('change', function () {
+                if ($(this).val() === 'Sector Head' || $(this).val() === 'Sector Admin') {
+                    $("#update_sector_area").show();
+                    $("#update_sector_id").prop('required', true);
+                } else {
+                    $("#update_sector_area").hide();
+                    $("#update_sector_id").prop('required', false);
                 }
             });
         });

@@ -67,6 +67,13 @@ class AuthLoginController extends Controller
     }
 
     protected function redirectPath(){
+        $user = Auth::user();
+        
+        // Redirect Governor users to statistics page
+        if ($user && $user->isGovernor()) {
+            return route("dashboard.statistics");
+        }
+        
         return route("dashboard");
     }
 

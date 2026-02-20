@@ -47,15 +47,63 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    /**
+     * Get all roles for this user
+     */
+    public function roles()
+    {
+        return $this->hasMany(UserRole::class);
+    }
+
+    /**
+     * Get the active role for this user (relationship)
+     */
+    public function activeRole()
+    {
+        return $this->hasOne(UserRole::class)
+            ->where('role_status', UserRole::STATUS_ACTIVE)
+            ->orderBy('id', 'DESC');
+    }
+
+    /**
+     * Get the current active role (for backward compatibility)
+     */
     public function role()
     {
-        return UserRole::where(['user_id' => $this->id])->orderBy('id', 'DESC')->first();
+        return $this->getCurrentRole();
+    }
+
+    /**
+     * Get the current active role (for backward compatibility)
+     */
+    public function getCurrentRole()
+    {
+        return $this->roles()->active()->orderBy('id', 'DESC')->first();
+    }
+
+    /**
+     * Get all active roles
+     */
+    public function activeRoles()
+    {
+        return $this->roles()->active()->get();
+    }
+
+    /**
+     * Get all revoked roles
+     */
+    public function revokedRoles()
+    {
+        return $this->roles()->revoked()->get();
     }
 
     public function sector()
     {
-        $role = $this->role();
-        return $role ? Sector::find($role->entity_id) : null;
+        $role = $this->getCurrentRole();
+        if ($role && $role->target_entity === UserRole::ENTITY_SECTOR) {
+            return Sector::find($role->entity_id);
+        }
+        return null;
     }
 
 
@@ -208,37 +256,48 @@ class User extends Authenticatable
 
     public function isSystemAdmin()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if ($userRole) {
-            return $userRole->target_entity == 'System';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_SYSTEM;
         }
         return false;
     }
 
     public function isGovernor()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if ($userRole) {
-            return $userRole->target_entity == 'State';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_STATE;
         }
         return false;
     }
 
     public function isSectorHead()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if ($userRole) {
-            return $userRole->target_entity == 'Sector' ? Sector::find($userRole->entity_id) : 0;
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && $userRole->role === UserRole::ROLE_SECTOR_HEAD) {
+                return Sector::find($userRole->entity_id);
+            }
         }
         return false;
     }
 
     public function isDeliveryDepartment()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if ($userRole) {
-            return $userRole->target_entity == 'Deliverable';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_DELIVERABLE;
         }
         return false;
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole($role)
+    {
+        $userRole = $this->getCurrentRole();
+        return $userRole && $userRole->isActive() && $userRole->role === $role;
     }
 }
