@@ -125,12 +125,23 @@
                                 <div class="flex flex-col">
                                     <span class="text-[10px] text-slate-500 font-medium">{{ $gallery->created_at->format('M d, Y') }}</span>
                                     @if($gallery->uploader)
-                                        <span class="text-[10px] text-slate-500 mt-0.5">By {{ $gallery->uploader->name ?? 'N/A' }}</span>
+                                        <span class="text-[10px] text-slate-500 mt-0.5">By {{ $gallery->uploader->full_name ?? $gallery->uploader->name ?? 'N/A' }}</span>
+                                    @elseif($gallery->uploaded_by)
+                                        <span class="text-[10px] text-slate-500 mt-0.5">By User #{{ $gallery->uploaded_by }}</span>
+                                    @else
+                                        <span class="text-[10px] text-slate-500 mt-0.5">By Unknown</span>
                                     @endif
                                 </div>
-                                <span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary font-semibold rounded">
-                                    Order: {{ $gallery->display_order }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.gallery.show', $gallery->id) }}"
+                                       class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary font-semibold rounded hover:bg-primary hover:text-white transition-colors flex items-center gap-1">
+                                        <span class="material-icons text-xs">comment</span>
+                                        {{ $gallery->comments_count ?? 0 }} comments
+                                    </a>
+                                    <span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 font-semibold rounded">
+                                        Order: {{ $gallery->display_order }}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

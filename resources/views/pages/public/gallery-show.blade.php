@@ -306,12 +306,6 @@
                                     @endif
                                 </div>
                                 <p class="text-slate-700 leading-relaxed ml-13">{{ $comment->comment }}</p>
-                                @if($comment->phone_number)
-                                    <div class="mt-3 flex items-center gap-1 text-xs text-slate-500 ml-13">
-                                        <span class="material-icons text-sm">phone</span>
-                                        {{ $comment->phone_number }}
-                                    </div>
-                                @endif
                             </div>
                         @empty
                             <div class="text-center py-12 text-slate-500">

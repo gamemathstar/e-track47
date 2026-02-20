@@ -19,7 +19,9 @@ class GalleryController extends Controller
      */
     public function index()
     {
-        $galleries = Gallery::orderBy('display_order', 'asc')
+        $galleries = Gallery::withCount('comments')
+            ->with('uploader')
+            ->orderBy('display_order', 'asc')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -77,7 +79,10 @@ class GalleryController extends Controller
      */
     public function show(Gallery $gallery)
     {
-        return view('pages.gallery.show', compact('gallery'));
+        // Load comments with all details for admin view
+        $comments = $gallery->comments()->orderBy('created_at', 'desc')->get();
+        
+        return view('pages.gallery.show', compact('gallery', 'comments'));
     }
 
     /**

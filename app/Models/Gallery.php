@@ -23,6 +23,21 @@ class Gallery extends Model
     ];
 
     /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Automatically set uploaded_by to current authenticated user if not set
+        static::creating(function ($gallery) {
+            if (empty($gallery->uploaded_by) && auth()->check()) {
+                $gallery->uploaded_by = auth()->id();
+            }
+        });
+    }
+
+    /**
      * Get the user who uploaded this gallery item
      */
     public function uploader()
