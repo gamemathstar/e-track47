@@ -109,13 +109,24 @@ class ProjectController extends Controller
         try {
             $user = Auth::user();
 
-            if ($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryDepartment())
+            if ($user->isGovernor() || $user->isSystemAdmin() || $user->canAccessAllSectors()) {
+                // Coordinators, Deputy Coordinators, and other roles with all-sector access
                 $sectors = Sector::select(['id', 'sector_name', 'description'])->get();
-            else if ($sector = $user->isSectorHead())
+            } else if ($sector = $user->isSectorHead()) {
                 $sectors = Sector::select(['id', 'sector_name', 'description'])
                     ->where('id', $sector->id)
                     ->get();
-            else
+            } else {
+                // Facilitators - show only assigned sectors
+                $assignedSectorIds = $user->getAssignedSectorIds();
+                if (!empty($assignedSectorIds)) {
+                    $sectors = Sector::select(['id', 'sector_name', 'description'])
+                        ->whereIn('id', $assignedSectorIds)
+                        ->get();
+                } else {
+                    $sectors = collect([]);
+                }
+            }
                 $sectors = [];
 
             return response(['success' => true, 'message' => "", 'data' => $sectors]);
@@ -308,7 +319,7 @@ class ProjectController extends Controller
     {
         try {
             $user = Auth::user();
-            if (!$user->isGovernor() && !$user->isDeliveryDepartment() && !$user->isSystemAdmin()) {
+            if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin()) {
                 return response()->json(['success' => true, 'message' => 'you do not have a permission to view this report', 'data' => []]);
             }
 
@@ -462,7 +473,7 @@ class ProjectController extends Controller
                     'id' => $kpi->id,
                     'deliverable_id' => $kpi->deliverable_id,
                     'kpi' => $kpi->kpi,
-                    'role' => $user->isSectorHead() ? 'sh' : ($user->isDeliveryDepartment() ? 'dd' : ''),
+                    'role' => $user->isSectorHead() ? 'sh' : ($user->isDeliveryUnit() ? 'dd' : ''),
                     'target_value' => $kpi->target_value,
                     'year' => $kpi->year ?? null,
                     'unit_of_measurement' => $kpi->unit_of_measurement,

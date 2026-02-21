@@ -27,7 +27,10 @@ class UserRole extends Model
     const ROLE_SYSTEM_ADMIN = 'System Admin';
     const ROLE_SECTOR_HEAD = 'Sector Head';
     const ROLE_SECTOR_ADMIN = 'Sector Admin';
-    const ROLE_DELIVERY_DEPARTMENT = 'Delivery Department';
+    const ROLE_DELIVERY_DEPARTMENT = 'Delivery Department'; // Deprecated - use new delivery unit roles
+    const ROLE_COORDINATOR = 'Coordinator';
+    const ROLE_DEPUTY_COORDINATOR = 'Deputy Coordinator';
+    const ROLE_FACILITATOR = 'Facilitator';
 
     // Target entity constants
     const ENTITY_SYSTEM = 'System';
@@ -119,7 +122,43 @@ class UserRole extends Model
             self::ROLE_SYSTEM_ADMIN => self::ENTITY_SYSTEM,
             self::ROLE_SECTOR_HEAD => self::ENTITY_SECTOR,
             self::ROLE_SECTOR_ADMIN => self::ENTITY_SECTOR,
-            self::ROLE_DELIVERY_DEPARTMENT => self::ENTITY_DELIVERABLE,
+            self::ROLE_DELIVERY_DEPARTMENT => self::ENTITY_DELIVERABLE, // Deprecated
+            self::ROLE_COORDINATOR => self::ENTITY_DELIVERABLE,
+            self::ROLE_DEPUTY_COORDINATOR => self::ENTITY_DELIVERABLE,
+            self::ROLE_FACILITATOR => self::ENTITY_SECTOR, // Facilitators are assigned to specific sectors
         ];
+    }
+
+    /**
+     * Check if this role is a delivery unit role (Coordinator, Deputy Coordinator, or Facilitator)
+     */
+    public function isDeliveryUnitRole()
+    {
+        return in_array($this->role, [
+            self::ROLE_COORDINATOR,
+            self::ROLE_DEPUTY_COORDINATOR,
+            self::ROLE_FACILITATOR,
+            self::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+        ]);
+    }
+
+    /**
+     * Check if this role can access all sectors (Coordinator or Deputy Coordinator)
+     */
+    public function canAccessAllSectors()
+    {
+        return in_array($this->role, [
+            self::ROLE_COORDINATOR,
+            self::ROLE_DEPUTY_COORDINATOR,
+            self::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+        ]);
+    }
+
+    /**
+     * Check if this role is restricted to assigned sectors (Facilitator)
+     */
+    public function isRestrictedToAssignedSectors()
+    {
+        return $this->role === self::ROLE_FACILITATOR;
     }
 }

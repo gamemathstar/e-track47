@@ -366,7 +366,7 @@
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>0)
+                                                    @if($user->isDeliveryUnit() && count($tracks)>0)
                                                         @php $track = $tracks[0]; @endphp
                                                         @if($track->actual_value)
                                                             <a href="javascript:"
@@ -767,11 +767,11 @@
                                         <div id="remarkView"></div>
                                     </div>
 
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="actual-value" class="form-label">Actual Delivery</label>
-                                        <input id="delivery_department_valueIx" type="number" class="form-control"
-                                               name="delivery_department_value" step="any"
-                                               required>
+                                    <div class="col-span-12 sm:col-span-12">
+                                        <label class="form-label font-semibold">Attached Evidence(s):</label>
+                                        <div id="evidenceView" class="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                            <p class="text-sm text-gray-500">Loading evidence...</p>
+                                        </div>
                                     </div>
 
                                     <div class="col-span-12 sm:col-span-12">
@@ -944,15 +944,21 @@
             });
 
             $('body .updM').on('click', function () {
-                $('#track_idX').val($(this).data('id'))
-                $('#delivery_department_valueIx').val($(this).data('delivery_department_value'))
+                let trackId = $(this).data('id')
+                $('#track_idX').val(trackId)
                 $('#delivery_department_remarkIx').val($(this).data('delivery_department_remark'))
                 $('#confirmation_statusIx').val($(this).data('confirmation_status'))
                 $('#milestoneView').html($(this).data('milestone'))
                 $('#remarkView').html($(this).data('remarks'))
                 $('#quarterView').html($(this).data('quarter'))
                 $('#actual_valueView').html($(this).data('actual_value'))
-                console.log($(this).data('milestone'), $(this).data('remarks'), $(this).data('actual_value'));
+                
+                // Load evidence attachments
+                $.get('{{ route('deliverable.kpi.tracking.files',[':id']) }}'.replace(':id', trackId), function (data) {
+                    $('#evidenceView').html(data)
+                }).fail(function() {
+                    $('#evidenceView').html('<p class="text-sm text-gray-500">No evidence attached.</p>')
+                })
             });
 
             // Update target modal year when year selector changes

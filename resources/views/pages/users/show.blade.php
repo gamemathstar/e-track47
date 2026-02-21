@@ -232,8 +232,14 @@
                                         <option {{ $userRole && $userRole->role == 'Sector Admin'? 'selected' : '' }}
                                                 value="Sector Admin">Sector Admin
                                         </option>
-                                        <option {{ $userRole && $userRole->role == 'Delivery Department'? 'selected' : '' }}
-                                                value="Delivery Department">Delivery Department
+                                        <option {{ $userRole && $userRole->role == 'Coordinator'? 'selected' : '' }}
+                                                value="Coordinator">Coordinator
+                                        </option>
+                                        <option {{ $userRole && $userRole->role == 'Deputy Coordinator'? 'selected' : '' }}
+                                                value="Deputy Coordinator">Deputy Coordinator
+                                        </option>
+                                        <option {{ $userRole && $userRole->role == 'Facilitator'? 'selected' : '' }}
+                                                value="Facilitator">Facilitator
                                         </option>
                                     </select>
                                 </div>
@@ -320,7 +326,9 @@
                                             <option value="System Admin">System Admin</option>
                                             <option value="Sector Head">Sector Head</option>
                                             <option value="Sector Admin">Sector Admin</option>
-                                            <option value="Delivery Department">Delivery Department</option>
+                                            <option value="Coordinator">Coordinator</option>
+                                            <option value="Deputy Coordinator">Deputy Coordinator</option>
+                                            <option value="Facilitator">Facilitator</option>
                                         </select>
                                     </div>
                                     <div class="col-span-12 lg:col-span-4" id="update_sector_area" style="display: none;">
@@ -410,7 +418,8 @@
         $(function () {
             // Role change handler for edit profile
             $("select[name='role']").on('change', function () {
-                if ($(this).val() === 'Sector Head' || $(this).val() === 'Sector Admin') {
+                var selectedRole = $(this).val();
+                if (selectedRole === 'Sector Head' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
                     $("#sectorArea").show();
                 } else {
                     $("#sectorArea").hide();
@@ -419,7 +428,8 @@
 
             // Role change handler for role update form
             $("#update_role").on('change', function () {
-                if ($(this).val() === 'Sector Head' || $(this).val() === 'Sector Admin') {
+                var selectedRole = $(this).val();
+                if (selectedRole === 'Sector Head' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
                     $("#update_sector_area").show();
                     $("#update_sector_id").prop('required', true);
                 } else {

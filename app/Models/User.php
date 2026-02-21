@@ -293,6 +293,91 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is a Coordinator
+     */
+    public function isCoordinator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_COORDINATOR]);
+    }
+
+    /**
+     * Check if user is a Deputy Coordinator
+     */
+    public function isDeputyCoordinator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_DEPUTY_COORDINATOR]);
+    }
+
+    /**
+     * Check if user is a Facilitator
+     */
+    public function isFacilitator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_FACILITATOR]);
+    }
+
+    /**
+     * Check if user has any delivery unit role (Coordinator, Deputy Coordinator, or Facilitator)
+     */
+    public function isDeliveryUnit()
+    {
+        return $this->hasAnyActiveRole([
+            UserRole::ROLE_COORDINATOR,
+            UserRole::ROLE_DEPUTY_COORDINATOR,
+            UserRole::ROLE_FACILITATOR,
+            UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+        ]);
+    }
+
+    /**
+     * Check if user can access all sectors (Coordinator or Deputy Coordinator)
+     */
+    public function canAccessAllSectors()
+    {
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if ($role->canAccessAllSectors()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get sectors assigned to user (for Facilitators)
+     * Returns array of sector IDs, or empty array if user can access all sectors
+     */
+    public function getAssignedSectorIds()
+    {
+        if ($this->canAccessAllSectors()) {
+            return []; // Empty array means all sectors
+        }
+
+        $sectorIds = [];
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if ($role->isRestrictedToAssignedSectors() && $role->entity_id > 0) {
+                $sectorIds[] = $role->entity_id;
+            }
+        }
+        return array_unique($sectorIds);
+    }
+
+    /**
+     * Check if user has any of the specified active roles
+     */
+    public function hasAnyActiveRole(array $roles)
+    {
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if (in_array($role->role, $roles)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Check if user has a specific role
      */
     public function hasRole($role)
