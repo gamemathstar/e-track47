@@ -416,10 +416,32 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Handle quarter button selection
+            const form = document.getElementById('statisticsFilterForm');
             const quarterButtons = document.querySelectorAll('.quarter-btn');
             const selectedQuarterInput = document.getElementById('selected_quarter');
+            const sectorSelect = document.getElementById('filter_sector');
+            const yearSelect = document.getElementById('filter_year');
             
+            // Function to submit the form
+            function submitForm() {
+                form.submit();
+            }
+            
+            // Handle sector dropdown change
+            if (sectorSelect) {
+                sectorSelect.addEventListener('change', function() {
+                    submitForm();
+                });
+            }
+            
+            // Handle year dropdown change
+            if (yearSelect) {
+                yearSelect.addEventListener('change', function() {
+                    submitForm();
+                });
+            }
+            
+            // Handle quarter button selection
             quarterButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const quarter = this.getAttribute('data-quarter');
@@ -435,6 +457,9 @@
                     
                     this.classList.remove('hover:bg-primary/10');
                     this.classList.add('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
+                    
+                    // Auto-submit form when quarter changes
+                    submitForm();
                 });
             });
         });

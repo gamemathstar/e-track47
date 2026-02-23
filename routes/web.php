@@ -5,6 +5,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataEntryAccessController;
 use App\Http\Controllers\DeliverableController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\KpiController;
@@ -116,6 +117,15 @@ Route::middleware(['auth'])->group(function () {
     // Gallery Management (Admin only)
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('gallery', GalleryController::class);
+    });
+
+    // Data Entry Access Management (PDCU Coordinators only)
+    Route::prefix('data-entry')->name('data-entry.')->group(function () {
+        Route::get('/', [DataEntryAccessController::class, 'index'])->name('index');
+        Route::post('/grant-override', [DataEntryAccessController::class, 'grantOverride'])->name('grant-override');
+        Route::post('/lock-all', [DataEntryAccessController::class, 'lockAll'])->name('lock-all');
+        Route::post('/unlock-all', [DataEntryAccessController::class, 'unlockAll'])->name('unlock-all');
+        Route::post('/initialize-quarter', [DataEntryAccessController::class, 'initializeQuarter'])->name('initialize-quarter');
     });
 });
 

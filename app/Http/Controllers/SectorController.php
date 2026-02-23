@@ -97,14 +97,25 @@ class SectorController extends Controller
     public function view(Request $request, $id, $comm_id = null)
     {
         $sector = Sector::find($id);
+        
+        // Check if sector exists
+        if (!$sector) {
+            return redirect()->route('dashboard')->with('failure', 'Sector not found.');
+        }
+        
         $commitments = $sector->__commitments()->orderBy('created_at', 'desc')->get();
         return view('pages.sector.view', compact('sector', 'commitments', 'comm_id'));
     }
 
     public function show(Request $request, $id)
     {
-
         $sector = Sector::find($id);
+        
+        // Check if sector exists
+        if (!$sector) {
+            return redirect()->route('dashboard')->with('failure', 'Sector not found.');
+        }
+        
         $commitments = $sector->__commitments()->get();
         $baseYear = 2023;
         $targetYear = 2024;

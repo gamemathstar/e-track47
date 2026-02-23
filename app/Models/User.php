@@ -283,6 +283,17 @@ class User extends Authenticatable
         return false;
     }
 
+    public function isSectorAdmin()
+    {
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && $userRole->role === UserRole::ROLE_SECTOR_ADMIN) {
+                return Sector::find($userRole->entity_id);
+            }
+        }
+        return false;
+    }
+
     public function isDeliveryDepartment()
     {
         $userRole = $this->getCurrentRole();

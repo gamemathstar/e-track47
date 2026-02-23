@@ -8,7 +8,7 @@
 
 
     <ul>
-        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit())
+        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit() || $user->isSectorHead() || $user->isSectorAdmin())
             <li>
                 <a href="{{route('dashboard')}}"
                    class="side-menu {{ Request::is('dashboard*') ? 'side-menu--active' : '' }}">
@@ -18,6 +18,8 @@
                     </div>
                 </a>
             </li>
+        @endif
+        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit())
             <li>
                 <a href="javascript:;" class="side-menu">
                     <div class="side-menu__icon"><i data-lucide="box"></i></div>
@@ -45,23 +47,34 @@
             </li>
         @endif
         @if($user->isDeliveryUnit())
-            {{--        <li>--}}
-            {{--            <a href="javascript:;" class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">--}}
-            {{--                <div class="side-menu__icon"><i data-lucide="box"></i></div>--}}
-            {{--                <div class="side-menu__title">--}}
-            {{--                    Delivery Department--}}
-            {{--                    <div class="side-menu__sub-icon "> <i data-lucide="chevron-down"></i> </div>--}}
-            {{--                </div>--}}
-            {{--            </a>--}}
-            {{--            <ul class="">--}}
-            {{--                <li>--}}
-            {{--                    <a href="{{route('delivery.awaiting.verification')}}" class="side-menu">--}}
-            {{--                        <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>--}}
-            {{--                        <div class="side-menu__title">Confirmation </div>--}}
-            {{--                    </a>--}}
-            {{--                </li>--}}
-            {{--            </ul>--}}
-            {{--        </li>--}}
+            <li>
+                <a href="javascript:;" class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="box"></i></div>
+                    <div class="side-menu__title">
+                        Delivery Unit
+                        <div class="side-menu__sub-icon "> <i data-lucide="chevron-down"></i> </div>
+                    </div>
+                </a>
+                <ul class="">
+                    <li>
+                        <a href="{{route('delivery.awaiting.verification')}}" class="side-menu">
+                            <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>
+                            <div class="side-menu__title">Confirmation </div>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        @endif
+        @if($user->isCoordinator() || $user->isDeputyCoordinator())
+            <li>
+                <a href="{{route('data-entry.index')}}"
+                   class="side-menu {{ Request::is('data-entry*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="key"></i></div>
+                    <div class="side-menu__title">
+                        Data Entry Management
+                    </div>
+                </a>
+            </li>
         @endif
 
         @if($user->isSystemAdmin())
@@ -87,8 +100,19 @@
         @if($sector = $user->isSectorHead())
             <li>
                 <a href="{{route('sectors.view',[$sector->id])}}"
-                   class="side-menu {{ Request::is('users*') ? 'side-menu--active' : '' }}">
-                    <div class="side-menu__icon"><i data-lucide="users"></i></div>
+                   class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="box"></i></div>
+                    <div class="side-menu__title">
+                        My Sector
+                    </div>
+                </a>
+            </li>
+        @endif
+        @if($sector = $user->isSectorAdmin())
+            <li>
+                <a href="{{route('sectors.view',[$sector->id])}}"
+                   class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="box"></i></div>
                     <div class="side-menu__title">
                         My Sector
                     </div>

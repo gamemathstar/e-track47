@@ -57,10 +57,10 @@
                href="{{ route('home') }}">Home</a>
             <a class="text-sm font-medium text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary transition-colors"
                href="{{ route('public.gallery.index') }}">Public Gallery</a>
-            <a class="text-sm font-medium text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary transition-colors"
-               href="{{ route('reports.index') }}">Reporting</a>
-            <a class="text-sm font-medium text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary transition-colors"
-               href="#">Resources</a>
+            {{--            <a class="text-sm font-medium text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary transition-colors"--}}
+            {{--               href="{{ route('reports.index') }}">Reporting</a>--}}
+            {{--            <a class="text-sm font-medium text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary transition-colors"--}}
+            {{--               href="#">Resources</a>--}}
         </nav>
         <div class="flex items-center gap-4">
             <a href="{{ route('login') }}"
@@ -170,52 +170,28 @@
                 </a>
             </div>
             <div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                <div
-                    class="group overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all">
-                    <div class="relative h-48 w-full overflow-hidden">
-                        <img alt="Infrastructure Project"
-                             class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                             src="{{asset('jigawa3_map.png')}}">
-                        <span
-                            class="absolute top-4 right-4 rounded-full bg-green-500/90 px-3 py-1 text-[10px] font-bold text-white">COMPLETED</span>
+                @forelse($galleries as $gallery)
+                    <a href="{{ route('public.gallery.show', $gallery->id) }}"
+                       class="group overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all cursor-pointer">
+                        <div class="relative h-48 w-full overflow-hidden">
+                            <img alt="{{ $gallery->title ?? 'Gallery Image' }}"
+                                 class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                 src="{{ asset($gallery->image_path) }}">
+                            <span
+                                class="absolute top-4 right-4 rounded-full bg-primary/90 px-3 py-1 text-[10px] font-bold text-white uppercase">Active</span>
+                        </div>
+                        <div class="p-6">
+                            <h5 class="text-lg font-bold text-slate-900 dark:text-white">{{ $gallery->title ?? 'Untitled' }}</h5>
+                            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                                {{ $gallery->caption ? Str::limit($gallery->caption, 100) : 'No description available.' }}
+                            </p>
+                        </div>
+                    </a>
+                @empty
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-slate-600 dark:text-slate-400">No gallery items available at the moment.</p>
                     </div>
-                    <div class="p-6">
-                        <h5 class="text-lg font-bold text-slate-900 dark:text-white">Dutse Modern Market Road</h5>
-                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Urban infrastructure expansion to
-                            facilitate trade and logistics within the state capital.</p>
-                    </div>
-                </div>
-                <div
-                    class="group overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all">
-                    <div class="relative h-48 w-full overflow-hidden">
-                        <img alt="Health Sector"
-                             class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                             src="{{asset('jigawa3_map.png')}}">
-                        <span
-                            class="absolute top-4 right-4 rounded-full bg-primary/90 px-3 py-1 text-[10px] font-bold text-white">IN PROGRESS</span>
-                    </div>
-                    <div class="p-6">
-                        <h5 class="text-lg font-bold text-slate-900 dark:text-white">State General Hospital
-                            Expansion</h5>
-                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Upgrading medical facilities with
-                            modern diagnostic equipment and specialized units.</p>
-                    </div>
-                </div>
-                <div
-                    class="group overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all">
-                    <div class="relative h-48 w-full overflow-hidden">
-                        <img alt="Education Project"
-                             class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                             src="{{asset('jigawa3_map.png')}}">
-                        <span
-                            class="absolute top-4 right-4 rounded-full bg-primary/90 px-3 py-1 text-[10px] font-bold text-white">90% READY</span>
-                    </div>
-                    <div class="p-6">
-                        <h5 class="text-lg font-bold text-slate-900 dark:text-white">Universal Education Reform</h5>
-                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Refurbishing 45 primary schools
-                            across the three senatorial districts of the state.</p>
-                    </div>
-                </div>
+                @endforelse
             </div>
         </div>
     </section>
@@ -243,10 +219,10 @@
                                 Administrative Login
                             </a>
                         @endauth
-                        <a href="{{ route('reports.index') }}"
-                           class="rounded-lg bg-primary/30 border border-white/30 px-8 py-4 text-sm font-bold text-white backdrop-blur-sm hover:bg-primary/40 transition-all">
-                            Public Statistics
-                        </a>
+{{--                        <a href="{{ route('reports.index') }}"--}}
+{{--                           class="rounded-lg bg-primary/30 border border-white/30 px-8 py-4 text-sm font-bold text-white backdrop-blur-sm hover:bg-primary/40 transition-all">--}}
+{{--                            Public Statistics--}}
+{{--                        </a>--}}
                     </div>
                 </div>
             </div>

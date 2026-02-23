@@ -9,6 +9,7 @@ use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\Notification;
 use App\Models\PerformanceTracking;
+use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 
 class DeliverableController extends Controller
 {
+    use ChecksDataEntryAccess;
+
     //
 
     public function __construct()
@@ -25,6 +28,19 @@ class DeliverableController extends Controller
 
     public function store(Request $request)
     {
+        // Check data entry access
+        $request->validate([
+            'commitment_id' => "required",
+        ]);
+        
+        $sectorId = $this->getSectorIdFromCommitment($request->commitment_id);
+        if ($sectorId) {
+            $accessCheck = $this->checkDataEntryAccess($sectorId);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
+
 //        return $request;
         $request->validate([
             'commitment_id' => "required",
@@ -138,13 +154,28 @@ class DeliverableController extends Controller
     {
         $request->validate([
             'deliverable_id' => 'required|exists:deliverables,id',
+        ]);
+
+        $deliverable = Deliverable::find($request->deliverable_id);
+        
+        // Check data entry access
+        if ($deliverable) {
+            $sectorId = $this->getSectorIdFromDeliverable($request->deliverable_id);
+            if ($sectorId) {
+                $accessCheck = $this->checkDataEntryAccess($sectorId);
+                if ($accessCheck) {
+                    return $accessCheck;
+                }
+            }
+        }
+
+        $request->validate([
+            'deliverable_id' => 'required|exists:deliverables,id',
             'deliverable' => 'required|string|max:255',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'status' => 'required|string|in:Not Started,In Progress,Completed'
         ]);
-
-        $deliverable = Deliverable::find($request->deliverable_id);
 
         if (!$deliverable) {
             return redirect()->back()->with('failure', 'Deliverable not found');
@@ -163,6 +194,15 @@ class DeliverableController extends Controller
 
     public function delete(Deliverable $deliverable)
     {
+        // Check data entry access
+        $sectorId = $this->getSectorIdFromDeliverable($deliverable->id);
+        if ($sectorId) {
+            $accessCheck = $this->checkDataEntryAccess($sectorId);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
+
         if (count($deliverable->kpis()->get()) == 0) {
             $deliverable->delete();
             return back()->with('success', 'Deliverable deleted successfully');

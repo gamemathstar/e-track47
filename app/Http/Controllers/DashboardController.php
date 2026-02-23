@@ -20,11 +20,48 @@ class DashboardController extends Controller
     public function index()
     {
         $user = Auth::user();
-        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin()) {
-            $userRole = UserRole::where(['user_id' => $user->id])->first();
-            return redirect(route('sectors.view', [$userRole->entity_id]));
+        
+        // Allow Governor, Delivery Unit, System Admin, Sector Head, and Sector Admin to access dashboard
+        // Only redirect other roles (if any) to their specific views
+        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin() && !$user->isSectorHead() && !$user->isSectorAdmin()) {
+            $userRole = UserRole::where(['user_id' => $user->id, 'role_status' => 'active'])->first();
+            
+            // Check if user role exists and has a valid entity_id
+            if ($userRole && $userRole->entity_id) {
+                $sector = Sector::find($userRole->entity_id);
+                if ($sector) {
+                    return redirect(route('sectors.view', [$userRole->entity_id]));
+                }
+            }
+            
+            // If no valid sector found, show error message but continue to show dashboard
+            // This prevents redirect loop - we'll show the dashboard with an error message
+            session()->flash('failure', 'Your account is not associated with a valid sector. Please contact the administrator.');
         }
+        
         $year = date('Y');
+        
+        // Determine which sectors the user can access
+        $accessibleSectorIds = [];
+        $hasAccessToAllSectors = false;
+        $userSector = null;
+        
+        if ($user->isGovernor() || $user->isSystemAdmin() || $user->canAccessAllSectors()) {
+            // User has access to all sectors
+            $hasAccessToAllSectors = true;
+        } else {
+            // User has access to specific sector(s)
+            $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+            if ($userSector) {
+                $accessibleSectorIds = [$userSector->id];
+            } else {
+                // Check for Facilitator or other roles with sector restrictions
+                $assignedSectorIds = $user->getAssignedSectorIds();
+                if (!empty($assignedSectorIds)) {
+                    $accessibleSectorIds = $assignedSectorIds;
+                }
+            }
+        }
 
         // Compute quarterly average performance per sector using performance_trackings
         // Performance is the average of (actual_value / milestone) * 100 for valid numeric entries with milestone > 0
@@ -35,7 +72,14 @@ class DashboardController extends Controller
             ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
             ->where('pt.year', '=', $year)
             ->whereIn('pt.quarter', [1, 2, 3, 4])
-            ->whereNotNull('d.end_date')
+            ->whereNotNull('d.end_date');
+        
+        // Filter by accessible sectors if user doesn't have access to all
+        if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
+            $rawQuarterly->whereIn('s.id', $accessibleSectorIds);
+        }
+        
+        $rawQuarterly = $rawQuarterly
             ->select(
                 's.id as sector_id',
                 's.sector_name',
@@ -46,8 +90,17 @@ class DashboardController extends Controller
             ->orderBy('s.sector_name')
             ->get();
 
-        // Initialize all sectors to ensure display even with no data
-        $allSectors = DB::table('sectors')->select('id', 'sector_name')->orderBy('sector_name')->get();
+        // Initialize sectors to ensure display even with no data
+        if ($hasAccessToAllSectors) {
+            $allSectors = DB::table('sectors')->select('id', 'sector_name')->orderBy('sector_name')->get();
+        } else {
+            $allSectors = DB::table('sectors')
+                ->whereIn('id', $accessibleSectorIds)
+                ->select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get();
+        }
+        
         $sectorQuarterPerf = [];
         foreach ($allSectors as $sec) {
             $sectorQuarterPerf[$sec->id] = [
@@ -64,10 +117,36 @@ class DashboardController extends Controller
                 $sectorQuarterPerf[$row->sector_id][$row->quarter] = $row->avg_performance !== null ? (float)$row->avg_performance : null;
             }
         }
+        
+        // Calculate statistics filtered by accessible sectors
+        $commitmentsQuery = DB::table('commitments');
+        $kpisQuery = DB::table('kpis as k')
+            ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+            ->join('commitments as c', 'd.commitment_id', '=', 'c.id');
+        
+        if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
+            $commitmentsQuery->whereIn('sector_id', $accessibleSectorIds);
+            $kpisQuery->whereIn('c.sector_id', $accessibleSectorIds);
+        }
+        
+        $commitments = $commitmentsQuery->count();
+        $kpis = $kpisQuery->count('k.id');
+        
+        // Calculate budget separately
+        $budgetQuery = DB::table('commitments');
+        if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
+            $budgetQuery->whereIn('sector_id', $accessibleSectorIds);
+        }
+        $stateBudget = $budgetQuery->sum('budget') ?? 0;
 
         return view('pages.dashboard.index', [
             'year' => $year,
             'sectorQuarterPerf' => $sectorQuarterPerf,
+            'commitments' => $commitments,
+            'kpis' => $kpis,
+            'stateBudget' => $stateBudget,
+            'hasAccessToAllSectors' => $hasAccessToAllSectors,
+            'userSector' => $userSector,
         ]);
     }
 

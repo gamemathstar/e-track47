@@ -6,10 +6,13 @@ use App\Models\Commitment;
 use App\Models\CommitmentBudget;
 use App\Models\Deliverable;
 use App\Models\SectorBudget;
+use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 
 class CommitmentController extends Controller
 {
+    use ChecksDataEntryAccess;
+
     //
     public function __construct()
     {
@@ -37,6 +40,16 @@ class CommitmentController extends Controller
 
     public function store(Request $request)
     {
+        // Check data entry access
+        $request->validate([
+            'sector_id' => "required",
+        ]);
+        
+        $accessCheck = $this->checkDataEntryAccess($request->sector_id);
+        if ($accessCheck) {
+            return $accessCheck;
+        }
+
 //        return $request;
         $request->validate([
             'sector_id' => "required",
@@ -98,14 +111,26 @@ class CommitmentController extends Controller
     {
         $request->validate([
             'commitment_id' => 'required|exists:commitments,id',
+        ]);
+
+        $commitment = Commitment::find($request->commitment_id);
+        
+        // Check data entry access
+        if ($commitment) {
+            $accessCheck = $this->checkDataEntryAccess($commitment->sector_id);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
+
+        $request->validate([
+            'commitment_id' => 'required|exists:commitments,id',
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'description' => 'required|string',
             'status' => 'required|string|in:Not Started,In Progress,Completed',
             'img_url' => 'nullable|file|mimes:jpg,png,jpeg|max:2048'
         ]);
-
-        $commitment = Commitment::find($request->commitment_id);
         
         if (!$commitment) {
             return redirect()->back()->with('failure', 'Commitment not found');
@@ -132,6 +157,12 @@ class CommitmentController extends Controller
 
     public function delete(Commitment $commitment)
     {
+        // Check data entry access
+        $accessCheck = $this->checkDataEntryAccess($commitment->sector_id);
+        if ($accessCheck) {
+            return $accessCheck;
+        }
+
         if (count($commitment->deliverables()->get()) == 0) {
             $commitment->delete();
             return back()->with('success', 'Commitment deleted successfully');

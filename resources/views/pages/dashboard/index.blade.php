@@ -51,12 +51,14 @@
     @php
         $user = auth()->user();
         $year = $year ?? date('Y');
-        $stateBudget = \App\Models\Commitment::sum('budget');
+        $stateBudget = $stateBudget ?? 0;
         $releasedAmount = 40000;
         $releasedIncomplete = 8;
         $deliverablesSoFar = 3;
-        $commitments = \App\Models\Commitment::count('id');
-        $kpis = \App\Models\Kpi::count('id');
+        $commitments = $commitments ?? 0;
+        $kpis = $kpis ?? 0;
+        $hasAccessToAllSectors = $hasAccessToAllSectors ?? false;
+        $userSector = $userSector ?? null;
     @endphp
 
     <div class="p-6 space-y-6">
@@ -127,8 +129,15 @@
             <div class="p-6 border-b border-primary/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold text-slate-900">General Report {{ $year }}</h2>
-                    <p class="text-sm text-slate-600">Quarterly performance breakdown across all
-                        government sectors.</p>
+                    <p class="text-sm text-slate-600">
+                        @if($hasAccessToAllSectors)
+                            Quarterly performance breakdown across all government sectors.
+                        @elseif($userSector)
+                            Quarterly performance breakdown for {{ $userSector->sector_name }}.
+                        @else
+                            Quarterly performance breakdown for your assigned sector(s).
+                        @endif
+                    </p>
                 </div>
                 <div class="flex items-center gap-3">
                     <button
@@ -251,40 +260,40 @@
         </div>
 
         <!-- Charts Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Chart 1: Sector Performance -->
-            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">KPI Delivery Performance</h3>
-                <div class="h-[290px]">
-                    <canvas id="sectorPerformanceChart" width="506" height="580"></canvas>
-                </div>
-            </div>
+{{--        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">--}}
+{{--            <!-- Chart 1: Sector Performance -->--}}
+{{--            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">--}}
+{{--                <h3 class="text-lg font-bold text-slate-900 mb-4">KPI Delivery Performance</h3>--}}
+{{--                <div class="h-[290px]">--}}
+{{--                    <canvas id="sectorPerformanceChart" width="506" height="580"></canvas>--}}
+{{--                </div>--}}
+{{--            </div>--}}
 
-            <!-- Chart 2: KPI Completion Ratio -->
-            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">KPI Completion Ratio</h3>
-                <div class="h-[290px]">
-                    <canvas id="sectorPerformanceChartRatio" width="506" height="580"></canvas>
-                </div>
-            </div>
+{{--            <!-- Chart 2: KPI Completion Ratio -->--}}
+{{--            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">--}}
+{{--                <h3 class="text-lg font-bold text-slate-900 mb-4">KPI Completion Ratio</h3>--}}
+{{--                <div class="h-[290px]">--}}
+{{--                    <canvas id="sectorPerformanceChartRatio" width="506" height="580"></canvas>--}}
+{{--                </div>--}}
+{{--            </div>--}}
 
-            <!-- Chart 3: Budget Distribution -->
-            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">Sector-wise Budget/Target
-                    Distribution</h3>
-                <div class="h-[290px]">
-                    <canvas id="budgetDistributionChart" width="640" height="640"></canvas>
-                </div>
-            </div>
+{{--            <!-- Chart 3: Budget Distribution -->--}}
+{{--            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">--}}
+{{--                <h3 class="text-lg font-bold text-slate-900 mb-4">Sector-wise Budget/Target--}}
+{{--                    Distribution</h3>--}}
+{{--                <div class="h-[290px]">--}}
+{{--                    <canvas id="budgetDistributionChart" width="640" height="640"></canvas>--}}
+{{--                </div>--}}
+{{--            </div>--}}
 
-            <!-- Chart 4: Commitment Status -->
-            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">Commitment Status</h3>
-                <div class="h-[290px]">
-                    <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
-                </div>
-            </div>
-        </div>
+{{--            <!-- Chart 4: Commitment Status -->--}}
+{{--            <div class="bg-white rounded-xl border border-primary/10 shadow-sm p-6">--}}
+{{--                <h3 class="text-lg font-bold text-slate-900 mb-4">Commitment Status</h3>--}}
+{{--                <div class="h-[290px]">--}}
+{{--                    <canvas id="commitmentStatusChart" width="640" height="640"></canvas>--}}
+{{--                </div>--}}
+{{--            </div>--}}
+{{--        </div>--}}
     </div>
 
 @endsection

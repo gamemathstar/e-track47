@@ -195,32 +195,59 @@
         <!-- Pagination -->
         @if($galleries->hasPages())
             <div class="flex flex-col items-center gap-4 py-8">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-center">
+                    {{-- Previous Button --}}
                     @if($galleries->onFirstPage())
-                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
-                            <span class="material-icons">chevron_left</span>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
+                            <span class="material-icons text-sm">chevron_left</span>
                         </button>
                     @else
-                        <a href="{{ $galleries->previousPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">
-                            <span class="material-icons">chevron_left</span>
+                        <a href="{{ $galleries->previousPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium">
+                            <span class="material-icons text-sm">chevron_left</span>
                         </a>
                     @endif
 
-                    @foreach($galleries->getUrlRange(1, $galleries->lastPage()) as $page => $url)
-                        @if($page == $galleries->currentPage())
-                            <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white font-bold">{{ $page }}</button>
-                        @else
-                            <a href="{{ $url }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">{{ $page }}</a>
-                        @endif
-                    @endforeach
+                    {{-- Page Numbers --}}
+                    @php
+                        $currentPage = $galleries->currentPage();
+                        $lastPage = $galleries->lastPage();
+                        $startPage = max(1, $currentPage - 2);
+                        $endPage = min($lastPage, $currentPage + 2);
+                    @endphp
 
+                    {{-- First page and ellipsis --}}
+                    @if($startPage > 1)
+                        <a href="{{ $galleries->url(1) }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium">1</a>
+                        @if($startPage > 2)
+                            <span class="w-10 h-10 flex items-center justify-center text-slate-400">...</span>
+                        @endif
+                    @endif
+
+                    {{-- Page range around current page --}}
+                    @for($page = $startPage; $page <= $endPage; $page++)
+                        @if($page == $currentPage)
+                            <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white font-bold shadow-md">{{ $page }}</button>
+                        @else
+                            <a href="{{ $galleries->url($page) }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium">{{ $page }}</a>
+                        @endif
+                    @endfor
+
+                    {{-- Ellipsis and last page --}}
+                    @if($endPage < $lastPage)
+                        @if($endPage < $lastPage - 1)
+                            <span class="w-10 h-10 flex items-center justify-center text-slate-400">...</span>
+                        @endif
+                        <a href="{{ $galleries->url($lastPage) }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium">{{ $lastPage }}</a>
+                    @endif
+
+                    {{-- Next Button --}}
                     @if($galleries->hasMorePages())
-                        <a href="{{ $galleries->nextPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 font-medium">
-                            <span class="material-icons">chevron_right</span>
+                        <a href="{{ $galleries->nextPageUrl() }}" class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium">
+                            <span class="material-icons text-sm">chevron_right</span>
                         </a>
                     @else
-                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
-                            <span class="material-icons">chevron_right</span>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed" disabled>
+                            <span class="material-icons text-sm">chevron_right</span>
                         </button>
                     @endif
                 </div>

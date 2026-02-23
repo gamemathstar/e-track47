@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Gallery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,7 +18,13 @@ class AuthLoginController extends Controller
 
     public function index()
     {
-        return view('welcome');
+        // Fetch the latest 3 active gallery items for the welcome page
+        $galleries = Gallery::active()
+            ->ordered()
+            ->limit(3)
+            ->get();
+
+        return view('welcome', compact('galleries'));
     }
 
     public function showLoginForm()
