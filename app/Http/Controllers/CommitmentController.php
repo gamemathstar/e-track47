@@ -6,10 +6,13 @@ use App\Models\Commitment;
 use App\Models\CommitmentBudget;
 use App\Models\Deliverable;
 use App\Models\SectorBudget;
+use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 
 class CommitmentController extends Controller
 {
+    use ChecksDataEntryAccess;
+
     //
     public function __construct()
     {
@@ -37,14 +40,22 @@ class CommitmentController extends Controller
 
     public function store(Request $request)
     {
+        // Check data entry access
+        $request->validate([
+            'sector_id' => "required",
+        ]);
+        
+        $accessCheck = $this->checkDataEntryAccess($request->sector_id);
+        if ($accessCheck) {
+            return $accessCheck;
+        }
+
 //        return $request;
         $request->validate([
             'sector_id' => "required",
             'name' => "required",
             'type' => "required",
             'description' => "required",
-            'start_date' => 'required',
-            'end_date' => 'required',
             'status' => 'required',
 //            'budget' => 'required',
             'img_url' => 'required|file|mimes:jpg,png|max:2048'
@@ -58,19 +69,11 @@ class CommitmentController extends Controller
 
 //        }
 
-        $dt_start = new \DateTime($request->start_date);
-        $dt_end = new \DateTime($request->end_date);
-        $diff = $dt_start->diff($dt_end);
-        $duration = $diff->format('%a');
-
         $commitment = new Commitment();
         $commitment->sector_id = $request->sector_id;
         $commitment->name = $request->name;
         $commitment->type = $request->type;
         $commitment->description = $request->description;
-        $commitment->duration_in_days = $duration;
-        $commitment->start_date = $request->start_date;
-        $commitment->end_date = $request->end_date;
         $commitment->status = $request->status;
 //        $commitment->budget = $request->budget;
         $commitment->img_url = $fileName;
@@ -106,20 +109,60 @@ class CommitmentController extends Controller
 
     public function update(Request $request)
     {
-        $commitment = Commitment::find($request->commitment_id);
         $request->validate([
-            'commitment_title' => 'required|unique:commitments,commitment_title,' . $commitment->id . '|max:255',
-            'description' => 'required|max:255',
-            // Add other validation rules as needed
+            'commitment_id' => 'required|exists:commitments,id',
         ]);
 
-        $commitment->update($request->all());
+        $commitment = Commitment::find($request->commitment_id);
+        
+        // Check data entry access
+        if ($commitment) {
+            $accessCheck = $this->checkDataEntryAccess($commitment->sector_id);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
 
-        return redirect()->route('sectors.view', [$commitment->sector_id, $commitment->id]);
+        $request->validate([
+            'commitment_id' => 'required|exists:commitments,id',
+            'name' => 'required|string|max:255',
+            'type' => 'required|string|max:255',
+            'description' => 'required|string',
+            'status' => 'required|string|in:Not Started,In Progress,Completed',
+            'img_url' => 'nullable|file|mimes:jpg,png,jpeg|max:2048'
+        ]);
+        
+        if (!$commitment) {
+            return redirect()->back()->with('failure', 'Commitment not found');
+        }
+
+        // Update commitment fields
+        $commitment->name = $request->name;
+        $commitment->type = $request->type;
+        $commitment->description = $request->description;
+        $commitment->status = $request->status;
+
+        // Handle image upload if provided
+        if ($request->hasFile('img_url')) {
+            $file = $request->file('img_url');
+            $fileName = time() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads'), $fileName);
+            $commitment->img_url = $fileName;
+        }
+
+        $commitment->save();
+
+        return redirect()->back()->with('success', 'Commitment updated successfully');
     }
 
     public function delete(Commitment $commitment)
     {
+        // Check data entry access
+        $accessCheck = $this->checkDataEntryAccess($commitment->sector_id);
+        if ($accessCheck) {
+            return $accessCheck;
+        }
+
         if (count($commitment->deliverables()->get()) == 0) {
             $commitment->delete();
             return back()->with('success', 'Commitment deleted successfully');

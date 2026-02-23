@@ -56,7 +56,7 @@
         <!-- BEGIN: Logo -->
         <a href="" class="logo -intro-x hidden md:flex xl:w-[180px] block">
             <img alt="App Logo" class="logo__image w-6" src="{{asset('jg_logo.png')}}">
-            <span class="logo__text text-white text-lg ml-3"> JS-EPM </span>
+            <span class="logo__text text-white text-lg ml-3"> Performance Delivery Coordination Unit (PDCU) </span>
         </a>
         <!-- END: Logo -->
     </div>
@@ -90,8 +90,6 @@
             </h2>
             <div
                 class="intro-y text-slate-600 dark:text-slate-500 mt-3 text-xs sm:text-sm">
-                {{ Carbon::parse($commitment->start_date)->format('jS F Y') }}
-                <span class="mx-1"> - </span> {{  Carbon::parse($commitment->end_date)->format('jS F Y')  }}
             </div>
             <div class="intro-y mt-6">
                 <div class="news__preview image-fit">

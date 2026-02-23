@@ -4266,7 +4266,7 @@ select{
    */
 /* Default colors */
 :root {
-    --color-primary: 22 78 99;
+    --color-primary: 0 135 81;
     --color-secondary: 226 232 240;
     --color-success: 13 148 136;
     --color-info: 6 182 212;
@@ -4288,7 +4288,7 @@ select{
 }
 /* Default dark-mode colors */
 .dark {
-    --color-primary: 21 94 117;
+    --color-primary: 0 135 81;
     --color-slate-500: 148 163 184;
     --color-darkmode-50: 87 103 132;
     --color-darkmode-100: 74 90 121;
@@ -4303,7 +4303,7 @@ select{
 }
 /* Theme 1 colors */
 .theme-1 {
-    --color-primary: 30 64 175;
+    --color-primary: 0 135 81;
     --color-secondary: 226 232 240;
     --color-success: 132 204 22;
     --color-info: 6 182 212;
@@ -4314,11 +4314,11 @@ select{
     --color-dark: 30 41 59;
 }
 .theme-1.dark {
-        --color-primary: 29 78 216;
+        --color-primary: 0 135 81;
     }
 /* Theme 2 colors */
 .theme-2 {
-    --color-primary: 30 58 138;
+    --color-primary: 0 135 81;
     --color-secondary: 226 232 240;
     --color-success: 13 148 136;
     --color-info: 6 182 212;
@@ -4329,11 +4329,11 @@ select{
     --color-dark: 30 41 59;
 }
 .theme-2.dark {
-        --color-primary: 30 64 175;
+        --color-primary: 0 135 81;
     }
 /* Theme 3 colors */
 .theme-3 {
-    --color-primary: 6 78 59;
+    --color-primary: 0 135 81;
     --color-secondary: 226 232 240;
     --color-success: 5 150 105;
     --color-info: 6 182 212;
@@ -4344,11 +4344,11 @@ select{
     --color-dark: 30 41 59;
 }
 .theme-3.dark {
-        --color-primary: 6 95 70;
+        --color-primary: 0 135 81;
     }
 /* Theme 4 colors */
 .theme-4 {
-    --color-primary: 49 46 129;
+    --color-primary: 0 135 81;
     --color-secondary: 226 232 240;
     --color-success: 5 150 105;
     --color-info: 6 182 212;
@@ -4359,7 +4359,7 @@ select{
     --color-dark: 30 41 59;
 }
 .theme-4.dark {
-        --color-primary: 67 56 202;
+        --color-primary: 0 135 81;
     }
 /*
    |--------------------------------------------------------------------------

@@ -343,9 +343,9 @@
     </div> <!-- END: Modal Content -->
 
     <div id="editCommitmentModal" class="modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form action="{{route('commitments.update')}}" method="post">
+                <form action="{{route('commitments.update')}}" method="post" enctype="multipart/form-data">
                     @csrf
                     <input type="hidden" name="commitment_id" id="comm-id" value="">
                     <!-- BEGIN: Modal Header -->
@@ -356,15 +356,34 @@
                     </div> <!-- END: Modal Header -->
                     <!-- BEGIN: Modal Body -->
                     <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                        <div class="col-span-12 sm:col-span-12">
-                            <label for="modal-form-1" class="form-label">Commitment</label>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="comm-title" class="form-label">Commitment Title</label>
                             <input type="text" class="form-control"
-                                   name="commitment_title" id="comm-title" required>
+                                   name="name" id="comm-title" required>
                         </div>
-                        <div class="col-span-12 sm:col-span-12">
-                            <label for="modal-form-2" class="form-label">Description</label>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="comm-type" class="form-label">Commitment Type</label>
+                            <input type="text" class="form-control"
+                                   name="type" id="comm-type" required>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="comm-desc" class="form-label">Description</label>
                             <textarea name="description" id="comm-desc" class="form-control"
                                       required></textarea>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="comm-status" class="form-label">Status</label>
+                            <select class="form-control" name="status" id="comm-status" required>
+                                <option value="">Select</option>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="col-span-12 sm:col-span-12">
+                            <label for="comm-photo" class="form-label">Photo</label>
+                            <input type="file" name="img_url" id="comm-photo" class="form-control">
+                            <small class="text-muted">Leave empty to keep current photo</small>
                         </div>
                     </div> <!-- END: Modal Body -->
                     <!-- BEGIN: Modal Footer -->
@@ -372,7 +391,7 @@
                         <button type="button" data-tw-dismiss="modal"
                                 class="btn btn-outline-secondary w-20 mr-1">Cancel
                         </button>
-                        <button type="submit" class="btn btn-primary w-20">Save</button>
+                        <button type="submit" class="btn btn-primary w-20">Update</button>
                     </div> <!-- END: Modal Footer -->
                 </form>
             </div>
@@ -444,10 +463,15 @@
             $('body').on('click', '#editCommitmentBtn', function () {
                 com_id = $(this).attr('com-id');
                 com_title = $(this).attr('com-title');
+                com_type = $(this).attr('com-type');
                 com_description = $(this).attr('com-description');
-                $("#comm-title").val(com_title);
-                $("#comm-desc").text(com_description);
+                com_status = $(this).attr('com-status');
+                
                 $("#comm-id").val(com_id);
+                $("#comm-title").val(com_title);
+                $("#comm-type").val(com_type);
+                $("#comm-desc").val(com_description);
+                $("#comm-status").val(com_status);
                 editCommitmentModal.show();
             });
 

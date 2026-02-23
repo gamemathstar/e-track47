@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sector;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,9 +25,49 @@ class ReportController extends Controller
         $this->middleware("auth");
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return view('pages.reports.index');
+        $user = auth()->user();
+        // Get sector for both Sector Head and Sector Admin
+        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+
+        // Get filter parameters
+        $selectedSectorId = $request->input('sector_id');
+        $year = $request->input('year', date('Y'));
+        $quarter = $request->input('quarter', 'all');
+
+        // Get sectors based on user access
+        if ($user->isGovernor() || $user->isSystemAdmin() || $user->canAccessAllSectors()) {
+            // User has access to all sectors
+            $sectors = Sector::select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get();
+        } else if ($userSector) {
+            // Sector Head or Sector Admin - show only their sector
+            $sectors = Sector::select('id', 'sector_name')
+                ->where('id', $userSector->id)
+                ->orderBy('sector_name')
+                ->get();
+        } else {
+            // Facilitator or other roles with sector restrictions
+            $assignedSectorIds = $user->getAssignedSectorIds();
+            if (!empty($assignedSectorIds)) {
+                $sectors = Sector::select('id', 'sector_name')
+                    ->whereIn('id', $assignedSectorIds)
+                    ->orderBy('sector_name')
+                    ->get();
+            } else {
+                $sectors = collect([]);
+            }
+        }
+
+        // Determine if user has access to all sectors (for showing "All Sectors" option)
+        $hasAccessToAllSectors = $user->isGovernor() || $user->isSystemAdmin() || $user->canAccessAllSectors();
+
+        // Calculate statistics based on filters
+        $stats = $this->calculateStatistics($selectedSectorId, $year, $quarter, $request);
+
+        return view('pages.reports.index', compact('sectors', 'stats', 'year', 'quarter', 'selectedSectorId', 'userSector', 'hasAccessToAllSectors'));
     }
 
     public function generate(Request $request)
@@ -42,71 +83,194 @@ class ReportController extends Controller
         $endMonth = $request->input('end_month');
         $year = $request->input('year');
 
-        $sectors = Sector::with(['commitments' => function ($query) use ($startMonth, $endMonth, $year) {
-            $query->withCount(['deliverables' => function ($q) use ($startMonth, $endMonth, $year) {
+        // Create date range for filtering
+        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+
+        // Check if user is a sector head or sector admin
+        $user = auth()->user();
+        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+
+        // Get sectors with commitments that have deliverables within the specified date range
+        $sectorsQuery = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+            $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
                     ->whereYear('end_date', $year)
-                    ->whereMonth('end_date', '>=', $startMonth)
-                    ->whereMonth('end_date', '<=', $endMonth);
-            }]);
-        }])->get();
+                    ->whereBetween('end_date', [$startDate, $endDate]);
+            }])
+                ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                    $q->whereNotNull('end_date')
+                        ->whereYear('end_date', $year)
+                        ->whereBetween('end_date', [$startDate, $endDate]);
+                }]);
+        }]);
+
+        // Filter sectors based on user role
+        if ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = $sectorsQuery->where('id', $userSector->id)->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = $sectorsQuery->get();
+        }
 
         $snapshotData = [];
         foreach ($sectors->sortBy('id') as $sector) {
-            $totalCommitments = $sector->commitments->count();
-            $totalOutputs = $sector->commitments->sum('deliverables_count');
-            $outputsDelivered = $sector->commitments->sum(function ($commitment) {
-                return $commitment->deliverables_count;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
             });
 
+            $totalCommitments = $filteredCommitments->count();
+            $totalOutputs = $filteredCommitments->sum('total_deliverables');
+            $outputsDelivered = $filteredCommitments->sum('deliverables_count');
+
+            // Calculate total KPIs for all deliverables in the date range
+            $totalKpis = 0;
+            foreach ($filteredCommitments as $commitment) {
+                $kpiCount = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+                $totalKpis += $kpiCount;
+            }
+
+            // Calculate KPI performance tracking ratio for the sector
+            $totalKpiRatios = 0;
+            $validKpiCount = 0;
+
+            foreach ($filteredCommitments as $commitment) {
+                $kpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($kpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $totalKpiRatios += $ratio;
+                    $validKpiCount++;
+                }
+            }
+
+            // Calculate average performance ratio
+            $averagePerformanceRatio = ($validKpiCount > 0) ? ($totalKpiRatios / $validKpiCount) * 100 : 0;
+
             $performancePercentage = ($totalOutputs > 0)
-                ? ($totalCommitments > 0 ? ($outputsDelivered / $totalOutputs) * 100 : 0)
+                ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
-            $rating = $this->calculatePerformanceRating($performancePercentage);
+            $rating = $this->calculatePerformanceRating(round($averagePerformanceRatio, 2));
 
             $snapshotData[] = [
                 's_n' => $sector->id,
                 'sector_name' => $sector->sector_name,
                 'no_of_commitments' => $totalCommitments,
                 'no_of_outputs' => $totalOutputs,
+                'no_of_kpis' => $totalKpis,
                 'outputs_delivered' => $outputsDelivered,
+                'performance' => round($averagePerformanceRatio, 2),
                 'rating' => $rating,
             ];
         }
 
         $summaryData = [];
         foreach ($sectors as $sector) {
-            $commitments = $sector->commitments;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
+            });
+
             $ministryCommitments = [];
             $totalDeliverables = 0;
             $completedDeliverables = 0;
 
-            foreach ($commitments as $index => $commitment) {
-                $totalDeliverables += $commitment->deliverables_count ?? 0;
+            foreach ($filteredCommitments as $index => $commitment) {
+                $totalDeliverables += $commitment->total_deliverables ?? 0;
                 $completedDeliverables += $commitment->deliverables_count ?? 0;
 
-                $performancePercentage = ($commitment->deliverables_count > 0)
-                    ? ($commitment->deliverables_count / $commitment->deliverables_count) * 100
+                // Calculate KPIs for this commitment
+                $commitmentKpis = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+
+                // Calculate KPI performance tracking ratio for this commitment
+                $commitmentKpiRatios = 0;
+                $commitmentValidKpiCount = 0;
+
+                $commitmentKpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($commitmentKpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $commitmentKpiRatios += $ratio;
+                    $commitmentValidKpiCount++;
+                }
+
+                // Calculate average performance ratio for this commitment
+                $commitmentAveragePerformanceRatio = ($commitmentValidKpiCount > 0) ? ($commitmentKpiRatios / $commitmentValidKpiCount) * 100 : 0;
+
+                $performancePercentage = ($commitment->total_deliverables > 0)
+                    ? ($commitment->deliverables_count / $commitment->total_deliverables) * 100
                     : 0;
                 $performanceRating = $this->calculatePerformanceRating($performancePercentage);
 
                 $ministryCommitments[] = [
                     's_n' => $index + 1,
                     'commitment' => $commitment->description ?? 'N/A',
-                    'no_of_outputs' => $commitment->deliverables_count ?? 0,
+                    'no_of_outputs' => $commitment->total_deliverables ?? 0,
+                    'no_of_kpis' => $commitmentKpis,
                     'no_results_to_be_delivered' => $commitment->deliverables_count ?? 0,
                     'exceptional' => ($performancePercentage > 150) ? $commitment->deliverables_count : 0,
                     'above_expectation' => ($performancePercentage >= 50 && $performancePercentage <= 150) ? $commitment->deliverables_count : 0,
                     'meets_expectation' => ($performancePercentage >= 30 && $performancePercentage < 50) ? $commitment->deliverables_count : 0,
                     'needs_improvement' => ($performancePercentage >= 20 && $performancePercentage < 30) ? $commitment->deliverables_count : 0,
                     'below_minimum' => ($performancePercentage < 20) ? $commitment->deliverables_count : 0,
-                    'overall_performance' => $performancePercentage . '%',
+                    'overall_performance' => round($commitmentAveragePerformanceRatio, 2) . '%',
                     'rating' => $performanceRating,
                     'remarks' => '',
                     'check' => '',
                 ];
             }
+
+            // Calculate total KPIs for the sector
+            $totalSectorKpis = array_sum(array_column($ministryCommitments, 'no_of_kpis'));
 
             $overallPerformance = ($totalDeliverables > 0)
                 ? ($completedDeliverables / $totalDeliverables) * 100
@@ -119,6 +283,7 @@ class ReportController extends Controller
                     's_n' => '',
                     'commitment' => 'Total',
                     'no_of_outputs' => $totalDeliverables,
+                    'no_of_kpis' => $totalSectorKpis,
                     'no_results_to_be_delivered' => $completedDeliverables,
                     'exceptional' => array_sum(array_column($ministryCommitments, 'exceptional')),
                     'above_expectation' => array_sum(array_column($ministryCommitments, 'above_expectation')),
@@ -138,6 +303,27 @@ class ReportController extends Controller
         $title = "$startMonthName to $endMonthName $year Snapshot View of MDA/Sector Performance";
         $summaryTitle = "$startMonthName to $endMonthName $year MDA/Sector Summary of Performance on Commitments";
 
+        // Check if this is an AJAX request
+        if ($request->ajax()) {
+            // Generate HTML content for AJAX response
+            $html = view('pages.reports.partials.report-content', compact(
+                'snapshotData',
+                'summaryData',
+                'title',
+                'summaryTitle',
+                'startMonth',
+                'endMonth',
+                'year'
+            ))->render();
+
+            return response()->json([
+                'success' => true,
+                'html' => $html,
+                'title' => $title,
+                'summaryTitle' => $summaryTitle
+            ]);
+        }
+
         return view('pages.reports.index', compact('request', 'snapshotData', 'summaryData', 'title', 'summaryTitle', 'startMonth', 'endMonth', 'year'));
     }
 
@@ -154,14 +340,22 @@ class ReportController extends Controller
         $endMonth = $request->input('end_month');
         $year = $request->input('year');
 
-        $sectors = Sector::with(['commitments' => function ($query) use ($startMonth, $endMonth, $year) {
-            $query->withCount(['deliverables' => function ($q) use ($startMonth, $endMonth, $year) {
+        // Create date range for filtering
+        $startDate = Carbon::createFromDate($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $endMonth, 1)->endOfMonth();
+
+        $sectors = Sector::with(['commitments' => function ($query) use ($startDate, $endDate, $year) {
+            $query->withCount(['deliverables' => function ($q) use ($startDate, $endDate, $year) {
                 $q->whereNotNull('end_date')
                     ->where('status', 'completed')
                     ->whereYear('end_date', $year)
-                    ->whereMonth('end_date', '>=', $startMonth)
-                    ->whereMonth('end_date', '<=', $endMonth);
-            }]);
+                    ->whereBetween('end_date', [$startDate, $endDate]);
+            }])
+                ->withCount(['deliverables as total_deliverables' => function ($q) use ($startDate, $endDate, $year) {
+                    $q->whereNotNull('end_date')
+                        ->whereYear('end_date', $year)
+                        ->whereBetween('end_date', [$startDate, $endDate]);
+                }]);
         }])->get();
 
         $spreadsheet = new Spreadsheet();
@@ -205,14 +399,64 @@ class ReportController extends Controller
 
         $row = 3;
         foreach ($sectors->sortBy('id') as $sector) {
-            $totalCommitments = $sector->commitments->count();
-            $totalOutputs = $sector->commitments->sum('deliverables_count');
-            $outputsDelivered = $sector->commitments->sum(function ($commitment) {
-                return $commitment->deliverables_count;
+            // Filter commitments that have deliverables in the specified date range
+            $filteredCommitments = $sector->commitments->filter(function ($commitment) use ($startDate, $endDate, $year) {
+                return $commitment->deliverables()
+                    ->whereNotNull('end_date')
+                    ->whereYear('end_date', $year)
+                    ->whereBetween('end_date', [$startDate, $endDate])
+                    ->exists();
             });
 
+            $totalCommitments = $filteredCommitments->count();
+            $totalOutputs = $filteredCommitments->sum('total_deliverables');
+            $outputsDelivered = $filteredCommitments->sum('deliverables_count');
+
+            // Calculate total KPIs for all deliverables in the date range
+            $totalKpis = 0;
+            foreach ($filteredCommitments as $commitment) {
+                $kpiCount = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->count();
+                $totalKpis += $kpiCount;
+            }
+
+            // Calculate KPI performance tracking ratio for the sector
+            $totalKpiRatios = 0;
+            $validKpiCount = 0;
+
+            foreach ($filteredCommitments as $commitment) {
+                $kpiPerformanceData = DB::table('deliverables as d')
+                    ->join('kpis as k', 'd.id', '=', 'k.deliverable_id')
+                    ->join('performance_trackings as pt', 'k.id', '=', 'pt.kpi_id')
+                    ->where('d.commitment_id', $commitment->id)
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year)
+                    ->whereBetween('d.end_date', [$startDate, $endDate])
+                    ->whereNotNull('pt.actual_value')
+                    ->whereNotNull('pt.milestone')
+                    ->where('pt.milestone', '>', 0)
+                    ->whereRaw('pt.actual_value REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->whereRaw('pt.milestone REGEXP "^[0-9]+\.?[0-9]*$"')
+                    ->select('pt.actual_value', 'pt.milestone as target')
+                    ->get();
+
+                foreach ($kpiPerformanceData as $kpiData) {
+                    $ratio = $kpiData->actual_value / $kpiData->target;
+                    $totalKpiRatios += $ratio;
+                    $validKpiCount++;
+                }
+            }
+
+            // Calculate average performance ratio
+            $averagePerformanceRatio = ($validKpiCount > 0) ? ($totalKpiRatios / $validKpiCount) * 100 : 0;
+
             $performancePercentage = ($totalOutputs > 0)
-                ? ($totalCommitments > 0 ? ($outputsDelivered / $totalOutputs) * 100 : 0)
+                ? ($outputsDelivered / $totalOutputs) * 100
                 : 0;
             $rating = $this->calculatePerformanceRating($performancePercentage);
 
@@ -220,10 +464,11 @@ class ReportController extends Controller
             $sheet1->setCellValue('B' . $row, $sector->sector_name);
             $sheet1->setCellValue('C' . $row, $totalCommitments);
             $sheet1->setCellValue('D' . $row, $totalOutputs);
-            $sheet1->setCellValue('E' . $row, $outputsDelivered);
-            $sheet1->setCellValue('F' . $row, '');
-            $sheet1->setCellValue('G' . $row, $rating);
-            $sheet1->setCellValue('H' . $row, '');
+            $sheet1->setCellValue('E' . $row, $totalKpis);
+            $sheet1->setCellValue('F' . $row, $outputsDelivered);
+            $sheet1->setCellValue('G' . $row, round($averagePerformanceRatio, 2));
+            $sheet1->setCellValue('H' . $row, $rating);
+            $sheet1->setCellValue('I' . $row, '');
 
             $row++;
         }
@@ -396,26 +641,210 @@ class ReportController extends Controller
     public function comprehensiveReport(Request $request)
     {
         $year = $request->input('year', date('Y'));
+        $startQuarter = $request->input('start_quarter', 1);
+        $endQuarter = $request->input('end_quarter', 4);
+
+        // Check if user is a sector head or sector admin
+        $user = auth()->user();
+        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+
+        // Get all sectors for the dropdown (only if not a sector head)
+        $sectors = [];
+        if (!$userSector) {
+            $sectors = Sector::orderBy('sector_name')->get();
+        }
 
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year);
+            $reportData = [];   //  $this->getComprehensiveReportData($year);
         } catch (Exception $e) {
             // Handle database errors gracefully
             $reportData = [];
             session()->flash('error', 'Database tables not found. Please run database migrations first.');
         }
 
-        return view('pages.reports.comprehensive', compact('reportData', 'year'));
+        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startQuarter', 'endQuarter', 'userSector', 'sectors'));
+    }
+
+    /**
+     * Convert quarter to date range
+     * 
+     * @param int $quarter Quarter number (1-4)
+     * @param int $year Year
+     * @return array ['start' => Carbon, 'end' => Carbon]
+     */
+    private function quarterToDateRange($quarter, $year)
+    {
+        switch ($quarter) {
+            case 1:
+                return [
+                    'start' => Carbon::createFromDate($year, 1, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 3, 31)->endOfMonth()
+                ];
+            case 2:
+                return [
+                    'start' => Carbon::createFromDate($year, 4, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 6, 30)->endOfMonth()
+                ];
+            case 3:
+                return [
+                    'start' => Carbon::createFromDate($year, 7, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 9, 30)->endOfMonth()
+                ];
+            case 4:
+                return [
+                    'start' => Carbon::createFromDate($year, 10, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 12, 31)->endOfMonth()
+                ];
+            default:
+                return [
+                    'start' => Carbon::createFromDate($year, 1, 1)->startOfMonth(),
+                    'end' => Carbon::createFromDate($year, 12, 31)->endOfMonth()
+                ];
+        }
+    }
+
+    /**
+     * Get date range from start and end quarters
+     * 
+     * @param int $startQuarter Start quarter (1-4)
+     * @param int $endQuarter End quarter (1-4)
+     * @param int $year Year
+     * @return array ['start' => Carbon, 'end' => Carbon]
+     */
+    private function getQuarterDateRange($startQuarter, $endQuarter, $year)
+    {
+        $startRange = $this->quarterToDateRange($startQuarter, $year);
+        $endRange = $this->quarterToDateRange($endQuarter, $year);
+        
+        return [
+            'start' => $startRange['start'],
+            'end' => $endRange['end']
+        ];
+    }
+
+    public function printComprehensiveReport(Request $request)
+    {
+        // Validate input
+        $request->validate([
+            'start_quarter' => 'required|integer|between:1,4',
+            'end_quarter' => 'required|integer|between:1,4|gte:start_quarter',
+            'year' => 'required|integer|digits:4',
+            'sectors' => 'nullable|array',
+            'sectors.*' => 'exists:sectors,id',
+        ]);
+
+        $startQuarter = $request->input('start_quarter');
+        $endQuarter = $request->input('end_quarter');
+        $year = $request->input('year', date('Y'));
+        $selectedSectorIds = $request->input('sectors', []);
+
+        // Create date range for filtering from quarters
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
+
+        // Check if user is a sector head or sector admin
+        $user = auth()->user();
+        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+
+        // Determine which sectors to include
+        $sectorIds = [];
+        if ($userSector) {
+            // Sector head can only see their sector
+            $sectorIds = [$userSector->id];
+            $sectors = DB::table('sectors')->where('id', $userSector->id)->orderBy('sector_name')->get();
+        } else {
+            // Non-sector head: use selected sectors or all sectors
+            if (!empty($selectedSectorIds)) {
+                $sectorIds = $selectedSectorIds;
+                $sectors = DB::table('sectors')->whereIn('id', $sectorIds)->orderBy('sector_name')->get();
+            } else {
+                $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+                $sectorIds = $sectors->pluck('id')->toArray();
+            }
+        }
+
+        // Get data for each sheet
+        $overallSummaryData = $this->getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
+        $grandSummaryData = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds);
+        $sectorSummaryData = $this->getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
+        
+        // Get individual sector data
+        $individualSectorData = [];
+        foreach ($sectors as $sector) {
+            if ($sector->description) {
+                $individualSectorData[$sector->id] = $this->getIndividualSectorDataForPrint($sector, $year, $startDate, $endDate);
+            }
+        }
+
+        // Get quarter names for display
+        $quarterNames = [
+            1 => 'Q1 (Jan - Mar)',
+            2 => 'Q2 (Apr - Jun)',
+            3 => 'Q3 (Jul - Sep)',
+            4 => 'Q4 (Oct - Dec)'
+        ];
+        $startQuarterName = $quarterNames[$startQuarter];
+        $endQuarterName = $quarterNames[$endQuarter];
+
+        return view('pages.reports.comprehensive-print', compact(
+            'year', 
+            'startQuarter', 
+            'endQuarter', 
+            'startQuarterName', 
+            'endQuarterName',
+            'startDate', 
+            'endDate',
+            'userSector',
+            'sectors',
+            'overallSummaryData',
+            'grandSummaryData',
+            'sectorSummaryData',
+            'individualSectorData'
+        ));
     }
 
     public function downloadComprehensiveReport(Request $request)
     {
+        // Validate input
+        $request->validate([
+            'start_quarter' => 'required|integer|between:1,4',
+            'end_quarter' => 'required|integer|between:1,4|gte:start_quarter',
+            'year' => 'required|integer|digits:4',
+            'sectors' => 'nullable|array',
+            'sectors.*' => 'exists:sectors,id',
+        ]);
+
+        $startQuarter = $request->input('start_quarter');
+        $endQuarter = $request->input('end_quarter');
         $year = $request->input('year', date('Y'));
+        $selectedSectorIds = $request->input('sectors', []);
+
+        // Create date range for filtering from quarters
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
+
+        // Check if user is a sector head or sector admin
+        $user = auth()->user();
+        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+
+        // Determine which sectors to include
+        $sectorIds = [];
+        if ($userSector) {
+            // Sector head can only see their sector
+            $sectorIds = [$userSector->id];
+        } else {
+            // Non-sector head: use selected sectors or all sectors
+            if (!empty($selectedSectorIds)) {
+                $sectorIds = $selectedSectorIds;
+            }
+        }
 
         try {
             // Get comprehensive KPI tracking data
-            $reportData = $this->getComprehensiveReportData($year);
+            $reportData = $this->getComprehensiveReportData($year, $startDate, $endDate, $userSector, $sectorIds);
         } catch (Exception $e) {
             // Handle database errors gracefully
             return redirect()->back()->with('error', 'Database tables not found. Please run database migrations first.');
@@ -425,18 +854,18 @@ class ReportController extends Controller
         $spreadsheet = new Spreadsheet();
 
         // Create individual sector sheets and get commitment average row mapping
-        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year);
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector, $sectorIds);
         $commitmentAverageRows = $sectorData['commitmentAverageRows'];
         $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
 
         // Create Overall Summary sheet
-        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         // Create Grand Summary sheet
-        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows);
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         // Create Sector Summary Details sheet
-        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows);
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate, $userSector, $sectorIds);
 
         //  RE-ORDER THE SHEETS HERE
         // Reorder sheets: Overall Summary at index 0, Grand Summary at index 1, Sector Summary Details at index 2
@@ -474,7 +903,7 @@ class ReportController extends Controller
         exit;
     }
 
-    private function getComprehensiveReportData($year)
+    private function getComprehensiveReportData($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
         // Get main report data with the correct structure
         $reportData = DB::table('sectors as s')
@@ -488,6 +917,15 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+            })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->whereBetween('d.end_date', [$startDate, $endDate])
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
             })
             ->select([
                 's.sector_name',
@@ -570,7 +1008,8 @@ class ReportController extends Controller
 
             if ($target > 0 && is_numeric($actual)) {
                 $performanceRatio = ($actual / $target) * 100;
-                $adjustedPerformance = $performanceRatio;
+                // Cap adjusted performance at 101% if it exceeds 100%
+                $adjustedPerformance = $performanceRatio > 100 ? 101 : $performanceRatio;
             }
 
             // Add KPI data row
@@ -593,7 +1032,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorSummaryData($year)
+    private function getSectorSummaryData($year, $startDate = null, $endDate = null, $userSector = null)
     {
         // Get sector summary data with performance counts
         $sectorSummary = DB::table('sectors as s')
@@ -608,6 +1047,14 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 's.sector_name',
                 DB::raw('COUNT(DISTINCT c.id) as commitment_count'),
@@ -621,7 +1068,7 @@ class ReportController extends Controller
         $sn = 1;
         foreach ($sectorSummary as $sector) {
             // Calculate performance counts for this sector
-            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year);
+            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year, $startDate, $endDate, $userSector);
 
             $result[] = [
                 'sn' => $sn++,
@@ -642,7 +1089,7 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function getSectorPerformanceCounts($sectorName, $year)
+    private function getSectorPerformanceCounts($sectorName, $year, $startDate = null, $endDate = null, $userSector = null)
     {
         // Get all KPIs for the sector to calculate not assessed count
         $allKpis = DB::table('sectors as s')
@@ -657,12 +1104,20 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->where('s.sector_name', $sectorName)
+            ->whereNotNull('kt.target')
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when($userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 'kt.target',
                 'pt.actual_value'
             ])
-            ->where('s.sector_name', $sectorName)
-            ->whereNotNull('kt.target')
             ->get();
 
         // Get performance data for assessed KPIs
@@ -727,7 +1182,7 @@ class ReportController extends Controller
         return $counts;
     }
 
-    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
+    private function createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Overall Summary');
@@ -837,8 +1292,16 @@ class ReportController extends Controller
         $sheet->getRowDimension('4')->setRowHeight(40); // Merged headers (keep larger for merged content)
         $sheet->getRowDimension('5')->setRowHeight(25); // Sub-labels
 
-        // Get all sectors for the overall summary
-        $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+        // Get sectors for the overall summary based on user role and selected sectors
+        if (!empty($sectorIds)) {
+            $sectors = DB::table('sectors')->whereIn('id', $sectorIds)->orderBy('sector_name')->get();
+        } elseif ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = DB::table('sectors')->where('id', $userSector->id)->orderBy('sector_name')->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = DB::table('sectors')->orderBy('sector_name')->get();
+        }
 
         $row = 7; // Start data from row 7 after headers
         $iteration = 1; // Loop iteration counter
@@ -853,13 +1316,27 @@ class ReportController extends Controller
             $sheet->getStyle('B' . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
             // Cell C: Number of commitments for that sector in the given year
-            $commitmentCount = DB::table('commitments')->where('sector_id', $sector->id)->count();
+            $commitmentCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
+                ->distinct('c.id')
+                ->count('c.id');
             $sheet->setCellValue('C' . $row, $commitmentCount > 0 ? $commitmentCount : '-');
 
             // Cell D: Number of deliverables across all commitments for that sector in that year
             $deliverableCount = DB::table('commitments as c')
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->count();
             $sheet->setCellValue('D' . $row, $deliverableCount > 0 ? $deliverableCount : '-');
 
@@ -868,6 +1345,11 @@ class ReportController extends Controller
                 ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
                 ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
                 ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->count();
             $sheet->setCellValue('E' . $row, $kpiCount > 0 ? $kpiCount : '-');
 
@@ -886,14 +1368,19 @@ class ReportController extends Controller
                                 ->orWhere('pt.year', '=', 0); // Include records with year = 0
                         });
                 })
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('kt.target')
+                ->where('kt.target', '!=', '') // Exclude empty targets
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
                 ->select([
                     'k.id as kpi_id',
                     'kt.target',
                     DB::raw('SUM(CAST(pt.actual_value AS DECIMAL(10,2))) as total_actual_value')
                 ])
-                ->where('c.sector_id', $sector->id)
-                ->whereNotNull('kt.target')
-                ->where('kt.target', '!=', '') // Exclude empty targets
                 ->groupBy('k.id', 'kt.target')
                 ->get();
 
@@ -1075,7 +1562,7 @@ class ReportController extends Controller
         }
     }
 
-    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [])
+    private function createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Grand Summary-Sector_MDAs+');
@@ -1181,7 +1668,7 @@ class ReportController extends Controller
         $sheet->getStyle('A3:H4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         // Get grand summary data
-        $grandSummary = $this->getGrandSummaryData($year);
+        $grandSummary = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds);
 
         $row = 5; // Start data from row 5 after headers
         $iteration = 1; // Loop iteration counter
@@ -1294,12 +1781,19 @@ class ReportController extends Controller
         $sheet->getStyle('A1:H4')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     }
 
-    private function getGrandSummaryData($year)
+    private function getGrandSummaryData($year, $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         // Get grand summary data - use LEFT JOIN to include all sectors even if they don't have complete data
         $grandSummary = DB::table('sectors as s')
             ->leftJoin('commitments as c', 'c.sector_id', '=', 's.id')
-            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('deliverables as d', function ($join) use ($year, $startDate, $endDate) {
+                $join->on('d.commitment_id', '=', 'c.id')
+                    ->whereNotNull('d.end_date')
+                    ->whereYear('d.end_date', $year);
+                if ($startDate && $endDate) {
+                    $join->whereBetween('d.end_date', [$startDate, $endDate]);
+                }
+            })
             ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
                 $join->on('kt.kpi_id', '=', 'k.id')
@@ -1309,13 +1803,19 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
             })
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
             ->select([
                 's.sector_name',
-                DB::raw('COUNT(DISTINCT c.id) as commitment_count'),
+                DB::raw('COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN c.id ELSE NULL END) as commitment_count'),
                 DB::raw('COUNT(DISTINCT d.id) as deliverable_count'),
                 DB::raw('COUNT(DISTINCT k.id) as kpi_count'),
-                DB::raw('AVG(CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) as average_performance'),
-                DB::raw('CASE WHEN AVG(CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) >= 150 THEN \'Exceptional (Distinction)\' WHEN AVG(CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) >= 50 THEN \'Above Expectation (Very Good)\' WHEN AVG(CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) >= 30 THEN \'Meets Expectation\' WHEN AVG(CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) >= 20 THEN \'Needs Improvement (Fair)\' ELSE \'Below Minimum Expectation\' END as performance_rating')
+                DB::raw('COALESCE(AVG(CASE WHEN d.id IS NOT NULL THEN (CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) ELSE NULL END), 0) as average_performance'),
+                DB::raw('CASE WHEN AVG(CASE WHEN d.id IS NOT NULL THEN (CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) ELSE NULL END) >= 150 THEN \'Exceptional (Distinction)\' WHEN AVG(CASE WHEN d.id IS NOT NULL THEN (CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) ELSE NULL END) >= 50 THEN \'Above Expectation (Very Good)\' WHEN AVG(CASE WHEN d.id IS NOT NULL THEN (CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) ELSE NULL END) >= 30 THEN \'Meets Expectation\' WHEN AVG(CASE WHEN d.id IS NOT NULL THEN (CASE WHEN pt.actual_value IS NOT NULL THEN (pt.actual_value / kt.target) * 100 ELSE 0 END) ELSE NULL END) >= 20 THEN \'Needs Improvement (Fair)\' ELSE \'Below Minimum Expectation\' END as performance_rating')
             ])
             ->groupBy('s.sector_name')
             ->get();
@@ -1378,7 +1878,247 @@ class ReportController extends Controller
         return $result;
     }
 
-    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [])
+    private function getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
+    {
+        // Get overall summary data similar to createOverallSummarySheet
+        $sectors = DB::table('sectors as s')
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
+            ->orderBy('s.sector_name')
+            ->get();
+
+        $result = [];
+        foreach ($sectors as $sector) {
+            // Get counts and performance data for this sector
+            $commitmentCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
+                ->distinct('c.id')
+                ->count('c.id');
+
+            $deliverableCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
+                ->count();
+
+            $kpiCount = DB::table('commitments as c')
+                ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+                ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('d.end_date')
+                ->whereYear('d.end_date', $year)
+                ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                    return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+                })
+                ->count();
+
+            $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year, $startDate, $endDate, $userSector);
+
+            $result[] = [
+                'sn' => count($result) + 1,
+                'sector_name' => $sector->sector_name,
+                'commitment_count' => $commitmentCount,
+                'deliverable_count' => $deliverableCount,
+                'kpi_count' => $kpiCount,
+                'exceptional_count' => $performanceCounts['exceptional'],
+                'above_expectation_count' => $performanceCounts['above_expectation'],
+                'meets_expectation_count' => $performanceCounts['meets_expectation'],
+                'needs_improvement_count' => $performanceCounts['needs_improvement'],
+                'below_minimum_count' => $performanceCounts['below_minimum'],
+                'not_assessed_count' => $performanceCounts['not_assessed'],
+                'overall_performance' => $performanceCounts['overall_performance'],
+                'performance_rating' => $performanceCounts['performance_rating']
+            ];
+        }
+        return $result;
+    }
+
+    private function getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
+    {
+        // Get sector summary data with commitments grouped by sector (matching Excel structure)
+        $sectorSummary = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                    ->where('pt.year', '=', $year);
+            })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
+            })
+            ->select([
+                's.id as sector_id',
+                's.sector_name',
+                's.description',
+                'c.id as commitment_id',
+                'c.name as commitment_name',
+                DB::raw('COUNT(DISTINCT d.id) as deliverable_count'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) > 1 THEN 1 ELSE 0 END) as exceptional_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.7 AND (pt.actual_value / kt.target) <= 1 THEN 1 ELSE 0 END) as above_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.6 AND (pt.actual_value / kt.target) < 0.7 THEN 1 ELSE 0 END) as meets_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.4 AND (pt.actual_value / kt.target) < 0.6 THEN 1 ELSE 0 END) as needs_improvement_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) < 0.4 THEN 1 ELSE 0 END) as below_minimum_count'),
+                DB::raw('SUM(CASE WHEN pt.actual_value IS NULL OR pt.actual_value = 0 THEN 1 ELSE 0 END) as not_assessed_count')
+            ])
+            ->groupBy('s.id', 's.sector_name', 's.description', 'c.id', 'c.name')
+            ->orderBy('s.sector_name')
+            ->orderBy('c.id')
+            ->get();
+
+        $result = [];
+        foreach ($sectorSummary as $row) {
+            // Calculate average performance for this commitment
+            $performanceCounts = $this->getCommitmentPerformanceCounts($row->commitment_id, $year, $startDate, $endDate);
+            
+            $result[] = [
+                'sector_id' => $row->sector_id,
+                'sector_name' => $row->sector_name,
+                'commitment_id' => $row->commitment_id,
+                'commitment_name' => $row->commitment_name,
+                'deliverable_count' => $row->deliverable_count,
+                'kpi_count' => $row->kpi_count,
+                'exceptional_count' => $row->exceptional_count,
+                'above_expectation_count' => $row->above_expectation_count,
+                'meets_expectation_count' => $row->meets_expectation_count,
+                'needs_improvement_count' => $row->needs_improvement_count,
+                'below_minimum_count' => $row->below_minimum_count,
+                'not_assessed_count' => $row->not_assessed_count,
+                'overall_performance' => $performanceCounts['overall_performance'] ?? 0,
+                'performance_rating' => $performanceCounts['performance_rating'] ?? ''
+            ];
+        }
+        return $result;
+    }
+
+    private function getCommitmentPerformanceCounts($commitmentId, $year, $startDate, $endDate)
+    {
+        // Get performance counts for a specific commitment
+        $allKpis = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                    ->where('pt.year', '=', $year);
+            })
+            ->where('c.id', $commitmentId)
+            ->whereNotNull('kt.target')
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->select([
+                'kt.target',
+                'pt.actual_value'
+            ])
+            ->get();
+
+        $performanceData = $allKpis->whereNotNull('actual_value');
+        $totalAssessed = 0;
+        $totalPerformance = 0;
+
+        foreach ($performanceData as $data) {
+            if ($data->target > 0 && is_numeric($data->actual_value)) {
+                $ratio = ($data->actual_value / $data->target) * 100;
+                $totalAssessed++;
+                $totalPerformance += $ratio;
+            }
+        }
+
+        $overallPerformance = ($totalAssessed > 0) ? ($totalPerformance / $totalAssessed) : 0;
+        
+        // Determine performance rating
+        $performanceRating = '';
+        if ($overallPerformance >= 100) {
+            $performanceRating = 'Exceptional';
+        } elseif ($overallPerformance >= 70) {
+            $performanceRating = 'Above Expectation';
+        } elseif ($overallPerformance >= 60) {
+            $performanceRating = 'Meets Expectation';
+        } elseif ($overallPerformance >= 40) {
+            $performanceRating = 'Needs Improvement';
+        } else {
+            $performanceRating = 'Below Minimum';
+        }
+
+        return [
+            'overall_performance' => $overallPerformance,
+            'performance_rating' => $performanceRating
+        ];
+    }
+
+    private function getIndividualSectorDataForPrint($sector, $year, $startDate, $endDate)
+    {
+        // Get individual sector data similar to createIndividualSectorSheets
+        $sectorData = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                    ->where('pt.year', '=', $year);
+            })
+            ->where('s.id', '=', $sector->id)
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->whereBetween('d.end_date', [$startDate, $endDate])
+            ->select([
+                'c.id as commitment_id',
+                'c.name as commitment_name',
+                'd.id as deliverable_id',
+                'd.deliverable',
+                'k.id as kpi_id',
+                'k.kpi',
+                'k.unit_of_measurement',
+                'kt.target as target_value',
+                DB::raw('COALESCE(SUM(pt.actual_value), 0) as total_actual_value')
+            ])
+            ->groupBy('c.id', 'c.name', 'd.id', 'd.deliverable', 'k.id', 'k.kpi', 'k.unit_of_measurement', 'kt.target')
+            ->orderBy('c.id')
+            ->orderBy('d.id')
+            ->orderBy('k.id')
+            ->get();
+
+        return $sectorData;
+    }
+
+    private function createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows = [], $startDate = null, $endDate = null, $userSector = null, $sectorIds = [])
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Sector_MDAs Summary Details');
@@ -1516,6 +2256,17 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+            })
+            ->whereNotNull('d.end_date')
+            ->whereYear('d.end_date', $year)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                return $query->whereBetween('d.end_date', [$startDate, $endDate]);
+            })
+            ->when(!empty($sectorIds), function ($query) use ($sectorIds) {
+                return $query->whereIn('s.id', $sectorIds);
+            })
+            ->when(empty($sectorIds) && $userSector, function ($query) use ($userSector) {
+                return $query->where('s.id', $userSector->id);
             })
             ->select([
                 's.id as sector_id',
@@ -1655,9 +2406,18 @@ class ReportController extends Controller
 
     }
 
-    private function createIndividualSectorSheets($spreadsheet, $year)
+    private function createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
-        $sectors = Sector::all(); // Get all sectors
+        // Filter sectors based on user role and selected sectors
+        if (!empty($sectorIds)) {
+            $sectors = Sector::whereIn('id', $sectorIds)->get();
+        } elseif ($userSector) {
+            // User is a sector head - only show their sector
+            $sectors = Sector::where('id', $userSector->id)->get();
+        } else {
+            // User is not a sector head - show all sectors
+            $sectors = Sector::all();
+        }
         $commitmentAverageRows = []; // Track commitment average row numbers
         $sectorOverallAverageRows = []; // Track sector overall average row numbers
 
@@ -1893,8 +2653,8 @@ class ReportController extends Controller
                     $sheet->setCellValue('G' . $row, '=F' . $row . '/E' . $row);
                     $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
 
-                    // Set adjusted performance formula in column H: =G
-                    $sheet->setCellValue('H' . $row, '=G' . $row);
+                    // Set adjusted performance formula in column H: =MIN(G, 1.01) to cap at 101%
+                    $sheet->setCellValue('H' . $row, '=MIN(G' . $row . ', 1.01)');
                     $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE);
                 } else {
                     // No performance data available - use 0 for computation but display 'Not Assessed'
@@ -2036,7 +2796,282 @@ class ReportController extends Controller
             }
         }
 
-        return ['commitmentAverageRows' => $commitmentAverageRows, 'sectorOverallAverageRows' => $sectorOverallAverageRows];
+        return ['commitmentAverageRows' => $commitmentAverageRows, 'sectorOverallAverageRows' => $sectorOverallAverageRows]; // e06fc9d7
+    }
+
+    private function calculateStatistics($sectorId = null, $year = null, $quarter = null, $request = null)
+    {
+        $year = $year ?? date('Y');
+        $quarter = $quarter ?? 'all';
+        $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
+
+        // Calculate average performance
+        $avgPerformanceQuery = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->where('pt.year', '=', $year)
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
+            ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
+        
+        if (!$isAllQuarters) {
+            $avgPerformanceQuery->where('pt.quarter', '=', $quarter);
+        } else {
+            $avgPerformanceQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
+        }
+        
+        if ($sectorId) {
+            $avgPerformanceQuery->where('s.id', '=', $sectorId);
+        }
+        
+        $avgPerformance = $avgPerformanceQuery
+            ->select(DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'))
+            ->value('avg_performance') ?? 0;
+
+        // Get top performing sector
+        $topSectorQuery = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->where('pt.year', '=', $year)
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
+            ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
+        
+        if (!$isAllQuarters) {
+            $topSectorQuery->where('pt.quarter', '=', $quarter);
+        } else {
+            $topSectorQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
+        }
+        
+        if ($sectorId) {
+            $topSectorQuery->where('s.id', '=', $sectorId);
+        }
+        
+        $topSector = $topSectorQuery
+            ->select(
+                's.id',
+                's.sector_name',
+                DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count')
+            )
+            ->groupBy('s.id', 's.sector_name')
+            ->orderBy('avg_performance', 'DESC')
+            ->first();
+
+        // Count pending verifications
+        $pendingVerificationsQuery = DB::table('performance_trackings as pt')
+            ->join('kpis as k', 'pt.kpi_id', '=', 'k.id')
+            ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+            ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+            ->join('sectors as s', 'c.sector_id', '=', 's.id')
+            ->where('pt.year', '=', $year)
+            ->where('pt.confirmation_status', '!=', 'Confirmed');
+        
+        if (!$isAllQuarters) {
+            $pendingVerificationsQuery->where('pt.quarter', '=', $quarter);
+        } else {
+            $pendingVerificationsQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
+        }
+        
+        if ($sectorId) {
+            $pendingVerificationsQuery->where('s.id', '=', $sectorId);
+        }
+        
+        $pendingVerifications = $pendingVerificationsQuery->distinct('s.id')->count('s.id');
+
+        // Get sector comparison data
+        $sectorComparisonQuery = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->where('pt.year', '=', $year)
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
+            ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
+        
+        if (!$isAllQuarters) {
+            $sectorComparisonQuery->where('pt.quarter', '=', $quarter);
+        } else {
+            $sectorComparisonQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
+        }
+        
+        if ($sectorId) {
+            $sectorComparisonQuery->where('s.id', '=', $sectorId);
+        }
+        
+        $sectorComparison = $sectorComparisonQuery
+            ->select(
+                's.id',
+                's.sector_name',
+                DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count')
+            )
+            ->groupBy('s.id', 's.sector_name')
+            ->orderBy('s.sector_name')
+            ->get();
+
+        // Get KPI status breakdown
+        $kpiStatusBreakdown = $this->getKpiStatusBreakdown($sectorId, $year, $quarter);
+
+        // Get detailed breakdown table data
+        $detailedBreakdown = $this->getDetailedBreakdown($sectorId, $year, $quarter, $request);
+
+        return [
+            'avg_performance' => round($avgPerformance, 1),
+            'top_sector' => $topSector,
+            'pending_verifications' => $pendingVerifications,
+            'sector_comparison' => $sectorComparison,
+            'kpi_status_breakdown' => $kpiStatusBreakdown,
+            'detailed_breakdown' => $detailedBreakdown,
+        ];
+    }
+
+    private function getKpiStatusBreakdown($sectorId = null, $year = null, $quarter = null)
+    {
+        $query = DB::table('kpis as k')
+            ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+            ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+            ->join('sectors as s', 'c.sector_id', '=', 's.id')
+            ->leftJoin('performance_trackings as pt', function($join) use ($year, $quarter) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                     ->where('pt.year', '=', $year)
+                     ->where('pt.quarter', '=', $quarter);
+            })
+            ->when($sectorId, function($q) use ($sectorId) {
+                return $q->where('s.id', '=', $sectorId);
+            });
+
+        $totalKpis = $query->clone()->distinct('k.id')->count('k.id');
+        
+        $onTrack = $query->clone()
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('(pt.actual_value / pt.milestone) * 100 >= 70')
+            ->distinct('k.id')
+            ->count('k.id');
+
+        $atRisk = $query->clone()
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('(pt.actual_value / pt.milestone) * 100 >= 40')
+            ->whereRaw('(pt.actual_value / pt.milestone) * 100 < 70')
+            ->distinct('k.id')
+            ->count('k.id');
+
+        $delayed = $query->clone()
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('(pt.actual_value / pt.milestone) * 100 < 40')
+            ->distinct('k.id')
+            ->count('k.id');
+
+        return [
+            'total' => $totalKpis,
+            'on_track' => $onTrack,
+            'at_risk' => $atRisk,
+            'delayed' => $delayed,
+            'on_track_pct' => $totalKpis > 0 ? round(($onTrack / $totalKpis) * 100) : 0,
+            'at_risk_pct' => $totalKpis > 0 ? round(($atRisk / $totalKpis) * 100) : 0,
+            'delayed_pct' => $totalKpis > 0 ? round(($delayed / $totalKpis) * 100) : 0,
+        ];
+    }
+
+    private function getDetailedBreakdown($sectorId = null, $year = null, $quarter = null, $request = null)
+    {
+        $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
+        
+        $query = DB::table('sectors as s')
+            ->join('commitments as c', 'c.sector_id', '=', 's.id')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                     ->where('kt.year', '=', $year);
+            })
+            ->leftJoin('performance_trackings as pt', function($join) use ($year, $quarter, $isAllQuarters) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                     ->where('pt.year', '=', $year);
+                if (!$isAllQuarters) {
+                    $join->where('pt.quarter', '=', $quarter);
+                } else {
+                    $join->whereIn('pt.quarter', [1, 2, 3, 4]);
+                }
+            })
+            ->whereNotNull('kt.target')
+            ->when($sectorId, function($q) use ($sectorId) {
+                return $q->where('s.id', '=', $sectorId);
+            })
+            ->select(
+                's.id as sector_id',
+                's.sector_name',
+                'c.name as commitment_name',
+                'k.id as kpi_id',
+                'k.kpi',
+                'k.target_value as baseline',
+                'kt.target as target_value',
+                'pt.actual_value',
+                'k.unit_of_measurement',
+                DB::raw('CASE 
+                    WHEN pt.actual_value IS NULL OR pt.milestone IS NULL OR pt.milestone = 0 THEN "Pending"
+                    WHEN (pt.actual_value / pt.milestone) * 100 >= 100 THEN "Exceptional"
+                    WHEN (pt.actual_value / pt.milestone) * 100 >= 70 THEN "Target Met"
+                    WHEN (pt.actual_value / pt.milestone) * 100 >= 40 THEN "At Risk"
+                    ELSE "Delayed"
+                END as status'),
+                DB::raw('CASE 
+                    WHEN pt.actual_value IS NOT NULL AND pt.milestone IS NOT NULL AND pt.milestone > 0 
+                    THEN ROUND(((pt.actual_value - pt.milestone) / pt.milestone) * 100, 1)
+                    ELSE NULL
+                END as variance')
+            )
+            ->orderBy('s.sector_name')
+            ->orderBy('c.name');
+
+        // Paginate the results (15 items per page)
+        $perPage = 15;
+        $currentPage = $request ? $request->input('page', 1) : 1;
+        
+        // Get total count
+        $total = $query->count();
+        
+        // Get paginated results
+        $items = $query->skip(($currentPage - 1) * $perPage)
+                      ->take($perPage)
+                      ->get();
+        
+        // Create paginator instance with preserved query parameters
+        $path = $request ? $request->url() : url()->current();
+        $queryParams = $request ? $request->except('page') : [];
+        
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $currentPage,
+            [
+                'path' => $path,
+                'query' => $queryParams,
+            ]
+        );
+        
+        // Set the page name to 'page' (default)
+        $paginator->setPageName('page');
+        
+        return $paginator;
     }
 
     /**

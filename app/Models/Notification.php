@@ -13,26 +13,91 @@ class Notification extends Model
     public static function submitTrackingForRewiew($tracking)
     {
         $user = Auth::user();
-        $receiverId = UserRole::where(['role' => 'Delivery Department', 'role_status' => 'Active'])->pluck('user_id');
-        $receiver = User::whereIn('id', $receiverId)->first();
+        if (!$user) {
+            return;
+        }
+        
+        $userRole = $user->role();
+        $userSector = $user->sector();
+        
+        if (!$userRole || !$userSector || !$tracking->kpi) {
+            return;
+        }
+        
+        // Get all delivery unit users (Coordinators, Deputy Coordinators, and Facilitators)
+        // For Facilitators, only notify those assigned to the relevant sector
+        $deliveryUnitRoleIds = UserRole::whereIn('role', [
+            'Coordinator',
+            'Deputy Coordinator',
+            'Facilitator',
+            'Delivery Department' // For backward compatibility
+        ])
+            ->where('role_status', 'Active')
+            ->get();
+        
+        // Filter Facilitators by sector if applicable
+        $sectorId = $tracking->kpi->deliverable->commitment->sector_id ?? null;
+        $receiverIds = [];
+        foreach ($deliveryUnitRoleIds as $role) {
+            if ($role->role === 'Facilitator' && $sectorId) {
+                // Only include Facilitators assigned to this sector
+                if ($role->entity_id == $sectorId) {
+                    $receiverIds[] = $role->user_id;
+                }
+            } else {
+                // Coordinators and Deputy Coordinators (access all sectors)
+                $receiverIds[] = $role->user_id;
+            }
+        }
+        
+        $receivers = User::whereIn('id', array_unique($receiverIds))->get();
+        
+        if ($receivers->isEmpty()) {
+            return;
+        }
 
-        $body = $user->role()->role . ' of ' . $user->sector()->sector_name . ' made a submission on ' . $tracking->kpi->kpi . '. It awaits your review';
-        $forme = 'Your request on ' . $tracking->kpi->kpi . ' has been submitted to Delivery Department. It is waiting for review';
+        $body = $userRole->role . ' of ' . $userSector->sector_name . ' made a submission on ' . $tracking->kpi->kpi . '. It awaits your review';
+        $forme = 'Your request on ' . $tracking->kpi->kpi . ' has been submitted to Delivery Unit. It is waiting for review';
 
-        self::make($user, $receiver, $tracking, 'Review Request', $body, 'Tracking Submitted');
-        self::make($receiver, $user, $tracking, 'Tracking Submitted', $forme, 'System');
+        // Send notification to all relevant delivery unit users
+        foreach ($receivers as $receiver) {
+            self::make($user, $receiver, $tracking, 'Review Request', $body, 'Tracking Submitted');
+            self::make($receiver, $user, $tracking, 'Tracking Submitted', $forme, 'System');
+        }
     }
 
     public static function submitTrackingReview($tracking)
     {
         $user = Auth::user();
-        $receiverId = $tracking->kpi->deliverable->commitment->sector->sector_head_id; // ->sector_name
+        if (!$user) {
+            return;
+        }
+        
+        if (!$tracking->kpi || !$tracking->kpi->deliverable || !$tracking->kpi->deliverable->commitment || !$tracking->kpi->deliverable->commitment->sector) {
+            return;
+        }
+        
+        $receiverId = $tracking->kpi->deliverable->commitment->sector->sector_head_id;
+        if (!$receiverId) {
+            return;
+        }
+        
         $receiver = User::find($receiverId);
+        if (!$receiver) {
+            return;
+        }
+        
+        $receiverRole = $receiver->role();
+        $receiverSector = $receiver->sector();
+        
+        if (!$receiverRole || !$receiverSector) {
+            return;
+        }
 
-        $body = 'Delivery department ' . $tracking->confirmation_status . ' your submission on '
+        $body = 'Delivery Unit ' . $tracking->confirmation_status . ' your submission on '
             . $tracking->kpi->kpi . '.';
-        $forme = 'Your review on ' . $tracking->kpi->kpi . ' has been submitted to ' . $receiver->role()->role
-            . ' of ' . $receiver->sector()->sector_name;
+        $forme = 'Your review on ' . $tracking->kpi->kpi . ' has been submitted to ' . $receiverRole->role
+            . ' of ' . $receiverSector->sector_name;
 
         self::make($user, $receiver, $tracking, 'Tracking Reviewed', $body, 'Tracking Reviewed');
         self::make($receiver, $user, $tracking, 'Tracking Reviewed', $forme, 'System');

@@ -14,13 +14,11 @@ class Commitment extends Model
     protected $fillable = [
         'name',
         'type',
-        'start_date',
         'description',
-        'end_date',
         'status',
         'budget',
-        'duration_in_days',
         'sector_id',
+        'img_url',
     ];
 
     public function users()

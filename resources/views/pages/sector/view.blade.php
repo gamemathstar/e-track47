@@ -1,198 +1,201 @@
 @php use Carbon\Carbon; @endphp
 @extends('layouts.app')
 
-@section('content')
-    <div class="intro-y flex flex-col sm:flex-row items-center mt-8">
-        <h2 class="text-lg font-medium mr-auto">
-            MDA/Sector : {{$sector->sector_name}}
-        </h2>
-        <div class="w-full sm:w-auto flex mt-4 sm:mt-0">
-            <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#sectorHeadModal">MDA/Sector Head
-            </button>
-            <div class="dropdown ml-auto sm:ml-0">
-                <button class="dropdown-toggle btn px-2 box" aria-expanded="false" data-tw-toggle="dropdown">
-                    <span class="w-5 h-5 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                             width="24" height="24"
-                             viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round"
-                             stroke-linejoin="round"
-                             icon-name="plus"
-                             class="lucide lucide-plus w-4 h-4"
-                             data-lucide="plus">
-                            <line x1="12" y1="5" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                    </span>
-                </button>
-                <div class="dropdown-menu w-40">
-                    <ul class="dropdown-content">
-                        <li>
-                            <a href="" class="dropdown-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" icon-name="file" data-lucide="file"
-                                     class="lucide lucide-file w-4 h-4 mr-2">
-                                    <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"></path>
-                                    <polyline points="14 2 14 8 20 8"></polyline>
-                                </svg>
-                                Export Word
-                            </a>
-                        </li>
-                        <li>
-                            <a href="" class="dropdown-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" icon-name="file" data-lucide="file"
-                                     class="lucide lucide-file w-4 h-4 mr-2">
-                                    <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"></path>
-                                    <polyline points="14 2 14 8 20 8"></polyline>
-                                </svg>
-                                Export PDF </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
-            <div class="box p-5 rounded-md">
-                <div class="flex items-center border-slate-200/60 dark:border-darkmode-400">
-                    <div class="text-primary text-2xl">{{ $sector->sector_name }}</div>
-                </div>
-                {{ $sector->description }}
-                <a class="btn btn-primary w-24 float-right" href="{{ route("sectors.show",$sector->id) }}"
-                   target="_blank">Download Report</a>
-                <br><br>
-            </div>
-        </div>
-    </div>
+@section('css')
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#008751",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Public Sans', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+@endsection
 
-    <div class="intro-y grid grid-cols-12 gap-5 mt-5">
-        <div class="col-span-12 lg:col-span-12 2xl:col-span-12">
-            <div class="rounded-md">
-                <a href="javascript:;" class="btn btn-primary ml-3" data-tw-toggle="modal"
-                   data-tw-target="#header-footer-modal-preview">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                         icon-name="edit" data-lucide="edit" class="lucide lucide-edit w-4 h-4 mr-2">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    Add New Commitment
-                </a>
-                @if(session('success'))
-                    <div class="alert alert-success-soft alert-dismissible show flex items-center mb-2 mt-5"
-                         role="alert">
-                        <i data-lucide="alert-triangle" class="w-6 h-6 mr-2"></i> {{ session('success') }}
-                        <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
-                            <i data-lucide="x" class="w-4 h-4"></i>
-                        </button>
+@section('content')
+    @php
+        $totalCommitments = $commitments->count();
+        $completedCommitments = $commitments->where('status', 'Completed')->count();
+        $inProgressCommitments = $commitments->where('status', 'In Progress')->count();
+        $atRiskCommitments = $commitments->where('status', 'At Risk')->count();
+        $notStartedCommitments = $commitments->where('status', 'Not Started')->count();
+    @endphp
+
+    <div class="p-8 space-y-6">
+        <!-- Sector Info Card -->
+        <div class="bg-white p-5 rounded-xl border border-primary/5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">{{ $sector->sector_name }}</h2>
+                    <p class="text-sm text-slate-600 mt-2">{{ $sector->description }}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button class="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all" data-tw-toggle="modal" data-tw-target="#sectorHeadModal">
+                        <span class="material-symbols-outlined text-[18px]">person</span>
+                        MDA/Sector Head
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl border border-primary/5 shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Commitments</span>
+                    <div class="p-2 bg-primary/10 text-primary rounded-lg">
+                        <span class="material-symbols-outlined text-[20px]">inventory_2</span>
                     </div>
-                @endif
-                @if(session('failure'))
-                    <div class="alert alert-danger-soft alert-dismissible show flex items-center mb-2 mt-5"
-                         role="alert"><i
-                            data-lucide="alert-octagon" class="w-6 h-6 mr-2"></i> {{ session('failure') }}
-                        <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
-                            <i data-lucide="x" class="w-4 h-4"></i>
-                        </button>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ $totalCommitments }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-primary/5 shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed</span>
+                    <div class="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                        <span class="material-symbols-outlined text-[20px]">task_alt</span>
                     </div>
-                @endif
-                @if($commitments->count())
-                    <table class="table table-report mt-2">
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ $completedCommitments }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-primary/5 shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">In Progress</span>
+                    <div class="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                        <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+                    </div>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ $inProgressCommitments }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-primary/5 shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">At Risk</span>
+                    <div class="p-2 bg-red-100 text-red-600 rounded-lg">
+                        <span class="material-symbols-outlined text-[20px]">report</span>
+                    </div>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ $atRiskCommitments }}</p>
+            </div>
+        </div>
+
+        @if(session('success'))
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    <span>{{ session('success') }}</span>
+                </div>
+                <button type="button" class="text-emerald-600 hover:text-emerald-800" onclick="this.parentElement.remove()">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+        @endif
+        @if(session('failure'))
+            <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined">error</span>
+                    <span>{{ session('failure') }}</span>
+                </div>
+                <button type="button" class="text-red-600 hover:text-red-800" onclick="this.parentElement.remove()">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+        @endif
+
+        <!-- Table Controls -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-primary/5 shadow-sm">
+            <div class="flex flex-1 items-center gap-3">
+                <div class="relative w-full max-w-sm">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                    <input class="w-full bg-slate-50 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-1 focus:ring-primary" placeholder="Filter commitments..." type="text" id="searchInput"/>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all" data-tw-toggle="modal" data-tw-target="#header-footer-modal-preview">
+                    <span class="material-symbols-outlined text-[18px]">add</span>
+                    New Commitment
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        @if($commitments->count())
+            <div class="bg-white rounded-xl border border-primary/5 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="commitmentsTable">
                         <thead>
-                        <tr>
-                            <th class="whitespace-nowrap">#</th>
-                            <th class="whitespace-nowrap">Commitment</th>
-                            {{--                            <th class="whitespace-nowrap">Budget</th>--}}
-                            <th class="whitespace-nowrap">Start Date</th>
-                            <th class="whitespace-nowrap">Duration</th>
-                            <th class="text-center whitespace-nowrap">Action</th>
+                        <tr class="border-b border-slate-100">
+                            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">#</th>
+                            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Commitment Name</th>
+                            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Status</th>
+                            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-slate-50">
                         @foreach($commitments as $commitment)
-                            <tr>
-                                <td>
-                                    {{$loop->iteration}}
+                            <tr class="hover:bg-slate-50/50 transition-colors group">
+                                <td class="px-6 py-4">
+                                    <span class="text-sm font-medium text-slate-600">{{ $loop->iteration }}</span>
                                 </td>
-                                <td>
-                                    <a href="javascript:;" class="ml-1">{{$commitment->title(48)}}</a>
+                                <td class="px-6 py-4">
+                                    <div class="flex flex-col">
+                                        <span class="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer">{{ $commitment->title(48) }}</span>
+                                        <span class="text-xs text-slate-400 mt-0.5 font-medium">Type: {{ $commitment->type ?? 'N/A' }}</span>
+                                    </div>
                                 </td>
-                                {{--                                <td>&#8358;{{ number_format($commitment->budget) }}</td>--}}
-                                <td>{{ $commitment->start_date?Carbon::parse($commitment->start_date)->format('d M, Y'):'---' }}</td>
-                                <td>{{ $commitment->duration_in_days? $commitment->duration_in_days.' day(s)':'---' }}</td>
-                                <td>
-                                    <div class="flex justify-center items-center">
-                                        <a class="flex items-center text-warning mr-3 tooltip edit" data-theme="dark"
-                                           title="Edit Commitment" href="javascript:;" data-tw-toggle="modal"
-                                           data-tw-target="#edit-photo" data-id="{{$commitment->id}}"
-                                           data-photo="{{ secure_asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="check-square"
-                                                 data-lucide="check-square"
-                                                 class="lucide lucide-check-square w-4 h-4 mr-1">
-                                                <polyline points="9 11 12 14 22 4"></polyline>
-                                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
-                                            </svg>
+                                <td class="px-6 py-4">
+                                    @if($commitment->status == 'Completed')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">Completed</span>
+                                    @elseif($commitment->status == 'In Progress')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">In Progress</span>
+                                    @elseif($commitment->status == 'At Risk')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700 uppercase tracking-wide">At Risk</span>
+                                    @else
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wide">Not Started</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <a class="flex items-center text-amber-600 hover:text-amber-700 tooltip edit" data-theme="dark" title="Edit Commitment" href="javascript:;" data-tw-toggle="modal" data-tw-target="#edit-photo" data-id="{{$commitment->id}}" data-name="{{$commitment->name}}" data-type="{{$commitment->type}}" data-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}" data-status="{{$commitment->status}}" data-photo="{{ secure_asset(( is_null($commitment->img_url)? 'dist/images/preview-3.jpg':'uploads/'.$commitment->img_url)) }}">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
                                         </a>
-                                        <a class="flex items-center mr-3  items-center text-success tooltip"
-                                           data-theme="dark" title="View Commitment"
-                                           href="{{route('commitments.deliverables',[$commitment->id])}}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="eye" data-lucide="eye"
-                                                 class="lucide lucide-eye block mx-auto">
-                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                <circle cx="12" cy="12" r="3"></circle>
-                                            </svg>
+                                        <a class="flex items-center text-primary hover:text-primary/80 tooltip" data-theme="dark" title="View Commitment" href="{{route('commitments.deliverables',[$commitment->id])}}">
+                                            <span class="material-symbols-outlined text-[20px]">visibility</span>
                                         </a>
-                                        <a class="flex items-center text-danger tooltip" data-theme="dark"
-                                           title="Delete Commitment" href="javascript:;" data-tw-toggle="modal"
-                                           data-tw-target="#delete-modal-preview{{$commitment->id}}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                 viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"
-                                                 stroke-linecap="round"
-                                                 stroke-linejoin="round" icon-name="trash-2" data-lucide="trash-2"
-                                                 class="lucide lucide-trash-2 w-4 h-4 mr-1">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path
-                                                    d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                                            </svg>
+                                        <a class="flex items-center text-red-600 hover:text-red-700 tooltip" data-theme="dark" title="Delete Commitment" href="javascript:;" data-tw-toggle="modal" data-tw-target="#delete-modal-preview{{$commitment->id}}">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
                                         </a>
                                     </div>
-                                    <div id="delete-modal-preview{{$commitment->id}}" class="modal" tabindex="-1"
-                                         aria-hidden="true">
+                                    <div id="delete-modal-preview{{$commitment->id}}" class="modal" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog">
                                             <div class="modal-content">
                                                 <div class="modal-body p-0">
-                                                    <div class="p-5 text-center"><i data-lucide="x-circle"
-                                                                                    class="w-16 h-16 text-danger mx-auto mt-3"></i>
+                                                    <div class="p-5 text-center">
+                                                        <span class="material-symbols-outlined text-red-600 text-6xl">error</span>
                                                         <div class="text-3xl mt-5">Are you sure?</div>
-                                                        <div class="text-slate-500 mt-2">Do you really want to delete
-                                                            this
-                                                            Commitment? <br>
+                                                        <div class="text-slate-500 mt-2">Do you really want to delete this Commitment? <br>
                                                             <strong>{{$commitment->title(48)}}</strong>
                                                         </div>
                                                     </div>
                                                     <div class="px-5 pb-8 text-center">
-                                                        <button type="button" data-tw-dismiss="modal"
-                                                                class="btn btn-outline-secondary w-24 mr-1">Cancel
-                                                        </button>
-                                                        <a href="{{ route('commitments.delete',[$commitment->id]) }}"
-                                                           class="btn btn-danger w-24">Delete</a>
+                                                        <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-24 mr-1">Cancel</button>
+                                                        <a href="{{ route('commitments.delete',[$commitment->id]) }}" class="btn btn-danger w-24">Delete</a>
                                                     </div>
                                                 </div>
                                             </div>
@@ -203,208 +206,146 @@
                         @endforeach
                         </tbody>
                     </table>
-                @else
-                    <center>
-                        Click <em class="text-success">Add New </em> to add commitments.
-                    </center>
-                @endif
-
-                <div id="edit-photo" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('commitments.change.photo')}}" method="post"
-                                  enctype="multipart/form-data">
-                                @csrf
-                                <input type="hidden" name="commitment_id" id="commitmentId">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Edit Commitment Photo</h2>
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-12 sm:col-span-12 h-40 2xl:h-56 image-fit">
-                                        <img class="rounded-md" id="commitmentPhoto"/>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-2" class="form-label">Picture</label>
-                                        <input type="file" name="img_url" id="" class="form-control">
-                                    </div>
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Change</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('commitments.save')}}" method="post" enctype="multipart/form-data">
-                                @csrf
-                                <input type="hidden" name="sector_id" value="{{$sector->id}}">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Add Commitment
-                                        to {{$sector->sector_name}}</h2>
-
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Commitment Title</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="name" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Commitment Type</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="type" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-2" class="form-label">Description</label>
-                                        <textarea name="description" id="" class="form-control" required></textarea>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-2" class="form-label">Picture</label>
-                                        <input type="file" name="img_url" id="" class="form-control">
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Status</label>
-                                        <select id="modal-form-1" class="form-control" name="status" required>
-                                            <option value="">Select</option>
-                                            <option value="Not Started">Not Started</option>
-                                            <option value="In Progress">In Progress</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Start Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="start_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">End Date</label>
-                                        <input id="modal-form-1" type="date" class="form-control"
-                                               name="end_date" required>
-                                    </div>
-                                    {{--                                    <div class="col-span-6 sm:col-span-6">--}}
-                                    {{--                                        <label for="modal-form-1" class="form-label">Budget</label>--}}
-                                    {{--                                        <input id="modal-form-1" type="text" class="form-control"--}}
-                                    {{--                                               name="budget" required>--}}
-                                    {{--                                    </div>--}}
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Save</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
-                    </div>
-                </div> <!-- END: Modal Content -->
-
-            </div>
-        </div>
-
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
-            <div class="box p-5 rounded-md">
-                <div class="h-[480px]">
-
-                    <canvas id="commitmentStatusChart" width="640" height="640"></canvas>
                 </div>
             </div>
-        </div>
+        @else
+            <div class="bg-white rounded-xl border border-primary/5 shadow-sm p-12 text-center">
+                <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">inventory_2</span>
+                <p class="text-slate-600 font-medium">No commitments found</p>
+                <p class="text-sm text-slate-400 mt-2">Click <strong class="text-primary">New Commitment</strong> to add commitments.</p>
+            </div>
+        @endif
+    </div>
 
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
-            <div class="box p-5 rounded-md">
-                {{--TODO: Add Second Chart Here--}}
+    <!-- Edit Commitment Modal -->
+    <div id="edit-photo" class="modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form action="{{route('commitments.update')}}" method="post" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="commitment_id" id="commitmentId">
+                    <div class="modal-header">
+                        <h2 class="font-medium text-base mr-auto">Edit Commitment</h2>
+                    </div>
+                    <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="edit-commitment-title" class="form-label">Commitment Title</label>
+                            <input id="edit-commitment-title" type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="edit-commitment-type" class="form-label">Commitment Type</label>
+                            <input id="edit-commitment-type" type="text" class="form-control" name="type" required>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="edit-commitment-description" class="form-label">Description</label>
+                            <textarea name="description" id="edit-commitment-description" class="form-control" required></textarea>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="edit-commitment-status" class="form-label">Status</label>
+                            <select id="edit-commitment-status" class="form-control" name="status" required>
+                                <option value="">Select</option>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="At Risk">At Risk</option>
+                            </select>
+                        </div>
+                        <div class="col-span-12 sm:col-span-12">
+                            <label for="edit-commitment-photo" class="form-label">Current Photo</label>
+                            <div class="h-40 2xl:h-56 image-fit mb-3">
+                                <img class="rounded-md" id="commitmentPhoto"/>
+                            </div>
+                            <input type="file" name="img_url" id="edit-commitment-photo" class="form-control">
+                            <small class="text-muted">Leave empty to keep current photo</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-1">Cancel</button>
+                        <button type="submit" class="btn btn-primary w-20">Update</button>
+                    </div>
+                </form>
             </div>
         </div>
+    </div>
 
-        <div class="col-span-12 lg:col-span-6 2xl:col-span-6">
-            <div class="box p-5 rounded-md">
-                {{--TODO: Add Third Chart Here--}}
+    <!-- Add Commitment Modal -->
+    <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form action="{{route('commitments.save')}}" method="post" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="sector_id" value="{{$sector->id}}">
+                    <div class="modal-header">
+                        <h2 class="font-medium text-base mr-auto">Add Commitment to {{$sector->sector_name}}</h2>
+                    </div>
+                    <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="modal-form-1" class="form-label">Commitment Title</label>
+                            <input id="modal-form-1" type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="modal-form-type" class="form-label">Commitment Type</label>
+                            <input id="modal-form-type" type="text" class="form-control" name="type" required>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="modal-form-2" class="form-label">Description</label>
+                            <textarea name="description" id="modal-form-2" class="form-control" required></textarea>
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="modal-form-picture" class="form-label">Picture</label>
+                            <input type="file" name="img_url" id="modal-form-picture" class="form-control">
+                        </div>
+                        <div class="col-span-6 sm:col-span-6">
+                            <label for="modal-form-status" class="form-label">Status</label>
+                            <select id="modal-form-status" class="form-control" name="status" required>
+                                <option value="">Select</option>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="At Risk">At Risk</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-1">Cancel</button>
+                        <button type="submit" class="btn btn-primary w-20">Save</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
 @endsection
+
 @section('js')
-    <script src="code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script src="cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script>
         $(function () {
             url = "{{route('sectors.view',['id'=>$sector->id])}}/";
-            // const editCommitmentModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#editCommitmentModal"));
-            // const addDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#addDeliverablesModal"));
-            // const viewDeliverablesModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#viewDeliverablesModal"));
-            // const addKPIModal = tailwind.Modal.getOrCreateInstance(document.querySelector("#next-overlapping-modal-preview"));
 
-            // $("#year").on('change', function (e) {
-            //     document.location = url + $(this).val();
-            // });
+            // Search functionality
+            $('#searchInput').on('keyup', function() {
+                const value = $(this).val().toLowerCase();
+                $('#commitmentsTable tbody tr').filter(function() {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+                });
+            });
 
             $('.edit').on('click', function () {
-                //  console.log($(this).data('photo'))
-                $('#commitmentId').val($(this).data('id'))
-                $('#commitmentPhoto').attr('src', $(this).data('photo'))
-            })
+                let commitmentId = $(this).data('id');
+                let commitmentName = $(this).data('name');
+                let commitmentType = $(this).data('type');
+                let commitmentDescription = $(this).data('description');
+                let commitmentStatus = $(this).data('status');
+                let commitmentPhoto = $(this).data('photo');
 
-            pendingCompleted()
-
-            function pendingCompleted() {
-
-                $.ajax({
-                    type: 'get',
-                    data: {sector_id: '{{$sector->id}}'},
-                    url: "{{route('chart.sector.pending.completed')}}",
-                    success: function (data) {
-                        // Extracting sector names and commitment counts for the chart
-                        const sectorNames = data.map(sector => sector.sector_name);
-                        const completedCounts = data.map(sector => sector.completed_commitments_count);
-                        const pendingCounts = data.map(sector => sector.pending_commitments_count);
-
-// Creating a side-by-side bar chart
-                        const ctx = document.getElementById('commitmentStatusChart').getContext('2d');
-                        const myChart = new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: sectorNames,
-                                datasets: [{
-                                    label: 'Completed Commitments',
-                                    data: completedCounts,
-                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                    borderColor: 'rgba(75, 192, 192, 1)',
-                                    borderWidth: 1
-                                }, {
-                                    label: 'Pending Commitments',
-                                    data: pendingCounts,
-                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                                    borderColor: 'rgba(255, 99, 132, 1)',
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        max: Math.max(...completedCounts, ...pendingCounts) + 1 // Adjust the max value for better visualization
-                                    }
-                                }
-                            }
-                        });
-
-                    }
-                });
-
-            }
+                $('#commitmentId').val(commitmentId);
+                $('#edit-commitment-title').val(commitmentName);
+                $('#edit-commitment-type').val(commitmentType);
+                $('#edit-commitment-description').val(commitmentDescription);
+                $('#edit-commitment-status').val(commitmentStatus);
+                $('#commitmentPhoto').attr('src', commitmentPhoto);
+            });
         });
 
         function loadCommitments(id) {
@@ -418,5 +359,4 @@
             });
         }
     </script>
-
 @endsection

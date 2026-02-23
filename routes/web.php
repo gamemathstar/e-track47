@@ -5,8 +5,11 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataEntryAccessController;
 use App\Http\Controllers\DeliverableController;
+use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\KpiController;
+use App\Http\Controllers\PublicGalleryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SectorController;
 use App\Http\Controllers\UserController;
@@ -24,7 +27,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/',[AuthLoginController::class, 'index'])->name('home');
+Route::get('/', [AuthLoginController::class, 'index'])->name('home');
 
 //Route::get('/', [AuthLoginController::class, 'showLoginForm']);
 Route::get('/sec-proj', [CommentController::class, 'index'])->name('home2');
@@ -32,12 +35,18 @@ Route::get('/login', [AuthLoginController::class, 'showLoginForm'])->name('login
 Route::post('login', [AuthLoginController::class, 'login'])->name('login.process');
 Route::get('logout', [AuthLoginController::class, 'logout'])->name('logout');
 
+// Public Gallery Routes (No authentication required - must be before auth routes)
+Route::get('gallery', [PublicGalleryController::class, 'index'])->name('public.gallery.index');
+Route::get('gallery/{gallery}', [PublicGalleryController::class, 'show'])->name('public.gallery.show');
+Route::post('gallery/{gallery}/comments', [PublicGalleryController::class, 'storeComment'])->name('public.gallery.comments.store');
+
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/statistics', [DashboardController::class, 'statistics'])->name('dashboard.statistics');
     Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
-// User Resource
+    // User Resource
     Route::get('users', [UserController::class, 'index'])->name("users.index");
     Route::get('delivery/tracking/awaiting/', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
     Route::get('delivery/tracking/awaiting/comm/{id}/view', [UserController::class, 'awaitingVerificationCommView'])->name("delivery.awaiting.verification.comm.view");
@@ -48,12 +57,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
     Route::get('users/view/{user}', [UserController::class, 'view'])->name("users.view");
     Route::post('users/update-photo', [UserController::class, 'uploadPhoto'])->name("users.upload.photo");
+    Route::post('users/{user}/role/update', [UserController::class, 'updateRole'])->name("users.role.update");
+    Route::post('users/{user}/role/revoke', [UserController::class, 'revokeRole'])->name("users.role.revoke");
+    Route::post('users/{user}/role/reactivate', [UserController::class, 'reactivateRole'])->name("users.role.reactivate");
 
     Route::get('chart/sector/kpi/performance', [ChartController::class, 'kpiPerformance'])->name('chart.sector.kpi.performance');
     Route::get('chart/sector/kpi/performance/ratio', [ChartController::class, 'kpiPerformanceRatio'])->name('chart.sector.kpi.performance.ratio');
     Route::get('chart/sector/budget/distribution', [ChartController::class, 'budgetDistribution'])->name('chart.sector.budget.distribution');
     Route::get('chart/sector/budget/pending', [ChartController::class, 'pendingCompleted'])->name('chart.sector.pending.completed');
-// MDA/Sector Resource
+
+    // MDA/Sector Resource
     Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
     Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
     Route::post('sectors/save', [SectorController::class, 'store'])->name('sectors.save');
@@ -64,7 +77,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
     Route::get('sectors/{id}/details/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
-// MDA/Sector Resource
+    // MDA/Sector Resource
     Route::get('commitment', [CommitmentController::class, 'index'])->name('commitments.index');
     Route::post('commitment/update', [CommitmentController::class, 'update'])->name('commitments.update');
     Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
@@ -76,12 +89,14 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('deliverable/kpi/tracking/save', [DeliverableController::class, 'storeTracking'])->name('deliverable.tracking.save');
     Route::post('deliverable/save', [DeliverableController::class, 'store'])->name('deliverable.save');
+    Route::post('deliverable/update', [DeliverableController::class, 'update'])->name('deliverable.update');
     Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
     Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');
-//Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+    //Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
     Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
     Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');
+    Route::post('kpi/update', [KpiController::class, 'update'])->name('kpi.update');
     Route::get('commitment/deliverable/kpi/{kpi}/{track}', [KpiController::class, 'tracking'])->name('performance.tracking');
     Route::post('deliverable/kpi/store/tracking', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking');
     Route::get('deliverable/kpi/tracking/files/{id}', [PerformanceTracking::class, 'attachments'])->name('deliverable.kpi.tracking.files');
@@ -101,6 +116,21 @@ Route::middleware(['auth'])->group(function () {
     // Word Document Report
     Route::get('reports/word', [ReportController::class, 'wordReportForm'])->name('reports.word.form');
     Route::post('reports/word/generate', [ReportController::class, 'generateWordReport'])->name('reports.word.generate');
+    Route::post('reports/comprehensive/print', [ReportController::class, 'printComprehensiveReport'])->name('reports.comprehensive.print');
+
+    // Gallery Management (Admin only)
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('gallery', GalleryController::class);
+    });
+
+    // Data Entry Access Management (PDCU Coordinators only)
+    Route::prefix('data-entry')->name('data-entry.')->group(function () {
+        Route::get('/', [DataEntryAccessController::class, 'index'])->name('index');
+        Route::post('/grant-override', [DataEntryAccessController::class, 'grantOverride'])->name('grant-override');
+        Route::post('/lock-all', [DataEntryAccessController::class, 'lockAll'])->name('lock-all');
+        Route::post('/unlock-all', [DataEntryAccessController::class, 'unlockAll'])->name('unlock-all');
+        Route::post('/initialize-quarter', [DataEntryAccessController::class, 'initializeQuarter'])->name('initialize-quarter');
+    });
 });
 
 Route::get('mdas/{commitment}/details', [CommentController::class, 'mda'])->name('public.mda.details');

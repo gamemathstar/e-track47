@@ -5,18 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\DeliveryKpi;
-use App\Models\File;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\Notification;
 use App\Models\PerformanceTracking;
-use App\Models\User;
+use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeliverableController extends Controller
 {
+    use ChecksDataEntryAccess;
+
     //
 
     public function __construct()
@@ -26,6 +28,19 @@ class DeliverableController extends Controller
 
     public function store(Request $request)
     {
+        // Check data entry access
+        $request->validate([
+            'commitment_id' => "required",
+        ]);
+        
+        $sectorId = $this->getSectorIdFromCommitment($request->commitment_id);
+        if ($sectorId) {
+            $accessCheck = $this->checkDataEntryAccess($sectorId);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
+
 //        return $request;
         $request->validate([
             'commitment_id' => "required",
@@ -44,20 +59,41 @@ class DeliverableController extends Controller
     public function storeTracking(Request $request)
     {
         $request->validate([
-            'delivery_department_value' => "required",
+            'id' => 'required|exists:performance_trackings,id',
             'delivery_department_remark' => "required",
             'confirmation_status' => "required",
         ]);
-        $pt = PerformanceTracking::find($request->id);
-        if ($pt) {
-            $pt->delivery_department_value = $request->delivery_department_value;
-            $pt->delivery_department_remark = $request->delivery_department_remark;
-            $pt->confirmation_status = $request->confirmation_status;
-            $pt->save();
 
-            Auth::user()->role()->role == "Delivery Department" ?
-                Notification::submitTrackingReview($pt)
-                : Notification::submitTrackingForRewiew($pt);
+        $pt = PerformanceTracking::find($request->id);
+        if (!$pt) {
+            return redirect()->back()->with('failure', 'Performance tracking record not found');
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return redirect()->back()->with('failure', 'User not authenticated');
+        }
+
+        $userRole = $user->role();
+        if (!$userRole) {
+            return redirect()->back()->with('failure', 'User role not found');
+        }
+
+        // Note: delivery_department_value field removed from form as per requirements
+        $pt->delivery_department_remark = $request->delivery_department_remark;
+        $pt->confirmation_status = $request->confirmation_status;
+        $pt->save();
+
+        try {
+            // Check if user has any delivery unit role
+            if ($user->isDeliveryUnit()) {
+                Notification::submitTrackingReview($pt);
+            } else {
+                Notification::submitTrackingForRewiew($pt);
+            }
+        } catch (\Exception $e) {
+            // Log the error but don't fail the request
+            Log::error('Notification error in storeTracking: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Delivery ' . $request->confirmation_status);
@@ -114,8 +150,59 @@ class DeliverableController extends Controller
         return ['status' => 0, 'message' => 'Invalid Deliverable'];
     }
 
+    public function update(Request $request)
+    {
+        $request->validate([
+            'deliverable_id' => 'required|exists:deliverables,id',
+        ]);
+
+        $deliverable = Deliverable::find($request->deliverable_id);
+        
+        // Check data entry access
+        if ($deliverable) {
+            $sectorId = $this->getSectorIdFromDeliverable($request->deliverable_id);
+            if ($sectorId) {
+                $accessCheck = $this->checkDataEntryAccess($sectorId);
+                if ($accessCheck) {
+                    return $accessCheck;
+                }
+            }
+        }
+
+        $request->validate([
+            'deliverable_id' => 'required|exists:deliverables,id',
+            'deliverable' => 'required|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'status' => 'required|string|in:Not Started,In Progress,Completed'
+        ]);
+
+        if (!$deliverable) {
+            return redirect()->back()->with('failure', 'Deliverable not found');
+        }
+
+        // Update deliverable fields
+        $deliverable->deliverable = $request->deliverable;
+        $deliverable->start_date = $request->start_date;
+        $deliverable->end_date = $request->end_date;
+        $deliverable->status = $request->status;
+
+        $deliverable->save();
+
+        return redirect()->back()->with('success', 'Deliverable updated successfully');
+    }
+
     public function delete(Deliverable $deliverable)
     {
+        // Check data entry access
+        $sectorId = $this->getSectorIdFromDeliverable($deliverable->id);
+        if ($sectorId) {
+            $accessCheck = $this->checkDataEntryAccess($sectorId);
+            if ($accessCheck) {
+                return $accessCheck;
+            }
+        }
+
         if (count($deliverable->kpis()->get()) == 0) {
             $deliverable->delete();
             return back()->with('success', 'Deliverable deleted successfully');

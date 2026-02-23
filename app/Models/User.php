@@ -14,6 +14,7 @@ use Laravel\Passport\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
 //    use HasApiTokens, Notifiable;
     /**
      * The attributes that are mass assignable.
@@ -46,15 +47,63 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    /**
+     * Get all roles for this user
+     */
+    public function roles()
+    {
+        return $this->hasMany(UserRole::class);
+    }
+
+    /**
+     * Get the active role for this user (relationship)
+     */
+    public function activeRole()
+    {
+        return $this->hasOne(UserRole::class)
+            ->where('role_status', UserRole::STATUS_ACTIVE)
+            ->orderBy('id', 'DESC');
+    }
+
+    /**
+     * Get the current active role (for backward compatibility)
+     */
     public function role()
     {
-        return UserRole::where(['user_id' => $this->id])->orderBy('id', 'DESC')->first();
+        return $this->getCurrentRole();
+    }
+
+    /**
+     * Get the current active role (for backward compatibility)
+     */
+    public function getCurrentRole()
+    {
+        return $this->roles()->active()->orderBy('id', 'DESC')->first();
+    }
+
+    /**
+     * Get all active roles
+     */
+    public function activeRoles()
+    {
+        return $this->roles()->active()->get();
+    }
+
+    /**
+     * Get all revoked roles
+     */
+    public function revokedRoles()
+    {
+        return $this->roles()->revoked()->get();
     }
 
     public function sector()
     {
-        $role = $this->role();
-        return $role ? Sector::find($role->entity_id) : null;
+        $role = $this->getCurrentRole();
+        if ($role && $role->target_entity === UserRole::ENTITY_SECTOR) {
+            return Sector::find($role->entity_id);
+        }
+        return null;
     }
 
 
@@ -149,7 +198,7 @@ class User extends Authenticatable
 //            ->where('performance_trackings.actual_value', '=', DB::raw('kpis.target_value'))
 //            ->where('performance_trackings.delivery_department_value', '=', DB::raw('kpis.target_value'))
             ->where('performance_trackings.confirmation_status', '=', 'Confirmed')
-            ->select('sectors.sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
+            ->select('sectors.description as sector_name', DB::raw('COUNT(DISTINCT performance_trackings.id) as confirmed_kpi_count'))
             ->groupBy('sectors.id')
             ->get();
 
@@ -157,7 +206,7 @@ class User extends Authenticatable
 
     public function kpiPerformanceRatio()
     {
-        $sectors = Sector::select('sectors.sector_name')
+        $sectors = Sector::select('sectors.description as sector_name')
             ->addSelect(DB::raw('COUNT(DISTINCT kpis.id) as total_kpi_count'))
             ->addSelect(DB::raw('COUNT(DISTINCT CASE WHEN performance_trackings.confirmation_status = "Confirmed" THEN kpis.id END) as confirmed_kpi_count'))
             ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
@@ -182,20 +231,20 @@ class User extends Authenticatable
 
     public function budgetDistribution()
     {
-        return $sectorsWithBudget = Sector::select('sector_name', DB::raw('SUM(commitments.budget) as total_budget'))
+        return $sectorsWithBudget = Sector::select('description as sector_name', DB::raw('SUM(commitments.budget) as total_budget'))
             ->leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->groupBy('sectors.id')
             ->get();
     }
 
-    public function pendingCompleted($sector_id=0)
+    public function pendingCompleted($sector_id = 0)
     {
         $where = [];
-        if($sector_id){
-            $where[] = ['sectors.id','=',$sector_id];
+        if ($sector_id) {
+            $where[] = ['sectors.id', '=', $sector_id];
         }
         $sectorsWithCommitmentStatus = Sector::leftJoin('commitments', 'sectors.id', '=', 'commitments.sector_id')
-            ->select('sectors.id', 'sectors.sector_name')
+            ->select('sectors.id', 'sectors.description as sector_name')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status = "Completed" THEN commitments.id END) as completed_commitments_count')
             ->selectRaw('COUNT(DISTINCT CASE WHEN commitments.status != "Completed" THEN commitments.id END) as pending_commitments_count')
             ->groupBy('sectors.id', 'sectors.sector_name')
@@ -207,34 +256,144 @@ class User extends Authenticatable
 
     public function isSystemAdmin()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='System';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_SYSTEM;
         }
         return false;
     }
+
     public function isGovernor()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='State';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_STATE;
         }
         return false;
     }
+
     public function isSectorHead()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='Sector'?Sector::find($userRole->entity_id):0;
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && $userRole->role === UserRole::ROLE_SECTOR_HEAD) {
+                return Sector::find($userRole->entity_id);
+            }
         }
         return false;
     }
-    public function isDeliveryDepartment()
+
+    public function isSectorAdmin()
     {
-        $userRole = UserRole::where(['user_id' => $this->id])->first();
-        if($userRole){
-            return  $userRole->target_entity=='Deliverable';
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && $userRole->role === UserRole::ROLE_SECTOR_ADMIN) {
+                return Sector::find($userRole->entity_id);
+            }
         }
         return false;
+    }
+
+    public function isDeliveryDepartment()
+    {
+        $userRole = $this->getCurrentRole();
+        if ($userRole && $userRole->isActive()) {
+            return $userRole->target_entity === UserRole::ENTITY_DELIVERABLE;
+        }
+        return false;
+    }
+
+    /**
+     * Check if user is a Coordinator
+     */
+    public function isCoordinator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_COORDINATOR]);
+    }
+
+    /**
+     * Check if user is a Deputy Coordinator
+     */
+    public function isDeputyCoordinator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_DEPUTY_COORDINATOR]);
+    }
+
+    /**
+     * Check if user is a Facilitator
+     */
+    public function isFacilitator()
+    {
+        return $this->hasAnyActiveRole([UserRole::ROLE_FACILITATOR]);
+    }
+
+    /**
+     * Check if user has any delivery unit role (Coordinator, Deputy Coordinator, or Facilitator)
+     */
+    public function isDeliveryUnit()
+    {
+        return $this->hasAnyActiveRole([
+            UserRole::ROLE_COORDINATOR,
+            UserRole::ROLE_DEPUTY_COORDINATOR,
+            UserRole::ROLE_FACILITATOR,
+            UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+        ]);
+    }
+
+    /**
+     * Check if user can access all sectors (Coordinator or Deputy Coordinator)
+     */
+    public function canAccessAllSectors()
+    {
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if ($role->canAccessAllSectors()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get sectors assigned to user (for Facilitators)
+     * Returns array of sector IDs, or empty array if user can access all sectors
+     */
+    public function getAssignedSectorIds()
+    {
+        if ($this->canAccessAllSectors()) {
+            return []; // Empty array means all sectors
+        }
+
+        $sectorIds = [];
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if ($role->isRestrictedToAssignedSectors() && $role->entity_id > 0) {
+                $sectorIds[] = $role->entity_id;
+            }
+        }
+        return array_unique($sectorIds);
+    }
+
+    /**
+     * Check if user has any of the specified active roles
+     */
+    public function hasAnyActiveRole(array $roles)
+    {
+        $activeRoles = $this->activeRoles();
+        foreach ($activeRoles as $role) {
+            if (in_array($role->role, $roles)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole($role)
+    {
+        $userRole = $this->getCurrentRole();
+        return $userRole && $userRole->isActive() && $userRole->role === $role;
     }
 }
