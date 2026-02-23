@@ -13,6 +13,10 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Style\Font;
+use PhpOffice\PhpWord\Style\Table;
+use PhpOffice\PhpWord\Shared\Html;
 
 class ReportController extends Controller
 {
@@ -3068,5 +3072,389 @@ class ReportController extends Controller
         $paginator->setPageName('page');
         
         return $paginator;
+    }
+
+    /**
+     * Show form for generating Word document report
+     */
+    public function wordReportForm(Request $request)
+    {
+        $sectorId = $request->input('sector_id');
+        $year = $request->input('year', date('Y'));
+        
+        $sectors = Sector::all();
+        $selectedSector = $sectorId ? Sector::find($sectorId) : null;
+        
+        return view('pages.reports.word-form', compact('sectors', 'selectedSector', 'year'));
+    }
+
+    /**
+     * Generate Word document report
+     */
+    public function generateWordReport(Request $request)
+    {
+        $request->validate([
+            'sector_id' => 'required|exists:sectors,id',
+            'year' => 'required|integer|digits:4',
+            'observations' => 'nullable|string',
+            'recommendations' => 'nullable|string',
+            'pdcu_coordinator_signature' => 'nullable|string',
+            'pdcu_coordinator_date' => 'nullable|date',
+            'sector_facilitator_signature' => 'nullable|string',
+            'sector_facilitator_date' => 'nullable|date',
+        ]);
+
+        $sector = Sector::findOrFail($request->sector_id);
+        $year = $request->year;
+
+        // Get performance data for the sector
+        $performanceData = $this->getSectorPerformanceDataForWord($sector, $year);
+
+        // Create Word document
+        $phpWord = new PhpWord();
+        $phpWord->setDefaultFontName('Tahoma');
+        $phpWord->setDefaultFontSize(11);
+
+        $section = $phpWord->addSection([
+            'marginTop' => 1440, // 1 inch in twips
+            'marginBottom' => 1440,
+            'marginLeft' => 1440,
+            'marginRight' => 1440,
+        ]);
+
+        // Add header
+        $this->addWordReportHeader($section, $year);
+
+        // Add Section A: Summary Overview
+        $this->addWordSummaryOverview($section, $sector, $performanceData);
+
+        // Add Section B: Performance Summary Tables (placeholder for chart)
+        $this->addWordPerformanceSummary($section);
+
+        // Add Section C: Observations and Recommendations
+        $this->addWordObservationsRecommendations(
+            $section,
+            $request->observations,
+            $request->recommendations
+        );
+
+        // Add signatures
+        $this->addWordSignatures(
+            $section,
+            $request->pdcu_coordinator_signature,
+            $request->pdcu_coordinator_date,
+            $request->sector_facilitator_signature,
+            $request->sector_facilitator_date
+        );
+
+        // Save document
+        $filename = "Performance_Report_{$sector->sector_name}_{$year}.docx";
+        $filename = preg_replace('/[^A-Za-z0-9_\-]/', '_', $filename);
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save('php://output');
+        exit;
+    }
+
+    private function getSectorPerformanceDataForWord($sector, $year)
+    {
+        // Get commitments count
+        $commitmentsCount = $sector->commitments()->count();
+
+        // Get outputs (deliverables) count
+        $outputsCount = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->where('c.sector_id', $sector->id)
+            ->count();
+
+        // Get results (KPIs) count
+        $resultsCount = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->where('c.sector_id', $sector->id)
+            ->count();
+
+        // Get results to be delivered (KPIs with targets for the year)
+        $resultsToBeDelivered = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->where('c.sector_id', $sector->id)
+            ->whereNotNull('kt.target')
+            ->count();
+
+        // Get assessed results (KPIs with performance tracking data)
+        $resultsAssessed = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->join('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                    ->where('pt.year', '=', $year);
+            })
+            ->where('c.sector_id', $sector->id)
+            ->whereNotNull('kt.target')
+            ->whereNotNull('pt.actual_value')
+            ->distinct()
+            ->count('k.id');
+
+        $resultsNotAssessed = $resultsToBeDelivered - $resultsAssessed;
+
+        // Get performance counts
+        $performanceCounts = $this->getSectorPerformanceCounts($sector->sector_name, $year);
+
+        // Calculate mid-year and full-year averages (using overall performance)
+        // For mid-year, we'll use Q1 and Q2 data
+        $midYearData = DB::table('commitments as c')
+            ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->join('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')
+                    ->where('kt.year', '=', $year);
+            })
+            ->join('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')
+                    ->where('pt.year', '=', $year)
+                    ->whereIn('pt.quarter', [1, 2]);
+            })
+            ->where('c.sector_id', $sector->id)
+            ->whereNotNull('kt.target')
+            ->whereNotNull('pt.actual_value')
+            ->select([
+                DB::raw('SUM(CAST(pt.actual_value AS DECIMAL(10,2))) as total_actual'),
+                DB::raw('SUM(CAST(kt.target AS DECIMAL(10,2))) as total_target'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count')
+            ])
+            ->first();
+
+        $midYearPerformance = 0;
+        if ($midYearData && $midYearData->total_target > 0 && $midYearData->kpi_count > 0) {
+            $midYearPerformance = round(($midYearData->total_actual / $midYearData->total_target) * 100, 0);
+        }
+        
+        $fullYearPerformance = $performanceCounts['overall_performance'] ?? 0;
+
+        // Determine performance rating text
+        $midYearRating = $this->getPerformanceRatingText($midYearPerformance);
+        $fullYearRating = $this->getPerformanceRatingText($fullYearPerformance);
+
+        return [
+            'commitments_count' => $commitmentsCount,
+            'outputs_count' => $outputsCount,
+            'results_count' => $resultsCount,
+            'results_to_be_delivered' => $resultsToBeDelivered,
+            'results_assessed' => $resultsAssessed,
+            'results_not_assessed' => $resultsNotAssessed,
+            'zero_score_count' => $performanceCounts['below_minimum'] ?? 0,
+            'below_40_count' => $performanceCounts['needs_improvement'] ?? 0,
+            'above_100_count' => $performanceCounts['exceptional'] ?? 0,
+            'mid_year_performance' => $midYearPerformance,
+            'mid_year_rating' => $midYearRating,
+            'full_year_performance' => round($fullYearPerformance, 0),
+            'full_year_rating' => $fullYearRating,
+        ];
+    }
+
+    private function getPerformanceRatingText($performance)
+    {
+        if ($performance >= 100) {
+            return 'Exceptional';
+        } elseif ($performance >= 70) {
+            return 'Above Expectation (Very Good)';
+        } elseif ($performance >= 60) {
+            return 'Meets Expectation (Good)';
+        } elseif ($performance >= 40) {
+            return 'Needs Improvement';
+        } else {
+            return 'Below Minimum';
+        }
+    }
+
+    private function addWordReportHeader($section, $year)
+    {
+        // Add empty lines
+        for ($i = 0; $i < 5; $i++) {
+            $section->addText('', ['size' => 13, 'bold' => true]);
+        }
+
+        // Title
+        $section->addText(
+            'PERFORMANCE DELIVERY COORDINATION UNIT,',
+            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+        );
+        $section->addText(
+            'OFFICE OF THE EXECUTIVE GOVERNOR',
+            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+        );
+        $section->addText(
+            "Full Year [Jan. – Dec. {$year}] Performance Assessment",
+            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+        );
+
+        // Underlined subtitle
+        $section->addText(
+            'Ministries / Sectors Performance Report Sheet',
+            ['name' => 'Tahoma', 'size' => 13, 'bold' => true, 'underline' => 'single'],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+        );
+
+        $section->addText('', ['size' => 5]);
+    }
+
+    private function addWordSummaryOverview($section, $sector, $data)
+    {
+        $section->addText(
+            'Section A: Summary Overview',
+            ['name' => 'Tahoma', 'size' => 11, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+        );
+
+        $section->addText('', ['size' => 6]);
+
+        // Create table
+        $table = $section->addTable([
+            'borderSize' => 1,
+            'borderColor' => '000000',
+            'cellMargin' => 50,
+        ]);
+
+        // Header row
+        $table->addRow();
+        $cell1 = $table->addCell(8000, ['valign' => 'center']);
+        $cell1->addText(
+            "Name of MDA – {$sector->sector_name}",
+            ['name' => 'Tahoma', 'size' => 10, 'bold' => true]
+        );
+        $cell2 = $table->addCell(2000, ['valign' => 'center']);
+        $cell2->addText('Sector:', ['name' => 'Tahoma', 'size' => 11]);
+        $cell2->addText($sector->sector_name, ['name' => 'Tahoma', 'size' => 11]);
+
+        // Data rows
+        $rows = [
+            [1, 'Number of Commitments', $data['commitments_count']],
+            [2, 'Number of Outputs', $data['outputs_count']],
+            [3, 'Number of Results to be Delivered', $data['results_to_be_delivered']],
+            [4, 'Number of Results Assessed', $data['results_assessed']],
+            [5, 'Number of Results Not Assessed', $data['results_not_assessed']],
+            [6, 'Number of Results with Absolute Zero (0%) Score', $data['zero_score_count']],
+            [7, 'Number of Results with Performance Below 40%', $data['below_40_count']],
+            [8, 'Number of Results with Performance Above 100%', $data['above_100_count']],
+            [9, "Average Performance at Mid-Year ({$data['mid_year_rating']})", $data['mid_year_performance'] . '%'],
+            [10, "Average Performance Full Year ({$data['full_year_rating']})", $data['full_year_performance'] . '%'],
+            [11, 'Full Year Performance Rating', $data['full_year_rating']],
+        ];
+
+        foreach ($rows as $row) {
+            $table->addRow();
+            $cell1 = $table->addCell(200, ['valign' => 'center']);
+            $cell1->addText($row[0], ['name' => 'Tahoma', 'size' => 11], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+            
+            $cell2 = $table->addCell(7800, ['valign' => 'center']);
+            $cell2->addText($row[1], ['name' => 'Tahoma', 'size' => 11]);
+            
+            $cell3 = $table->addCell(2000, ['valign' => 'center']);
+            $textStyle = ['name' => 'Tahoma', 'size' => 11];
+            if (in_array($row[0], [3, 6, 9, 10])) {
+                $textStyle['color'] = 'EE0000';
+            }
+            if ($row[0] == 11) {
+                $cell3Style = ['bgColor' => '92D050'];
+            } else {
+                $cell3Style = [];
+            }
+            $cell3->addText($row[2], $textStyle, ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+        }
+
+        $section->addText('', ['size' => 6]);
+    }
+
+    private function addWordPerformanceSummary($section)
+    {
+        $section->addText(
+            'B: Performance Summary Tables',
+            ['name' => 'Tahoma', 'size' => 11, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+        );
+        $section->addText('', ['size' => 6]);
+        $section->addText(
+            '[Performance summary tables/charts would be inserted here]',
+            ['name' => 'Tahoma', 'size' => 11, 'italic' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+        );
+        $section->addText('', ['size' => 6]);
+    }
+
+    private function addWordObservationsRecommendations($section, $observations, $recommendations)
+    {
+        $section->addText(
+            'Section C: Brief Observations and Recommendation',
+            ['name' => 'Tahoma', 'size' => 11, 'bold' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+        );
+        $section->addText('', ['size' => 6]);
+
+        // Create table for observations and recommendations
+        $table = $section->addTable([
+            'borderSize' => 1,
+            'borderColor' => '000000',
+            'cellMargin' => 50,
+        ]);
+
+        // Observations row
+        $table->addRow();
+        $cell1 = $table->addCell(3000, ['valign' => 'top']);
+        $cell1->addText('Observations:', ['name' => 'Tahoma', 'size' => 12]);
+        $cell2 = $table->addCell(9000, ['valign' => 'top']);
+        $cell2->addText(
+            $observations ?: '[Enter observations here]',
+            ['name' => 'Tahoma', 'size' => 12]
+        );
+
+        // Recommendations row
+        $table->addRow();
+        $cell1 = $table->addCell(3000, ['valign' => 'top']);
+        $cell1->addText('Recommendations on specific outputs / results that needs focused on:', ['name' => 'Tahoma', 'size' => 12]);
+        $cell2 = $table->addCell(9000, ['valign' => 'top']);
+        $cell2->addText(
+            $recommendations ?: '[Enter recommendations here]',
+            ['name' => 'Tahoma', 'size' => 12]
+        );
+
+        $section->addText('', ['size' => 6]);
+    }
+
+    private function addWordSignatures($section, $pdcuSignature, $pdcuDate, $facilitatorSignature, $facilitatorDate)
+    {
+        // Add empty lines
+        for ($i = 0; $i < 6; $i++) {
+            $section->addText('', ['size' => 11]);
+        }
+
+        $section->addText(
+            "Signed: " . ($pdcuSignature ?: '______________') . " Date: " . ($pdcuDate ?: '___________') . 
+            "        " . 
+            "Signed: " . ($facilitatorSignature ?: '________________') . " Date: " . ($facilitatorDate ?: '__________'),
+            ['name' => 'Tahoma', 'size' => 11],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+        );
+
+        $section->addText(
+            'PDCU Coordinator        Sector / MDA Facilitator',
+            ['name' => 'Tahoma', 'size' => 11],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+        );
     }
 }
