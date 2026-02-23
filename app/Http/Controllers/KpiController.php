@@ -39,7 +39,7 @@ class KpiController extends Controller
             }
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'kpi' => 'required',
             'year' => 'required|integer|min:2000|max:2100',
             'target_value' => 'required',
@@ -47,23 +47,63 @@ class KpiController extends Controller
             'unit_of_measurement' => 'required',
         ]);
 
-        Kpi::create($request->all());
+        Kpi::create($validated);
 
         return back();
     }
 
     public function storeTracking(Request $request)
     {
+        // Validate file uploads if present
         if ($request->hasFile('files')) {
             $request->validate([
                 'files.*' => 'required|mimes:jpg,jpeg,png,xlsx,xls,doc,docx,pdf|max:20480',
             ]);
         }
-        if (is_null($request->id))
+
+        // Validate required fields
+        $validated = $request->validate([
+            'kpi_id' => 'required|exists:kpis,id',
+            'quarter' => 'required|integer|in:1,2,3,4',
+            'year' => 'required|integer|min:2000|max:2100',
+            'tracking_date' => 'required|date',
+            'milestone' => 'required|numeric|min:0',
+            'actual_value' => 'required|numeric|min:0',
+            'remarks' => 'nullable|string|max:1000',
+        ]);
+
+        $user = Auth::user();
+        $isPDCU = $user->isDeliveryUnit();
+
+        // Check if this is an update or new entry
+        if (is_null($request->id)) {
             $tracking = new PerformanceTracking();
-        else
+            
+            // Check for duplicate entry (same KPI, quarter, and year)
+            $existing = PerformanceTracking::where('kpi_id', $validated['kpi_id'])
+                ->where('quarter', $validated['quarter'])
+                ->where('year', $validated['year'])
+                ->first();
+            
+            if ($existing) {
+                return redirect()->back()->with('failure', 'Performance tracking for this KPI, quarter, and year already exists. Please update the existing record instead.');
+            }
+            // For new entries, allow all users to set milestone (it's required)
+        } else {
             $tracking = PerformanceTracking::find($request->id);
-        $tracking->fill($request->all());
+            if (!$tracking) {
+                return redirect()->back()->with('failure', 'Performance tracking record not found.');
+            }
+            
+            // If updating and user is not PDCU, preserve the existing milestone value
+            if (!$isPDCU && isset($validated['milestone'])) {
+                // Remove milestone from validated data to prevent update
+                unset($validated['milestone']);
+            }
+        }
+
+        // Fill and save the tracking record
+        $tracking->fill($validated);
         $tracking->save();
 
         if ($request->file('files')) {
@@ -86,7 +126,16 @@ class KpiController extends Controller
 
         Notification::submitTrackingForRewiew($tracking);
 
-        return back();
+        // Handle AJAX requests
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Performance tracking saved successfully.',
+                'redirect' => url()->previous()
+            ]);
+        }
+
+        return back()->with('success', 'Performance tracking saved successfully.');
     }
 
     public function tracking(Kpi $kpi, $track_id)
@@ -154,12 +203,21 @@ class KpiController extends Controller
 
     public function saveTarget(Request $request)
     {
+        $user = Auth::user();
+        
+        // Only PDCU users (Coordinator, Deputy Coordinator, Facilitator) can set targets
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'You do not have permission to set KPI targets. Only PDCU users can set targets.');
+        }
+
         foreach ($request->target as $key => $value) {
             $target = KpiTarget::find($key);
-            $target->target = $value;
-            $target->save();
+            if ($target) {
+                $target->target = $value;
+                $target->save();
+            }
         }
-        return back();
+        return back()->with('success', 'KPI targets updated successfully.');
     }
 
 }

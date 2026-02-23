@@ -44,4 +44,33 @@ class Kpi extends Model
     {
         return $this->performanceTracking()->where('quarter',$quarter)->first();
     }
+
+    /**
+     * Get performance tracking for a specific quarter and year
+     *
+     * @param int $quarter Quarter number (1-4)
+     * @param int $year Year
+     * @return PerformanceTracking|null
+     */
+    public function getQuarterTrack($quarter, $year)
+    {
+        return $this->performanceTracking()
+            ->where('quarter', $quarter)
+            ->where('year', $year)
+            ->first();
+    }
+
+    /**
+     * Get all performance tracking records for a specific year
+     *
+     * @param int $year Year
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getYearTracks($year)
+    {
+        return $this->performanceTracking()
+            ->where('year', $year)
+            ->orderBy('quarter', 'ASC')
+            ->get();
+    }
 }

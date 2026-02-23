@@ -19,7 +19,7 @@
                 </a>
             </li>
         @endif
-        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit())
+        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isCoordinator() || $user->isDeputyCoordinator())
             <li>
                 <a href="javascript:;" class="side-menu">
                     <div class="side-menu__icon"><i data-lucide="box"></i></div>
@@ -153,6 +153,17 @@
                     </div>
                 </a>
             </li>
+        @if(!$user->isSystemAdmin())
+            <li>
+                <a href="{{route('users.view', [$user->id])}}"
+                   class="side-menu {{ Request::is('users/view/' . $user->id) ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="user"></i></div>
+                    <div class="side-menu__title">
+                        My Profile
+                    </div>
+                </a>
+            </li>
+        @endif
     </ul>
     @endauth
 </nav>

@@ -71,7 +71,15 @@
                                         </a>
                                         @else
                                         <a href="javascript:" class="add" data-tw-toggle="modal"
-                                           data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                           data-track-id="{{ $track->id }}" 
+                                           data-kpi-id="{{ $kpi->id }}"
+                                           data-kpi="{{ $kpi->kpi }}"
+                                           data-quarter="{{ $track->quarter }}"
+                                           data-year="{{ $track->year }}"
+                                           data-tracking-date="{{ $track->tracking_date ? \Carbon\Carbon::parse($track->tracking_date)->format('Y-m-d') : '' }}"
+                                           data-milestone="{{ $track->milestone }}"
+                                           data-actual-value="{{ $track->actual_value }}"
+                                           data-remarks="{{ $track->remarks }}"
                                            data-tw-target="#add-performance">
                                             {{ $track->actual_value }} <i data-lucide="plus-square" class="block mx-auto"></i>
                                         </a>
@@ -90,7 +98,15 @@
                                             </a>
                                         @else
                                             <a href="javascript:" class="add" data-tw-toggle="modal"
-                                               data-id="{{ $track->id }}"data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                               data-track-id="{{ $track->id }}"
+                                               data-kpi-id="{{ $kpi->id }}"
+                                               data-kpi="{{ $kpi->kpi }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-year="{{ $track->year }}"
+                                               data-tracking-date="{{ $track->tracking_date ? \Carbon\Carbon::parse($track->tracking_date)->format('Y-m-d') : '' }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual-value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-tw-target="#add-performance">
                                                 {{ $track->actual_value }} <i data-lucide="plus-square" class="block mx-auto"></i>
                                             </a>
@@ -108,7 +124,15 @@
                                             </a>
                                         @else
                                             <a href="javascript:" class="add" data-tw-toggle="modal"
-                                               data-id="{{ $track->id }}"data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                               data-track-id="{{ $track->id }}"
+                                               data-kpi-id="{{ $kpi->id }}"
+                                               data-kpi="{{ $kpi->kpi }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-year="{{ $track->year }}"
+                                               data-tracking-date="{{ $track->tracking_date ? \Carbon\Carbon::parse($track->tracking_date)->format('Y-m-d') : '' }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual-value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-tw-target="#add-performance">
                                                 {{ $track->actual_value }} <i data-lucide="plus-square" class="block mx-auto"></i>
                                             </a>
@@ -127,7 +151,15 @@
                                             </a>
                                         @else
                                             <a href="javascript:" class="add" data-tw-toggle="modal"
-                                               data-id="{{ $track->id }}" data-kpi="{{ $kpi->kpi }}" data-id="{{ $kpi->id }}"
+                                               data-track-id="{{ $track->id }}"
+                                               data-kpi-id="{{ $kpi->id }}"
+                                               data-kpi="{{ $kpi->kpi }}"
+                                               data-quarter="{{ $track->quarter }}"
+                                               data-year="{{ $track->year }}"
+                                               data-tracking-date="{{ $track->tracking_date ? \Carbon\Carbon::parse($track->tracking_date)->format('Y-m-d') : '' }}"
+                                               data-milestone="{{ $track->milestone }}"
+                                               data-actual-value="{{ $track->actual_value }}"
+                                               data-remarks="{{ $track->remarks }}"
                                                data-tw-target="#add-performance">
                                                 {{ $track->actual_value }} <i data-lucide="plus-square" class="block mx-auto"></i>
                                             </a>
@@ -214,10 +246,12 @@
                 <div id="add-performance" class="modal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <form action="{{route('deliverable.store.tracking.del.dept')}}" method="post">
+                            <form action="{{route('deliverable.store.tracking.del.dept')}}" method="post" id="add-performance-form">
                                 @csrf
                                 <input type="hidden" id="kpi_id" name="kpi_id">
                                 <input type="hidden" id="track_id" name="id">
+                                <input type="hidden" id="quarter" name="quarter">
+                                <input type="hidden" id="year" name="year">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
                                     <h2 class="font-medium text-base mr-auto">
@@ -228,24 +262,31 @@
                                 <!-- BEGIN: Modal Body -->
                                 <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
                                     <div class="col-span-6 sm:col-span-6">
-                                        <label for="delivery_department_value" class="form-label">Confirm Value</label>
-                                        <input id="delivery_department_value" type="date" class="form-control"
-                                               {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
-                                               name="delivery_department_value" required>
+                                        <label for="tracking_date" class="form-label">Tracking Date <span class="text-red-500">*</span></label>
+                                        <input id="tracking_date" type="date" class="form-control"
+                                               name="tracking_date" required>
                                     </div>
-
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="delivery_department_remark" class="form-label">Remark</label>
-                                        <textarea name="delivery_department_remark" id="delivery_department_remark"
-                                                  class="form-control"></textarea>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="milestone" class="form-label">Milestone <span class="text-red-500">*</span></label>
+                                        <input id="milestone" type="number" class="form-control"
+                                               name="milestone" step="any" min="0" required>
                                     </div>
-
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="actual_value" class="form-label">Actual Value <span class="text-red-500">*</span></label>
+                                        <input id="actual_value" type="number" class="form-control"
+                                               name="actual_value" step="any" min="0" required>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="quarter_display" class="form-label">Quarter</label>
+                                        <input id="quarter_display" type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="year_display" class="form-label">Year</label>
+                                        <input id="year_display" type="text" class="form-control" readonly>
+                                    </div>
                                     <div class="col-span-12 sm:col-span-12">
-                                        <label for="delivery_department_remark" class="form-label">Status</label>
-                                        <select name="confirmation_status" id="confirmation_status">
-                                            <option>Confirmed</option>
-                                            <option>Rejected</option>
-                                        </select>
+                                        <label for="remarks" class="form-label">Remarks</label>
+                                        <textarea name="remarks" id="remarks" class="form-control" rows="3"></textarea>
                                     </div>
 
                                 </div> <!-- END: Modal Body -->
@@ -309,9 +350,52 @@
     <script>
         $(function () {
             $('body .add').on('click', function () {
-                $('#kpi').html($(this).data('kpi'))
-                $('#track_id').val($(this).data('id'))
-            })
+                var trackId = $(this).data('track-id');
+                var kpiId = $(this).data('kpi-id');
+                var kpiName = $(this).data('kpi');
+                var quarter = $(this).data('quarter');
+                var year = $(this).data('year');
+                var trackingDate = $(this).data('tracking-date');
+                var milestone = $(this).data('milestone');
+                var actualValue = $(this).data('actual-value');
+                var remarks = $(this).data('remarks');
+                
+                // Set basic fields
+                $('#kpi').html(kpiName);
+                $('#track_id').val(trackId);
+                $('#kpi_id').val(kpiId);
+                $('#quarter').val(quarter);
+                $('#year').val(year);
+                
+                // Display quarter and year (readonly)
+                $('#quarter_display').val('Q' + quarter);
+                $('#year_display').val(year);
+                
+                // Populate form fields with existing tracking data
+                if (trackingDate) {
+                    $('#tracking_date').val(trackingDate);
+                } else {
+                    $('#tracking_date').val('');
+                }
+                
+                if (milestone) {
+                    $('#milestone').val(milestone);
+                } else {
+                    $('#milestone').val('');
+                }
+                
+                if (actualValue) {
+                    $('#actual_value').val(actualValue);
+                } else {
+                    $('#actual_value').val('');
+                }
+                
+                if (remarks) {
+                    $('#remarks').val(remarks);
+                } else {
+                    $('#remarks').val('');
+                }
+            });
 
             $('.view').on('click', function () {
                 $('#quarter').html($(this).data('qt'))
@@ -324,7 +408,72 @@
                         $('#track-details').html(response)
                     }
                 )
-            })
+            });
+            
+            // Handle form submission with error handling
+            $('#add-performance-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                var form = $(this);
+                var submitButton = form.find('button[type="submit"]');
+                var originalText = submitButton.html();
+                
+                // Disable submit button
+                submitButton.prop('disabled', true).html('Saving...');
+                
+                // Clear previous error messages
+                $('.error-message').remove();
+                $('.form-control').removeClass('border-red-500');
+                
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: form.serialize(),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    success: function(response) {
+                        // Show success message
+                        if (response.success) {
+                            // Reload page to show updated data and flash messages
+                            location.reload();
+                        } else if (response.redirect) {
+                            window.location.href = response.redirect;
+                        } else {
+                            location.reload();
+                        }
+                    },
+                    error: function(xhr) {
+                        // Re-enable submit button
+                        submitButton.prop('disabled', false).html(originalText);
+                        
+                        if (xhr.status === 422) {
+                            // Validation errors
+                            var errors = xhr.responseJSON?.errors || {};
+                            $.each(errors, function(field, messages) {
+                                var input = form.find('[name="' + field + '"]');
+                                if (input.length) {
+                                    input.addClass('border-red-500');
+                                    input.after('<div class="error-message text-red-500 text-xs mt-1">' + messages[0] + '</div>');
+                                }
+                            });
+                        } else if (xhr.status === 200) {
+                            // Sometimes Laravel returns 200 with redirect in response
+                            // Reload page to show flash messages
+                            location.reload();
+                        } else {
+                            // Other errors - show alert and reload
+                            var errorMsg = xhr.responseJSON?.message || xhr.responseText || 'An error occurred. Please try again.';
+                            alert(errorMsg);
+                            // Still reload to show any server-side messages
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        }
+                    }
+                });
+            });
         })
     </script>
 @endsection

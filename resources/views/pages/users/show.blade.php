@@ -1,9 +1,14 @@
 @extends("layouts.app")
 
+@php
+    $currentUser = auth()->user();
+    $isViewingOwnProfile = $currentUser && $currentUser->id === $user->id && !$currentUser->isSystemAdmin();
+@endphp
+
 @section('content')
     <div class="intro-y flex items-center mt-8">
         <h2 class="text-lg font-medium mr-auto">
-            User Profile
+            {{ $isViewingOwnProfile ? 'My Profile' : 'User Profile' }}
         </h2>
     </div>
 
@@ -95,15 +100,17 @@
                    aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="lock"></i> Change Password
                 </a>
             </li>
-            <li id="edit-profile-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#edit-profile"
-                   aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="pencil"></i> Edit Profile
-                </a>
-            </li>
-            <li id="settings-tab" class="nav-item" role="presentation">
-                <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#settings"
-                   aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="settings"></i> Settings </a>
-            </li>
+            @if(!$isViewingOwnProfile)
+                <li id="edit-profile-tab" class="nav-item" role="presentation">
+                    <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#edit-profile"
+                       aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="pencil"></i> Edit Profile
+                    </a>
+                </li>
+                <li id="settings-tab" class="nav-item" role="presentation">
+                    <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#settings"
+                       aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="settings"></i> Settings </a>
+                </li>
+            @endif
         </ul>
     </div>
     <!-- END: Profile Info -->
@@ -181,6 +188,7 @@
             </div>
         </div>
 
+        @if(!$isViewingOwnProfile)
         <div id="edit-profile" class="tab-pane" role="tabpanel" aria-labelledby="edit-profile-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- BEGIN: Latest Uploads -->
@@ -270,7 +278,9 @@
                 <!-- END: Latest Uploads -->
             </div>
         </div>
+        @endif
 
+        @if(!$isViewingOwnProfile)
         <div id="settings" class="tab-pane" role="tabpanel" aria-labelledby="settings-tab">
             <div class="grid grid-cols-12 gap-6">
                 <!-- Role Management Section -->
@@ -409,6 +419,7 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 @endsection
 

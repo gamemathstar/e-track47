@@ -116,12 +116,14 @@
                         <span class="material-symbols-outlined">add</span>
                         Add New KPI
                     </button>
-                    <button
-                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all"
-                        data-tw-toggle="modal" data-tw-target="#targetModal">
-                        <span class="material-symbols-outlined">target</span>
-                        Set Target
-                    </button>
+                    @if($user->isDeliveryUnit())
+                        <button
+                            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all"
+                            data-tw-toggle="modal" data-tw-target="#targetModal">
+                            <span class="material-symbols-outlined">target</span>
+                            Set Target
+                        </button>
+                    @endif
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium text-slate-600">Year:</label>
                         <select id="changeYear" class="form-control flex-1 text-sm">
@@ -300,7 +302,13 @@
                                         <tbody class="divide-y divide-slate-100">
                                         @foreach($kpis as $kpi)
                                             @php
-                                                $tracks = $kpi->performanceTracking()->get();
+                                                // Filter tracks by year
+                                                $tracks = $kpi->getYearTracks($year);
+                                                // Get tracks by quarter for proper display
+                                                $q1Track = $kpi->getQuarterTrack(1, $year);
+                                                $q2Track = $kpi->getQuarterTrack(2, $year);
+                                                $q3Track = $kpi->getQuarterTrack(3, $year);
+                                                $q4Track = $kpi->getQuarterTrack(4, $year);
                                                 $trgt = $kpi->kpiTargets($year)->first();
                                                 $latestTrack = $tracks->sortByDesc('updated_at')->first();
                                                 $statusBgClass = 'bg-primary';
@@ -338,20 +346,19 @@
                                                 <td class="px-6 py-4 text-sm text-slate-600">{{ $kpi->unit_of_measurement }}</td>
                                                 <td class="px-6 py-4 text-sm font-bold text-center">{{ $kpi->target_value }}</td>
                                                 <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>0)
-                                                        @php $track = $tracks[0]; @endphp
+                                                    @if($q1Track)
                                                         <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
+                                                           data-tw-target="#view-performance" data-id="{{ $q1Track->id }}"
                                                            data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
                                                            data-qt="1st QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
+                                                           class="view text-sm font-bold {{ $q1Track->confirmation_status=='Confirmed'?'text-emerald-600':($q1Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q1Track->actual_value }}
                                                         </a>
-                                                        @if($track->milestone && $track->milestone > 0)
+                                                        @if($q1Track->milestone && $q1Track->milestone > 0)
                                                             <div
                                                                 class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
                                                                 <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
+                                                                     style="width: {{ min(100, ($q1Track->actual_value / $q1Track->milestone) * 100) }}%"></div>
                                                             </div>
                                                         @endif
                                                     @elseif($user->isSectorHead())
@@ -366,20 +373,19 @@
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
-                                                    @if($user->isDeliveryUnit() && count($tracks)>0)
-                                                        @php $track = $tracks[0]; @endphp
-                                                        @if($track->actual_value)
+                                                    @if($user->isDeliveryUnit() && $q1Track)
+                                                        @if($q1Track->actual_value)
                                                             <a href="javascript:"
                                                                class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
                                                                data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                                               data-id="{{ $q1Track->id }}"
+                                                               data-quarter="{{ $q1Track->quarter }}"
+                                                               data-milestone="{{ $q1Track->milestone }}"
+                                                               data-actual_value="{{ $q1Track->actual_value }}"
+                                                               data-remarks="{{ $q1Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q1Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q1Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q1Track->confirmation_status }}"
                                                                data-tw-target="#update-performance">
                                                                 <span
                                                                     class="material-symbols-outlined text-sm">edit</span>
@@ -388,23 +394,22 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>1)
-                                                        @php $track = $tracks[1]; @endphp
+                                                    @if($q2Track)
                                                         <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
+                                                           data-tw-target="#view-performance" data-id="{{ $q2Track->id }}"
                                                            data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
                                                            data-qt="2nd QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
+                                                           class="view text-sm font-bold {{ $q2Track->confirmation_status=='Confirmed'?'text-emerald-600':($q2Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q2Track->actual_value }}
                                                         </a>
-                                                        @if($track->milestone && $track->milestone > 0)
+                                                        @if($q2Track->milestone && $q2Track->milestone > 0)
                                                             <div
                                                                 class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
                                                                 <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
+                                                                     style="width: {{ min(100, ($q2Track->actual_value / $q2Track->milestone) * 100) }}%"></div>
                                                             </div>
                                                         @endif
-                                                    @elseif(count($tracks)>0 && $user->isSectorHead())
+                                                    @elseif($q1Track && $user->isSectorHead())
                                                         <a href="javascript:"
                                                            class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
                                                            data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
@@ -416,20 +421,19 @@
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>1)
-                                                        @php $track = $tracks[1]; @endphp
-                                                        @if($track->actual_value)
+                                                    @if($user->isDeliveryUnit() && $q2Track)
+                                                        @if($q2Track->actual_value)
                                                             <a href="javascript:"
                                                                class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
                                                                data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                                               data-id="{{ $q2Track->id }}"
+                                                               data-quarter="{{ $q2Track->quarter }}"
+                                                               data-milestone="{{ $q2Track->milestone }}"
+                                                               data-actual_value="{{ $q2Track->actual_value }}"
+                                                               data-remarks="{{ $q2Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q2Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q2Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q2Track->confirmation_status }}"
                                                                data-tw-target="#update-performance">
                                                                 <span
                                                                     class="material-symbols-outlined text-sm">edit</span>
@@ -438,23 +442,22 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>2)
-                                                        @php $track = $tracks[2]; @endphp
+                                                    @if($q3Track)
                                                         <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
+                                                           data-tw-target="#view-performance" data-id="{{ $q3Track->id }}"
                                                            data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
                                                            data-qt="3rd QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
+                                                           class="view text-sm font-bold {{ $q3Track->confirmation_status=='Confirmed'?'text-emerald-600':($q3Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q3Track->actual_value }}
                                                         </a>
-                                                        @if($track->milestone && $track->milestone > 0)
+                                                        @if($q3Track->milestone && $q3Track->milestone > 0)
                                                             <div
                                                                 class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
                                                                 <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
+                                                                     style="width: {{ min(100, ($q3Track->actual_value / $q3Track->milestone) * 100) }}%"></div>
                                                             </div>
                                                         @endif
-                                                    @elseif(count($tracks)>1 && $user->isSectorHead())
+                                                    @elseif($q2Track && $user->isSectorHead())
                                                         <a href="javascript:"
                                                            class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
                                                            data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
@@ -466,20 +469,19 @@
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>2)
-                                                        @php $track = $tracks[2]; @endphp
-                                                        @if($track->actual_value)
+                                                    @if($user->isDeliveryUnit() && $q3Track)
+                                                        @if($q3Track->actual_value)
                                                             <a href="javascript:"
                                                                class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
                                                                data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                                               data-id="{{ $q3Track->id }}"
+                                                               data-quarter="{{ $q3Track->quarter }}"
+                                                               data-milestone="{{ $q3Track->milestone }}"
+                                                               data-actual_value="{{ $q3Track->actual_value }}"
+                                                               data-remarks="{{ $q3Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q3Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q3Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q3Track->confirmation_status }}"
                                                                data-tw-target="#update-performance">
                                                                 <span
                                                                     class="material-symbols-outlined text-sm">edit</span>
@@ -488,23 +490,22 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>3)
-                                                        @php $track = $tracks[3]; @endphp
+                                                    @if($q4Track)
                                                         <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
+                                                           data-tw-target="#view-performance" data-id="{{ $q4Track->id }}"
                                                            data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
                                                            data-qt="4th QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
+                                                           class="view text-sm font-bold {{ $q4Track->confirmation_status=='Confirmed'?'text-emerald-600':($q4Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q4Track->actual_value }}
                                                         </a>
-                                                        @if($track->milestone && $track->milestone > 0)
+                                                        @if($q4Track->milestone && $q4Track->milestone > 0)
                                                             <div
                                                                 class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
                                                                 <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
+                                                                     style="width: {{ min(100, ($q4Track->actual_value / $q4Track->milestone) * 100) }}%"></div>
                                                             </div>
                                                         @endif
-                                                    @elseif(count($tracks)>2 && $user->isSectorHead())
+                                                    @elseif($q3Track && $user->isSectorHead())
                                                         <a href="javascript:"
                                                            class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
                                                            data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
@@ -516,20 +517,19 @@
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>3)
-                                                        @php $track = $tracks[3]; @endphp
-                                                        @if($track->actual_value)
+                                                    @if($user->isDeliveryUnit() && $q4Track)
+                                                        @if($q4Track->actual_value)
                                                             <a href="javascript:"
                                                                class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
                                                                data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
+                                                               data-id="{{ $q4Track->id }}"
+                                                               data-quarter="{{ $q4Track->quarter }}"
+                                                               data-milestone="{{ $q4Track->milestone }}"
+                                                               data-actual_value="{{ $q4Track->actual_value }}"
+                                                               data-remarks="{{ $q4Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q4Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q4Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q4Track->confirmation_status }}"
                                                                data-tw-target="#update-performance">
                                                                 <span
                                                                     class="material-symbols-outlined text-sm">edit</span>
@@ -676,17 +676,28 @@
                                 @csrf
                                 <input type="hidden" id="kpi_id" name="kpi_id">
                                 <input type="hidden" id="track_id" name="id">
-                                <input type="hidden" id="quarterX" name="quarter">
                                 <input type="hidden" id="year" name="year" value="{{$year}}">
                                 <!-- BEGIN: Modal Header -->
                                 <div class="modal-header">
                                     <h2 class="font-medium text-base mr-auto">
                                         Add Performance Tracking to <span id="kpi"></span>
                                     </h2>
-
+                                    <div class="text-sm text-slate-500">
+                                        Year: <span class="font-bold text-slate-700">{{ $year }}</span>
+                                    </div>
                                 </div> <!-- END: Modal Header -->
                                 <!-- BEGIN: Modal Body -->
                                 <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                    <div class="col-span-6 sm:col-span-6">
+                                        <label for="quarter-select" class="form-label">Quarter <span class="text-red-500">*</span></label>
+                                        <select id="quarter-select" name="quarter" class="form-control" required>
+                                            <option value="">Select Quarter</option>
+                                            <option value="1">Q1 - First Quarter</option>
+                                            <option value="2">Q2 - Second Quarter</option>
+                                            <option value="3">Q3 - Third Quarter</option>
+                                            <option value="4">Q4 - Fourth Quarter</option>
+                                        </select>
+                                    </div>
                                     <div class="col-span-6 sm:col-span-6">
                                         <label for="tracking-date" class="form-label">Tracking Date</label>
                                         <input id="tracking-date" type="date" class="form-control"
@@ -697,7 +708,12 @@
                                         <label for="milestone" class="form-label">Milestone</label>
                                         <input id="milestone" type="number" class="form-control"
                                                {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
-                                               name="milestone" required>
+                                               name="milestone"
+                                               data-is-pdcu="{{ $user->isDeliveryUnit() ? '1' : '0' }}"
+                                               required>
+                                        @if(!$user->isDeliveryUnit())
+                                            <small class="text-slate-500 text-xs mt-1" id="milestone-help-text">Only PDCU users can modify milestone values for existing records</small>
+                                        @endif
                                     </div>
 
                                     <div class="col-span-6 sm:col-span-6">
@@ -940,7 +956,29 @@
             $('body .add').on('click', function () {
                 $('#kpi').html($(this).data('kpi'))
                 $('#kpi_id').val($(this).data('id'))
-                $('#quarterX').val($(this).data('quarter'))
+                // Set the quarter selector to the clicked quarter
+                var quarter = $(this).data('quarter');
+                $('#quarter-select').val(quarter);
+                // Clear track_id for new entries
+                $('#track_id').val('');
+                // Clear milestone value for new entries
+                $('#milestone').val('');
+                // For new entries, allow non-PDCU users to set milestone (since it's required)
+                var isPDCU = $('#milestone').data('is-pdcu') === '1' || $('#milestone').data('is-pdcu') === 1;
+                if (!isPDCU) {
+                    $('#milestone').prop('readonly', false);
+                    $('#milestone-help-text').text('Only PDCU users can modify milestone values for existing records');
+                }
+            });
+
+            // Make milestone readonly for non-PDCU users when editing existing records
+            $('#add-performance').on('show.bs.modal', function () {
+                var trackId = $('#track_id').val();
+                var isPDCU = $('#milestone').data('is-pdcu') === '1' || $('#milestone').data('is-pdcu') === 1;
+                if (trackId && trackId !== '' && !isPDCU) {
+                    $('#milestone').prop('readonly', true);
+                    $('#milestone-help-text').text('Only PDCU users can modify milestone values');
+                }
             });
 
             $('body .updM').on('click', function () {
@@ -952,7 +990,7 @@
                 $('#remarkView').html($(this).data('remarks'))
                 $('#quarterView').html($(this).data('quarter'))
                 $('#actual_valueView').html($(this).data('actual_value'))
-                
+
                 // Load evidence attachments
                 $.get('{{ route('deliverable.kpi.tracking.files',[':id']) }}'.replace(':id', trackId), function (data) {
                     $('#evidenceView').html(data)

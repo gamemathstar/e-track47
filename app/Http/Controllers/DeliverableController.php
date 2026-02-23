@@ -123,9 +123,9 @@ class DeliverableController extends Controller
         }
         $targets = Kpi::leftJoin("kpi_targets", function ($join) use ($year) {
             $join->on("kpi_targets.kpi_id", "=", "kpis.id")
-                ->on('year', "=", DB::raw($year));
+                ->on('kpi_targets.year', "=", DB::raw($year));
         })
-            ->where(['deliverable_id' => $deliverable->id])->get();
+            ->where(['kpis.deliverable_id' => $deliverable->id])->get();
         return view('pages.sector.kpis', compact('deliverable', 'kpis', 'year', 'targets'));
     }
 

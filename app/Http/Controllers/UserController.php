@@ -124,9 +124,12 @@ class UserController extends Controller
                 UserRole::ROLE_SYSTEM_ADMIN,
                 UserRole::ROLE_SECTOR_HEAD,
                 UserRole::ROLE_SECTOR_ADMIN,
-                UserRole::ROLE_DELIVERY_DEPARTMENT,
+                UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+                UserRole::ROLE_COORDINATOR,
+                UserRole::ROLE_DEPUTY_COORDINATOR,
+                UserRole::ROLE_FACILITATOR,
             ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . '|exists:sectors,id',
+            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
@@ -138,7 +141,7 @@ class UserController extends Controller
                 $user = User::findOrFail($request->id);
             } else {
                 $user = new User();
-                $user->password = bcrypt('JSUSER321'); // Default password
+                $user->password = bcrypt('123456'); // Default password
             }
 
             $user->full_name = $validated['full_name'];
@@ -219,7 +222,7 @@ class UserController extends Controller
 
         try {
             $user = User::findOrFail($validated['id']);
-            
+
             if ($validated['password'] === $validated['confirm_password']) {
                 $user->password = bcrypt($validated['password']);
                 $user->save();

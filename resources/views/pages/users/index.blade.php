@@ -170,7 +170,7 @@
                                         Number</label>
                                     <input type="tel" id="phone_number" name="phone_number"
                                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                           placeholder="Enter phone number" required>
+                                           placeholder="Enter phone number">
                                 </div>
                             </div>
 
