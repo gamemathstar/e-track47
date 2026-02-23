@@ -36,6 +36,10 @@
                 <i class="w-4 h-4 mr-2" data-lucide="bar-chart-3"></i>
                 Comprehensive KPI Report
             </a>
+            <a href="{{ route('reports.word.form') }}" class="btn btn-success mr-2">
+                <i class="w-4 h-4 mr-2" data-lucide="file-text"></i>
+                Generate Word Report
+            </a>
         </div>
     </div>
     <div class="intro-y grid grid-cols-12 gap-5 mt-5">

@@ -97,6 +97,10 @@ Route::middleware(['auth'])->group(function () {
     // Comprehensive KPI Report
     Route::get('reports/comprehensive', [ReportController::class, 'comprehensiveReport'])->name('reports.comprehensive');
     Route::post('reports/comprehensive/download', [ReportController::class, 'downloadComprehensiveReport'])->name('reports.comprehensive.download');
+
+    // Word Document Report
+    Route::get('reports/word', [ReportController::class, 'wordReportForm'])->name('reports.word.form');
+    Route::post('reports/word/generate', [ReportController::class, 'generateWordReport'])->name('reports.word.generate');
 });
 
 Route::get('mdas/{commitment}/details', [CommentController::class, 'mda'])->name('public.mda.details');
