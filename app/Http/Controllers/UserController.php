@@ -62,8 +62,18 @@ class UserController extends Controller
             });
         }
 
-        // Paginate results
-        $users = $query->orderBy('full_name', 'asc')->paginate(12)->withQueryString();
+        // Paginate results - Order by role priority (Governor first), then by name
+        $users = $query->orderByRaw("
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM user_roles 
+                    WHERE user_roles.user_id = users.id 
+                    AND user_roles.role = 'Governor' 
+                    AND user_roles.role_status = 'Active'
+                ) THEN 0
+                ELSE 1
+            END
+        ")->orderBy('full_name', 'asc')->paginate(12)->withQueryString();
         $sectors = Sector::all();
 
         // Get all unique roles for filter dropdown
