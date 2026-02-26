@@ -18,11 +18,49 @@ use function Laravel\Prompts\password;
 class UserController extends Controller
 {
     //
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::all();
+        $query = User::query();
+
+        // Search filter (name or email)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Role filter
+        if ($request->filled('role')) {
+            $role = $request->input('role');
+            $query->whereHas('roles', function ($q) use ($role) {
+                $q->where('role', $role)
+                    ->where('role_status', UserRole::STATUS_ACTIVE);
+            });
+        }
+
+        // Sector filter
+        if ($request->filled('sector_id')) {
+            $sectorId = $request->input('sector_id');
+            $query->whereHas('roles', function ($q) use ($sectorId) {
+                $q->where('entity_id', $sectorId)
+                    ->where('role_status', UserRole::STATUS_ACTIVE);
+            });
+        }
+
+        // Paginate results
+        $users = $query->orderBy('full_name', 'asc')->paginate(12)->withQueryString();
         $sectors = Sector::all();
-        return view('pages.users.index', compact('users', 'sectors'));
+
+        // Get all unique roles for filter dropdown
+        $roles = UserRole::where('role_status', UserRole::STATUS_ACTIVE)
+            ->distinct()
+            ->pluck('role')
+            ->sort()
+            ->values();
+
+        return view('pages.users.index', compact('users', 'sectors', 'roles'));
     }
 
     public function awaitingVerification(Request $request)
@@ -120,17 +158,17 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email,' . ($request->id ?? 'NULL'),
             'phone_number' => 'nullable|string|max:20',
             'role' => 'required|in:' . implode(',', [
-                UserRole::ROLE_GOVERNOR,
-                UserRole::ROLE_SYSTEM_ADMIN,
-                UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN, // Deprecated
-                UserRole::ROLE_DATA_ADMIN,
-                UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
-                UserRole::ROLE_COORDINATOR,
-                UserRole::ROLE_DEPUTY_COORDINATOR,
-                UserRole::ROLE_FACILITATOR,
-            ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+                    UserRole::ROLE_GOVERNOR,
+                    UserRole::ROLE_SYSTEM_ADMIN,
+                    UserRole::ROLE_SECTOR_HEAD,
+                    UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                    UserRole::ROLE_DATA_ADMIN,
+                    UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+                    UserRole::ROLE_COORDINATOR,
+                    UserRole::ROLE_DEPUTY_COORDINATOR,
+                    UserRole::ROLE_FACILITATOR,
+                ]),
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
@@ -270,17 +308,17 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'role' => 'required|in:' . implode(',', [
-                UserRole::ROLE_GOVERNOR,
-                UserRole::ROLE_SYSTEM_ADMIN,
-                UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN, // Deprecated
-                UserRole::ROLE_DATA_ADMIN,
-                UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
-                UserRole::ROLE_COORDINATOR,
-                UserRole::ROLE_DEPUTY_COORDINATOR,
-                UserRole::ROLE_FACILITATOR,
-            ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+                    UserRole::ROLE_GOVERNOR,
+                    UserRole::ROLE_SYSTEM_ADMIN,
+                    UserRole::ROLE_SECTOR_HEAD,
+                    UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                    UserRole::ROLE_DATA_ADMIN,
+                    UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+                    UserRole::ROLE_COORDINATOR,
+                    UserRole::ROLE_DEPUTY_COORDINATOR,
+                    UserRole::ROLE_FACILITATOR,
+                ]),
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
