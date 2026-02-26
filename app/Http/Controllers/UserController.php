@@ -88,14 +88,28 @@ class UserController extends Controller
 
     public function awaitingVerification(Request $request)
     {
-        $performanceTrackings = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
+        $user = Auth::user();
+        
+        $query = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
             ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->groupBy('sectors.id')
-            ->get();
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        
+        // If user is a Facilitator, filter to only show sectors assigned to them
+        if ($user->isFacilitator() && !$user->canAccessAllSectors()) {
+            $assignedSectorIds = $user->getAssignedSectorIds();
+            if (!empty($assignedSectorIds)) {
+                $query->whereIn('sectors.id', $assignedSectorIds);
+            } else {
+                // If no sectors assigned, return empty result
+                $query->whereRaw('1 = 0');
+            }
+        }
+        // For Coordinators and Deputy Coordinators, show all sectors (no additional filter)
+        
+        $performanceTrackings = $query->groupBy('sectors.id')->get();
 
         return view('pages.users.awaiting', compact('performanceTrackings'));
     }

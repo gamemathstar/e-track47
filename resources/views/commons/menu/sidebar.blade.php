@@ -46,6 +46,36 @@
                 </ul>
             </li>
         @endif
+        @if($user->isFacilitator())
+            @php
+                $facilitatorRole = $user->getCurrentRole();
+                $facilitatorSectors = collect();
+                if ($facilitatorRole && $facilitatorRole->role === \App\Models\UserRole::ROLE_FACILITATOR) {
+                    $facilitatorSectors = $facilitatorRole->facilitatorSectors()->with('sector')->get()->pluck('sector')->filter();
+                }
+            @endphp
+            @if($facilitatorSectors->count() > 0)
+                <li>
+                    <a href="javascript:;" class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="box"></i></div>
+                        <div class="side-menu__title">
+                            My Sector(s)
+                            <div class="side-menu__sub-icon "><i data-lucide="chevron-down"></i></div>
+                        </div>
+                    </a>
+                    <ul class="">
+                        @foreach($facilitatorSectors as $sector)
+                            <li>
+                                <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">
+                                    <div class="side-menu__icon"><i data-lucide="activity"></i></div>
+                                    <div class="side-menu__title">{{ $sector->sector_name }}</div>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </li>
+            @endif
+        @endif
         @if($user->isDeliveryUnit())
             <li>
                 <a href="javascript:;" class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
