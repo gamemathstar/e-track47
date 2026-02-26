@@ -28,8 +28,8 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        // Get sector for both Sector Head and Sector Admin
-        $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+        // Get sector for both Sector Head and Data Admin
+        $userSector = $user->isSectorHead() ?: $user->isDataAdmin();
 
         // Get filter parameters
         $selectedSectorId = $request->input('sector_id');
@@ -668,7 +668,7 @@ class ReportController extends Controller
 
     /**
      * Convert quarter to date range
-     * 
+     *
      * @param int $quarter Quarter number (1-4)
      * @param int $year Year
      * @return array ['start' => Carbon, 'end' => Carbon]
@@ -706,7 +706,7 @@ class ReportController extends Controller
 
     /**
      * Get date range from start and end quarters
-     * 
+     *
      * @param int $startQuarter Start quarter (1-4)
      * @param int $endQuarter End quarter (1-4)
      * @param int $year Year
@@ -716,7 +716,7 @@ class ReportController extends Controller
     {
         $startRange = $this->quarterToDateRange($startQuarter, $year);
         $endRange = $this->quarterToDateRange($endQuarter, $year);
-        
+
         return [
             'start' => $startRange['start'],
             'end' => $endRange['end']
@@ -769,7 +769,7 @@ class ReportController extends Controller
         $overallSummaryData = $this->getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
         $grandSummaryData = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds);
         $sectorSummaryData = $this->getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds);
-        
+
         // Get individual sector data
         $individualSectorData = [];
         foreach ($sectors as $sector) {
@@ -789,12 +789,12 @@ class ReportController extends Controller
         $endQuarterName = $quarterNames[$endQuarter];
 
         return view('pages.reports.comprehensive-print', compact(
-            'year', 
-            'startQuarter', 
-            'endQuarter', 
-            'startQuarterName', 
+            'year',
+            'startQuarter',
+            'endQuarter',
+            'startQuarterName',
             'endQuarterName',
-            'startDate', 
+            'startDate',
             'endDate',
             'userSector',
             'sectors',
@@ -1997,7 +1997,7 @@ class ReportController extends Controller
         foreach ($sectorSummary as $row) {
             // Calculate average performance for this commitment
             $performanceCounts = $this->getCommitmentPerformanceCounts($row->commitment_id, $year, $startDate, $endDate);
-            
+
             $result[] = [
                 'sector_id' => $row->sector_id,
                 'sector_name' => $row->sector_name,
@@ -2058,7 +2058,7 @@ class ReportController extends Controller
         }
 
         $overallPerformance = ($totalAssessed > 0) ? ($totalPerformance / $totalAssessed) : 0;
-        
+
         // Determine performance rating
         $performanceRating = '';
         if ($overallPerformance >= 100) {
@@ -2817,17 +2817,17 @@ class ReportController extends Controller
             ->where('pt.milestone', '>', 0)
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
-        
+
         if (!$isAllQuarters) {
             $avgPerformanceQuery->where('pt.quarter', '=', $quarter);
         } else {
             $avgPerformanceQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
         }
-        
+
         if ($sectorId) {
             $avgPerformanceQuery->where('s.id', '=', $sectorId);
         }
-        
+
         $avgPerformance = $avgPerformanceQuery
             ->select(DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'))
             ->value('avg_performance') ?? 0;
@@ -2844,17 +2844,17 @@ class ReportController extends Controller
             ->where('pt.milestone', '>', 0)
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
-        
+
         if (!$isAllQuarters) {
             $topSectorQuery->where('pt.quarter', '=', $quarter);
         } else {
             $topSectorQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
         }
-        
+
         if ($sectorId) {
             $topSectorQuery->where('s.id', '=', $sectorId);
         }
-        
+
         $topSector = $topSectorQuery
             ->select(
                 's.id',
@@ -2874,17 +2874,17 @@ class ReportController extends Controller
             ->join('sectors as s', 'c.sector_id', '=', 's.id')
             ->where('pt.year', '=', $year)
             ->where('pt.confirmation_status', '!=', 'Confirmed');
-        
+
         if (!$isAllQuarters) {
             $pendingVerificationsQuery->where('pt.quarter', '=', $quarter);
         } else {
             $pendingVerificationsQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
         }
-        
+
         if ($sectorId) {
             $pendingVerificationsQuery->where('s.id', '=', $sectorId);
         }
-        
+
         $pendingVerifications = $pendingVerificationsQuery->distinct('s.id')->count('s.id');
 
         // Get sector comparison data
@@ -2899,17 +2899,17 @@ class ReportController extends Controller
             ->where('pt.milestone', '>', 0)
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
-        
+
         if (!$isAllQuarters) {
             $sectorComparisonQuery->where('pt.quarter', '=', $quarter);
         } else {
             $sectorComparisonQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
         }
-        
+
         if ($sectorId) {
             $sectorComparisonQuery->where('s.id', '=', $sectorId);
         }
-        
+
         $sectorComparison = $sectorComparisonQuery
             ->select(
                 's.id',
@@ -2953,7 +2953,7 @@ class ReportController extends Controller
             });
 
         $totalKpis = $query->clone()->distinct('k.id')->count('k.id');
-        
+
         $onTrack = $query->clone()
             ->whereNotNull('pt.actual_value')
             ->whereNotNull('pt.milestone')
@@ -2993,7 +2993,7 @@ class ReportController extends Controller
     private function getDetailedBreakdown($sectorId = null, $year = null, $quarter = null, $request = null)
     {
         $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
-        
+
         $query = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
@@ -3025,15 +3025,15 @@ class ReportController extends Controller
                 'kt.target as target_value',
                 'pt.actual_value',
                 'k.unit_of_measurement',
-                DB::raw('CASE 
+                DB::raw('CASE
                     WHEN pt.actual_value IS NULL OR pt.milestone IS NULL OR pt.milestone = 0 THEN "Pending"
                     WHEN (pt.actual_value / pt.milestone) * 100 >= 100 THEN "Exceptional"
                     WHEN (pt.actual_value / pt.milestone) * 100 >= 70 THEN "Target Met"
                     WHEN (pt.actual_value / pt.milestone) * 100 >= 40 THEN "At Risk"
                     ELSE "Delayed"
                 END as status'),
-                DB::raw('CASE 
-                    WHEN pt.actual_value IS NOT NULL AND pt.milestone IS NOT NULL AND pt.milestone > 0 
+                DB::raw('CASE
+                    WHEN pt.actual_value IS NOT NULL AND pt.milestone IS NOT NULL AND pt.milestone > 0
                     THEN ROUND(((pt.actual_value - pt.milestone) / pt.milestone) * 100, 1)
                     ELSE NULL
                 END as variance')
@@ -3044,19 +3044,19 @@ class ReportController extends Controller
         // Paginate the results (15 items per page)
         $perPage = 15;
         $currentPage = $request ? $request->input('page', 1) : 1;
-        
+
         // Get total count
         $total = $query->count();
-        
+
         // Get paginated results
         $items = $query->skip(($currentPage - 1) * $perPage)
                       ->take($perPage)
                       ->get();
-        
+
         // Create paginator instance with preserved query parameters
         $path = $request ? $request->url() : url()->current();
         $queryParams = $request ? $request->except('page') : [];
-        
+
         $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
             $items,
             $total,
@@ -3067,10 +3067,10 @@ class ReportController extends Controller
                 'query' => $queryParams,
             ]
         );
-        
+
         // Set the page name to 'page' (default)
         $paginator->setPageName('page');
-        
+
         return $paginator;
     }
 
@@ -3081,10 +3081,10 @@ class ReportController extends Controller
     {
         $sectorId = $request->input('sector_id');
         $year = $request->input('year', date('Y'));
-        
+
         $sectors = Sector::all();
         $selectedSector = $sectorId ? Sector::find($sectorId) : null;
-        
+
         return view('pages.reports.word-form', compact('sectors', 'selectedSector', 'year'));
     }
 
@@ -3241,7 +3241,7 @@ class ReportController extends Controller
         if ($midYearData && $midYearData->total_target > 0 && $midYearData->kpi_count > 0) {
             $midYearPerformance = round(($midYearData->total_actual / $midYearData->total_target) * 100, 0);
         }
-        
+
         $fullYearPerformance = $performanceCounts['overall_performance'] ?? 0;
 
         // Determine performance rating text
@@ -3361,10 +3361,10 @@ class ReportController extends Controller
             $table->addRow();
             $cell1 = $table->addCell(200, ['valign' => 'center']);
             $cell1->addText($row[0], ['name' => 'Tahoma', 'size' => 11], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
-            
+
             $cell2 = $table->addCell(7800, ['valign' => 'center']);
             $cell2->addText($row[1], ['name' => 'Tahoma', 'size' => 11]);
-            
+
             $cell3 = $table->addCell(2000, ['valign' => 'center']);
             $textStyle = ['name' => 'Tahoma', 'size' => 11];
             if (in_array($row[0], [3, 6, 9, 10])) {
@@ -3444,8 +3444,8 @@ class ReportController extends Controller
         }
 
         $section->addText(
-            "Signed: " . ($pdcuSignature ?: '______________') . " Date: " . ($pdcuDate ?: '___________') . 
-            "        " . 
+            "Signed: " . ($pdcuSignature ?: '______________') . " Date: " . ($pdcuDate ?: '___________') .
+            "        " .
             "Signed: " . ($facilitatorSignature ?: '________________') . " Date: " . ($facilitatorDate ?: '__________'),
             ['name' => 'Tahoma', 'size' => 11],
             ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]

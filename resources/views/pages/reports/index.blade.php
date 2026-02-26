@@ -57,7 +57,7 @@
                 <i class="w-4 h-4 mr-2" data-lucide="bar-chart-3"></i>
                 Comprehensive KPI Report
             </a>
-            <a href="{{ route('reports.word.form') }}" class="btn btn-success mr-2">
+            <a href="{{ route('reports.word.form') }}" class="btn btn-primary mr-2">
                 <i class="w-4 h-4 mr-2" data-lucide="file-text"></i>
                 Generate Word Report
             </a>
@@ -96,7 +96,7 @@
                         <div class="relative">
                             <select name="year" id="filter_year"
                                     class="w-full bg-background-light border-primary/20 rounded-lg text-sm focus:ring-primary focus:border-primary appearance-none py-2 pl-3 pr-10">
-                                @foreach(range(date('Y'), 2020) as $yr)
+                                @foreach(range(date('Y'), 2024) as $yr)
                                     <option
                                         value="{{ $yr }}" {{ request('year', date('Y')) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                                 @endforeach
@@ -114,7 +114,7 @@
                                    value="{{ request('quarter', 'all') }}">
                             <button type="button" data-quarter="all"
                                     class="quarter-btn flex-1 py-1 text-xs font-bold rounded-md transition-colors hover:bg-primary/10 {{ request('quarter', 'all') == 'all' ? 'bg-primary text-white shadow-lg shadow-primary/20' : '' }}">
-                                All
+                                Annual
                             </button>
                             <button type="button" data-quarter="1"
                                     class="quarter-btn flex-1 py-1 text-xs font-bold rounded-md transition-colors hover:bg-primary/10 {{ request('quarter') == 1 ? 'bg-primary text-white shadow-lg shadow-primary/20' : '' }}">
@@ -134,12 +134,12 @@
                             </button>
                         </div>
                     </div>
-                    <div class="flex items-end">
-                        <button type="submit"
-                                class="w-full bg-primary/20 hover:bg-primary/30 text-primary font-bold py-2 rounded-lg text-sm transition-colors border border-primary/30">
-                            Apply View Filters
-                        </button>
-                    </div>
+                    {{--                    <div class="flex items-end">--}}
+                    {{--                        <button type="submit"--}}
+                    {{--                                class="w-full bg-primary/20 hover:bg-primary/30 text-primary font-bold py-2 rounded-lg text-sm transition-colors border border-primary/30">--}}
+                    {{--                            Apply View Filters--}}
+                    {{--                        </button>--}}
+                    {{--                    </div>--}}
                 </div>
             </form>
         </section>
@@ -222,9 +222,9 @@
                         <p class="text-sm text-slate-500">Comparison of Planned vs. Actual achievement rates (%)</p>
                     </div>
                     <div class="flex items-center gap-4 text-xs font-bold">
-                        <div class="flex items-center gap-1.5"><span
-                                class="w-3 h-3 rounded-sm bg-primary/20 border border-primary/30"></span> Target
-                        </div>
+                        {{--                        <div class="flex items-center gap-1.5"><span--}}
+                        {{--                                class="w-3 h-3 rounded-sm bg-primary/20 border border-primary/30"></span> Target--}}
+                        {{--                        </div>--}}
                         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-primary"></span>
                             Actual
                         </div>
@@ -235,10 +235,10 @@
                         <div class="grid grid-cols-[120px_1fr] items-center gap-4">
                             <span class="text-sm font-medium text-slate-400">{{ $sector->sector_name }}</span>
                             <div class="space-y-1">
-                                <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
-                                    <div class="bg-primary/20 h-full border-r border-primary/30"
-                                         style="width: 100%"></div>
-                                </div>
+                                {{--                                <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">--}}
+                                {{--                                    <div class="bg-primary/20 h-full border-r border-primary/30"--}}
+                                {{--                                         style="width: 100%"></div>--}}
+                                {{--                                </div>--}}
                                 <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
                                     <div class="bg-primary h-full"
                                          style="width: {{ min(100, $sector->avg_performance ?? 0) }}%"></div>
@@ -460,26 +460,26 @@
             const selectedQuarterInput = document.getElementById('selected_quarter');
             const sectorSelect = document.getElementById('filter_sector');
             const yearSelect = document.getElementById('filter_year');
-            
+
             // Function to submit the form
             function submitForm() {
                 form.submit();
             }
-            
+
             // Handle sector dropdown change
             if (sectorSelect) {
                 sectorSelect.addEventListener('change', function () {
                     submitForm();
                 });
             }
-            
+
             // Handle year dropdown change
             if (yearSelect) {
                 yearSelect.addEventListener('change', function () {
                     submitForm();
                 });
             }
-            
+
             // Handle quarter button selection
             quarterButtons.forEach(button => {
                 button.addEventListener('click', function () {
@@ -496,7 +496,7 @@
 
                     this.classList.remove('hover:bg-primary/10');
                     this.classList.add('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
-                    
+
                     // Auto-submit form when quarter changes
                     submitForm();
                 });

@@ -26,7 +26,8 @@ class UserRole extends Model
     const ROLE_GOVERNOR = 'Governor';
     const ROLE_SYSTEM_ADMIN = 'System Admin';
     const ROLE_SECTOR_HEAD = 'Sector Head';
-    const ROLE_SECTOR_ADMIN = 'Sector Admin';
+    const ROLE_SECTOR_ADMIN = 'Sector Admin'; // Deprecated - use ROLE_DATA_ADMIN
+    const ROLE_DATA_ADMIN = 'Data Admin';
     const ROLE_DELIVERY_DEPARTMENT = 'Delivery Department'; // Deprecated - use new delivery unit roles
     const ROLE_COORDINATOR = 'Coordinator';
     const ROLE_DEPUTY_COORDINATOR = 'Deputy Coordinator';
@@ -121,7 +122,8 @@ class UserRole extends Model
             self::ROLE_GOVERNOR => self::ENTITY_STATE,
             self::ROLE_SYSTEM_ADMIN => self::ENTITY_SYSTEM,
             self::ROLE_SECTOR_HEAD => self::ENTITY_SECTOR,
-            self::ROLE_SECTOR_ADMIN => self::ENTITY_SECTOR,
+            self::ROLE_SECTOR_ADMIN => self::ENTITY_SECTOR, // Deprecated
+            self::ROLE_DATA_ADMIN => self::ENTITY_SECTOR,
             self::ROLE_DELIVERY_DEPARTMENT => self::ENTITY_DELIVERABLE, // Deprecated
             self::ROLE_COORDINATOR => self::ENTITY_DELIVERABLE,
             self::ROLE_DEPUTY_COORDINATOR => self::ENTITY_DELIVERABLE,

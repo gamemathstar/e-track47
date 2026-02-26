@@ -123,13 +123,14 @@ class UserController extends Controller
                 UserRole::ROLE_GOVERNOR,
                 UserRole::ROLE_SYSTEM_ADMIN,
                 UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN,
+                UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                UserRole::ROLE_DATA_ADMIN,
                 UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
                 UserRole::ROLE_COORDINATOR,
                 UserRole::ROLE_DEPUTY_COORDINATOR,
                 UserRole::ROLE_FACILITATOR,
             ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
@@ -159,7 +160,7 @@ class UserController extends Controller
 
                 // Determine entity_id
                 $entityId = 0;
-                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_FACILITATOR])) {
+                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN, UserRole::ROLE_FACILITATOR])) {
                     $entityId = $validated['sector_id'] ?? 0;
                 }
                 // Coordinators and Deputy Coordinators have entity_id = 0 (access all sectors)
@@ -272,13 +273,14 @@ class UserController extends Controller
                 UserRole::ROLE_GOVERNOR,
                 UserRole::ROLE_SYSTEM_ADMIN,
                 UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN,
+                UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                UserRole::ROLE_DATA_ADMIN,
                 UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
                 UserRole::ROLE_COORDINATOR,
                 UserRole::ROLE_DEPUTY_COORDINATOR,
                 UserRole::ROLE_FACILITATOR,
             ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',

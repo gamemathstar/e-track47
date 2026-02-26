@@ -7,6 +7,7 @@ use App\Models\Sector;
 use App\Models\SectorBudget;
 use App\Models\SectorFile;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -97,25 +98,31 @@ class SectorController extends Controller
     public function view(Request $request, $id, $comm_id = null)
     {
         $sector = Sector::find($id);
-        
+
         // Check if sector exists
         if (!$sector) {
             return redirect()->route('dashboard')->with('failure', 'Sector not found.');
         }
-        
+
         $commitments = $sector->__commitments()->orderBy('created_at', 'desc')->get();
-        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id'));
+        $user = Auth::user();
+
+        // Get year and quarter from request for filtering
+        $year = $request->input('year', date('Y'));
+        $quarter = $request->input('quarter', null);
+
+        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id', 'user', 'year', 'quarter'));
     }
 
     public function show(Request $request, $id)
     {
         $sector = Sector::find($id);
-        
+
         // Check if sector exists
         if (!$sector) {
             return redirect()->route('dashboard')->with('failure', 'Sector not found.');
         }
-        
+
         $commitments = $sector->__commitments()->get();
         $baseYear = 2023;
         $targetYear = 2024;
@@ -321,7 +328,6 @@ class SectorController extends Controller
 
     public function targets(Request $request)
     {
-
 
 
     }

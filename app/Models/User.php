@@ -285,9 +285,16 @@ class User extends Authenticatable
 
     public function isSectorAdmin()
     {
+        // Deprecated - use isDataAdmin() instead
+        return $this->isDataAdmin();
+    }
+
+    public function isDataAdmin()
+    {
         $userRole = $this->getCurrentRole();
         if ($userRole && $userRole->isActive()) {
-            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && $userRole->role === UserRole::ROLE_SECTOR_ADMIN) {
+            if ($userRole->target_entity === UserRole::ENTITY_SECTOR && 
+                ($userRole->role === UserRole::ROLE_DATA_ADMIN || $userRole->role === UserRole::ROLE_SECTOR_ADMIN)) {
                 return Sector::find($userRole->entity_id);
             }
         }

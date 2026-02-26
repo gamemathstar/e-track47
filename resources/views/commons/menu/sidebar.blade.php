@@ -8,7 +8,7 @@
 
 
     <ul>
-        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit() || $user->isSectorHead() || $user->isSectorAdmin())
+        @if($user->isGovernor() || $user->isSystemAdmin() || $user->isDeliveryUnit() || $user->isSectorHead() || $user->isDataAdmin())
             <li>
                 <a href="{{route('dashboard')}}"
                    class="side-menu {{ Request::is('dashboard*') ? 'side-menu--active' : '' }}">
@@ -108,7 +108,7 @@
                 </a>
             </li>
         @endif
-        @if($sector = $user->isSectorAdmin())
+        @if($sector = $user->isDataAdmin())
             <li>
                 <a href="{{route('sectors.view',[$sector->id])}}"
                    class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">

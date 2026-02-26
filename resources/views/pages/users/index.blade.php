@@ -184,7 +184,7 @@
                                         <option value="Governor">Governor</option>
                                         <option value="System Admin">System Admin</option>
                                         <option value="Sector Head">Sector Head</option>
-                                        <option value="Sector Admin">Sector Admin</option>
+                                        <option value="Data Admin">Data Admin</option>
                                         <option value="Coordinator">Coordinator</option>
                                         <option value="Deputy Coordinator">Deputy Coordinator</option>
                                         <option value="Facilitator">Facilitator</option>
@@ -230,7 +230,7 @@
 
             $("#role").on('change', function () {
                 var selectedRole = $(this).val();
-                if (selectedRole === 'Sector Head' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
+                if (selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
                     $("#sectorArea").removeClass('hidden');
                     $("#sector").prop('required', true);
                 } else {

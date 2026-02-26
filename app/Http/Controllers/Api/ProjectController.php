@@ -215,7 +215,7 @@ class ProjectController extends Controller
                 ->leftJoin('user_roles', 'user_roles.user_id', '=', 'users.id')->get();
             $userEx = [];
             foreach ($users as $user) {
-                if (in_array($user->rank, ['Sector Head', 'Sector Admin'])) {
+                if (in_array($user->rank, ['Sector Head', 'Sector Admin', 'Data Admin'])) {
                     $sector = Sector::find($user->entity_id);
                     $sName = $sector ? $sector->name : "";
                 } elseif ($user->rank == 'Governor') {
@@ -250,7 +250,7 @@ class ProjectController extends Controller
 //            'sector'=>'required|exists:sectors,id'
 
             ]);
-            $roles = ['Governor' => 'State', 'System Admin' => 'System', 'Sector Head' => 'Sector', 'Sector Admin' => 'Sector', 'Delivery Department' => 'Deliverable'];
+            $roles = ['Governor' => 'State', 'System Admin' => 'System', 'Sector Head' => 'Sector', 'Sector Admin' => 'Sector', 'Data Admin' => 'Sector', 'Delivery Department' => 'Deliverable'];
 //            $user = User::find($user->id);
             $user->full_name = $request->name;
             $user->email = $request->email;

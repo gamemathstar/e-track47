@@ -50,27 +50,38 @@ class Kpi extends Model
      *
      * @param int $quarter Quarter number (1-4)
      * @param int $year Year
+     * @param bool $onlyApproved If true, only return records approved by Sector Head
      * @return PerformanceTracking|null
      */
-    public function getQuarterTrack($quarter, $year)
+    public function getQuarterTrack($quarter, $year, $onlyApproved = false)
     {
-        return $this->performanceTracking()
+        $query = $this->performanceTracking()
             ->where('quarter', $quarter)
-            ->where('year', $year)
-            ->first();
+            ->where('year', $year);
+        
+        if ($onlyApproved) {
+            $query->whereNotNull('sector_head_approved_at');
+        }
+        
+        return $query->first();
     }
 
     /**
      * Get all performance tracking records for a specific year
      *
      * @param int $year Year
+     * @param bool $onlyApproved If true, only return records approved by Sector Head
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getYearTracks($year)
+    public function getYearTracks($year, $onlyApproved = false)
     {
-        return $this->performanceTracking()
-            ->where('year', $year)
-            ->orderBy('quarter', 'ASC')
-            ->get();
+        $query = $this->performanceTracking()
+            ->where('year', $year);
+        
+        if ($onlyApproved) {
+            $query->whereNotNull('sector_head_approved_at');
+        }
+        
+        return $query->orderBy('quarter', 'ASC')->get();
     }
 }

@@ -103,6 +103,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
     Route::post('deliverable/kpi/target/save', [KpiController::class, 'saveTarget'])->name('kpis.target.save');
     Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');
+    Route::post('performance-tracking/approve', [KpiController::class, 'approveData'])->name('performance.tracking.approve');
+    Route::post('performance-tracking/facilitator-confirm', [KpiController::class, 'facilitatorConfirm'])->name('performance.tracking.facilitator.confirm');
+    Route::post('performance-tracking/coordinator-confirm', [KpiController::class, 'coordinatorConfirm'])->name('performance.tracking.coordinator.confirm');
 
     //  REPORTS
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

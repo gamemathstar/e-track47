@@ -21,9 +21,9 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         
-        // Allow Governor, Delivery Unit, System Admin, Sector Head, and Sector Admin to access dashboard
+        // Allow Governor, Delivery Unit, System Admin, Sector Head, and Data Admin to access dashboard
         // Only redirect other roles (if any) to their specific views
-        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin() && !$user->isSectorHead() && !$user->isSectorAdmin()) {
+        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin() && !$user->isSectorHead() && !$user->isDataAdmin()) {
             $userRole = UserRole::where(['user_id' => $user->id, 'role_status' => 'active'])->first();
             
             // Check if user role exists and has a valid entity_id
@@ -51,7 +51,7 @@ class DashboardController extends Controller
             $hasAccessToAllSectors = true;
         } else {
             // User has access to specific sector(s)
-            $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+            $userSector = $user->isSectorHead() ?: $user->isDataAdmin();
             if ($userSector) {
                 $accessibleSectorIds = [$userSector->id];
             } else {

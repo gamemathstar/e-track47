@@ -103,6 +103,126 @@ class Notification extends Model
         self::make($receiver, $user, $tracking, 'Tracking Reviewed', $forme, 'System');
     }
 
+    /**
+     * Notify Sector Head when Data Admin submits performance tracking
+     */
+    public static function notifySectorHeadForApproval($tracking)
+    {
+        if (!$tracking->kpi || !$tracking->kpi->deliverable || !$tracking->kpi->deliverable->commitment || !$tracking->kpi->deliverable->commitment->sector) {
+            return;
+        }
+        
+        $sector = $tracking->kpi->deliverable->commitment->sector;
+        $sectorHeadId = $sector->sector_head_id ?? null;
+        
+        if (!$sectorHeadId) {
+            // Find Sector Head by role
+            $sectorHeadRole = UserRole::where('role', UserRole::ROLE_SECTOR_HEAD)
+                ->where('entity_id', $sector->id)
+                ->where('role_status', UserRole::STATUS_ACTIVE)
+                ->first();
+            
+            if ($sectorHeadRole) {
+                $sectorHeadId = $sectorHeadRole->user_id;
+            }
+        }
+        
+        if (!$sectorHeadId) {
+            return;
+        }
+        
+        $sectorHead = User::find($sectorHeadId);
+        $dataAdmin = Auth::user();
+        
+        if (!$sectorHead || !$dataAdmin) {
+            return;
+        }
+
+        $body = 'Data Admin of ' . $sector->sector_name . ' has submitted performance tracking for ' . $tracking->kpi->kpi . '. Please review and approve.';
+        $forme = 'Your performance tracking submission for ' . $tracking->kpi->kpi . ' has been sent to Sector Head for approval.';
+
+        self::make($dataAdmin, $sectorHead, $tracking, 'Approval Required', $body, 'Tracking Submitted');
+        self::make($sectorHead, $dataAdmin, $tracking, 'Submission Sent', $forme, 'System');
+    }
+
+    /**
+     * Notify Facilitator when Sector Head approves data
+     */
+    public static function notifyFacilitatorAfterSectorHeadApproval($tracking)
+    {
+        if (!$tracking->kpi || !$tracking->kpi->deliverable || !$tracking->kpi->deliverable->commitment) {
+            return;
+        }
+        
+        $sectorId = $tracking->kpi->deliverable->commitment->sector_id;
+        $sector = \App\Models\Sector::find($sectorId);
+        
+        if (!$sector) {
+            return;
+        }
+        
+        // Get Facilitators assigned to this sector
+        $facilitatorRoles = UserRole::where('role', UserRole::ROLE_FACILITATOR)
+            ->where('entity_id', $sectorId)
+            ->where('role_status', UserRole::STATUS_ACTIVE)
+            ->get();
+        
+        if ($facilitatorRoles->isEmpty()) {
+            return;
+        }
+        
+        $facilitatorIds = $facilitatorRoles->pluck('user_id')->toArray();
+        $facilitators = User::whereIn('id', $facilitatorIds)->get();
+        $sectorHead = Auth::user();
+        
+        if ($facilitators->isEmpty() || !$sectorHead) {
+            return;
+        }
+
+        $body = 'Sector Head of ' . $sector->sector_name . ' has approved performance tracking for ' . $tracking->kpi->kpi . '. Please review and confirm.';
+        $forme = 'Your approval for ' . $tracking->kpi->kpi . ' has been sent to Facilitator for confirmation.';
+
+        foreach ($facilitators as $facilitator) {
+            self::make($sectorHead, $facilitator, $tracking, 'Confirmation Required', $body, 'Tracking Approved');
+        }
+        self::make($sectorHead, $sectorHead, $tracking, 'Approval Sent', $forme, 'System');
+    }
+
+    /**
+     * Notify Coordinator when Facilitator confirms
+     */
+    public static function notifyCoordinatorAfterFacilitatorConfirmation($tracking)
+    {
+        // Get all active Coordinators
+        $coordinatorRoles = UserRole::whereIn('role', [UserRole::ROLE_COORDINATOR, UserRole::ROLE_DEPUTY_COORDINATOR])
+            ->where('role_status', UserRole::STATUS_ACTIVE)
+            ->where('entity_id', 0) // All sectors access
+            ->get();
+        
+        if ($coordinatorRoles->isEmpty()) {
+            return;
+        }
+        
+        $coordinatorIds = $coordinatorRoles->pluck('user_id')->toArray();
+        $coordinators = User::whereIn('id', $coordinatorIds)->get();
+        $facilitator = Auth::user();
+        
+        if ($coordinators->isEmpty() || !$facilitator || !$tracking->kpi || !$tracking->kpi->deliverable || !$tracking->kpi->deliverable->commitment) {
+            return;
+        }
+        
+        $sector = $tracking->kpi->deliverable->commitment->sector;
+        $sectorName = $sector ? $sector->sector_name : 'Unknown Sector';
+
+        $body = 'Facilitator has confirmed performance tracking for ' . $tracking->kpi->kpi . ' from ' . $sectorName . '. Please review and provide final approval.';
+        $forme = 'Your confirmation for ' . $tracking->kpi->kpi . ' has been sent to Coordinator for final approval.';
+
+        foreach ($coordinators as $coordinator) {
+            self::make($facilitator, $coordinator, $tracking, 'Final Approval Required', $body, 'Tracking Confirmed');
+        }
+        self::make($facilitator, $facilitator, $tracking, 'Confirmation Sent', $forme, 'System');
+    }
+
     public static function make(User $sender, User $recipient, Model $model, $title, $body, $type, $do = 1)
     {
         $notification = new Notification();
