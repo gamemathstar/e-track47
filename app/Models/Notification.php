@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use App\Models\FacilitatorSector;
 
 class Notification extends Model
 {
@@ -40,8 +41,11 @@ class Notification extends Model
         $receiverIds = [];
         foreach ($deliveryUnitRoleIds as $role) {
             if ($role->role === 'Facilitator' && $sectorId) {
-                // Only include Facilitators assigned to this sector
-                if ($role->entity_id == $sectorId) {
+                // Only include Facilitators assigned to this sector (check facilitator_sectors pivot table)
+                $isAssignedToSector = FacilitatorSector::where('user_role_id', $role->id)
+                    ->where('sector_id', $sectorId)
+                    ->exists();
+                if ($isAssignedToSector) {
                     $receiverIds[] = $role->user_id;
                 }
             } else {
@@ -161,16 +165,20 @@ class Notification extends Model
             return;
         }
         
-        // Get Facilitators assigned to this sector
-        $facilitatorRoles = UserRole::where('role', UserRole::ROLE_FACILITATOR)
-            ->where('entity_id', $sectorId)
-            ->where('role_status', UserRole::STATUS_ACTIVE)
-            ->get();
+        // Get Facilitators assigned to this sector (from facilitator_sectors pivot table)
+        $facilitatorRoleIds = FacilitatorSector::where('sector_id', $sectorId)
+            ->whereHas('userRole', function($q) {
+                $q->where('role', UserRole::ROLE_FACILITATOR)
+                  ->where('role_status', UserRole::STATUS_ACTIVE);
+            })
+            ->pluck('user_role_id')
+            ->toArray();
         
-        if ($facilitatorRoles->isEmpty()) {
+        if (empty($facilitatorRoleIds)) {
             return;
         }
         
+        $facilitatorRoles = UserRole::whereIn('id', $facilitatorRoleIds)->get();
         $facilitatorIds = $facilitatorRoles->pluck('user_id')->toArray();
         $facilitators = User::whereIn('id', $facilitatorIds)->get();
         $sectorHead = Auth::user();

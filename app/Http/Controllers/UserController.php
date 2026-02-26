@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Commitment;
 use App\Models\Deliverable;
+use App\Models\FacilitatorSector;
 use App\Models\Kpi;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
@@ -43,9 +44,21 @@ class UserController extends Controller
         // Sector filter
         if ($request->filled('sector_id')) {
             $sectorId = $request->input('sector_id');
-            $query->whereHas('roles', function ($q) use ($sectorId) {
-                $q->where('entity_id', $sectorId)
-                    ->where('role_status', UserRole::STATUS_ACTIVE);
+            $query->where(function($q) use ($sectorId) {
+                // For single-sector roles (Sector Head, Data Admin)
+                $q->whereHas('roles', function ($roleQuery) use ($sectorId) {
+                    $roleQuery->where('entity_id', $sectorId)
+                        ->where('role_status', UserRole::STATUS_ACTIVE)
+                        ->whereIn('role', [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_DATA_ADMIN]);
+                })
+                // For Facilitators with multiple sectors
+                ->orWhereHas('roles', function ($roleQuery) use ($sectorId) {
+                    $roleQuery->where('role', UserRole::ROLE_FACILITATOR)
+                        ->where('role_status', UserRole::STATUS_ACTIVE)
+                        ->whereHas('facilitatorSectors', function ($fsQuery) use ($sectorId) {
+                            $fsQuery->where('sector_id', $sectorId);
+                        });
+                });
             });
         }
 
@@ -168,7 +181,7 @@ class UserController extends Controller
                     UserRole::ROLE_DEPUTY_COORDINATOR,
                     UserRole::ROLE_FACILITATOR,
                 ]),
-            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
@@ -198,9 +211,10 @@ class UserController extends Controller
 
                 // Determine entity_id
                 $entityId = 0;
-                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN, UserRole::ROLE_FACILITATOR])) {
+                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN])) {
                     $entityId = $validated['sector_id'] ?? 0;
                 }
+                // Facilitators use facilitator_sectors pivot table (entity_id = 0)
                 // Coordinators and Deputy Coordinators have entity_id = 0 (access all sectors)
 
                 // Check if user already has an active role
@@ -209,7 +223,10 @@ class UserController extends Controller
                     ->first();
 
                 if ($existingRole) {
-                    // Revoke existing active role
+                    // Revoke existing active role and remove facilitator sectors
+                    if ($existingRole->role === UserRole::ROLE_FACILITATOR) {
+                        FacilitatorSector::where('user_role_id', $existingRole->id)->delete();
+                    }
                     $existingRole->revoke();
                 }
 
@@ -221,6 +238,16 @@ class UserController extends Controller
                 $userRole->entity_id = $entityId;
                 $userRole->role_status = UserRole::STATUS_ACTIVE;
                 $userRole->save();
+
+                // For Facilitators, save multiple sectors in pivot table
+                if ($validated['role'] === UserRole::ROLE_FACILITATOR && !empty($validated['sector_ids'])) {
+                    foreach ($validated['sector_ids'] as $sectorId) {
+                        FacilitatorSector::create([
+                            'user_role_id' => $userRole->id,
+                            'sector_id' => $sectorId,
+                        ]);
+                    }
+                }
 
                 $message = isset($request->id) ? 'User updated successfully.' : 'User created successfully.';
                 return back()->with('success', $message);
@@ -318,10 +345,15 @@ class UserController extends Controller
                     UserRole::ROLE_DEPUTY_COORDINATOR,
                     UserRole::ROLE_FACILITATOR,
                 ]),
-            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . '|exists:sectors,id',
+            'sector_ids' => 'nullable|required_if:role,' . UserRole::ROLE_FACILITATOR . '|array',
+            'sector_ids.*' => 'exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
+            'sector_ids.required_if' => 'Please select at least one sector for Facilitator role.',
+            'sector_ids.array' => 'Sectors must be provided as an array.',
+            'sector_ids.*.exists' => 'One or more selected sectors do not exist.',
         ]);
 
         try {
@@ -335,10 +367,23 @@ class UserController extends Controller
 
             // Determine entity_id
             $entityId = 0;
-            if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_FACILITATOR])) {
+            if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN])) {
                 $entityId = $validated['sector_id'] ?? 0;
             }
+            // Facilitators use facilitator_sectors pivot table (entity_id = 0)
             // Coordinators and Deputy Coordinators have entity_id = 0 (access all sectors)
+
+            // Get existing active roles to clean up facilitator sectors
+            $existingActiveRoles = UserRole::where('user_id', $user->id)
+                ->where('role_status', UserRole::STATUS_ACTIVE)
+                ->get();
+
+            // Delete facilitator sectors for existing facilitator roles
+            foreach ($existingActiveRoles as $existingRole) {
+                if ($existingRole->role === UserRole::ROLE_FACILITATOR) {
+                    FacilitatorSector::where('user_role_id', $existingRole->id)->delete();
+                }
+            }
 
             // Revoke all existing active roles
             UserRole::where('user_id', $user->id)
@@ -353,6 +398,16 @@ class UserController extends Controller
             $userRole->entity_id = $entityId;
             $userRole->role_status = UserRole::STATUS_ACTIVE;
             $userRole->save();
+
+            // For Facilitators, save multiple sectors in pivot table
+            if ($validated['role'] === UserRole::ROLE_FACILITATOR && !empty($validated['sector_ids'])) {
+                foreach ($validated['sector_ids'] as $sectorId) {
+                    FacilitatorSector::create([
+                        'user_role_id' => $userRole->id,
+                        'sector_id' => $sectorId,
+                    ]);
+                }
+            }
 
             return back()->with('success', 'User role updated successfully.');
         } catch (\Exception $e) {

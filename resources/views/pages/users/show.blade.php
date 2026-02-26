@@ -306,7 +306,17 @@
                                         <p class="text-sm text-emerald-700 mt-1">
                                             <strong>Role:</strong> {{ $currentRole->role }}<br>
                                             <strong>Entity:</strong> {{ $currentRole->target_entity }}
-                                            @if($currentRole->target_entity === 'Sector' && $currentRole->sector)
+                                            @if($currentRole->role === 'Facilitator')
+                                                <br><strong>Sectors:</strong>
+                                                @php
+                                                    $facilitatorSectors = $currentRole->facilitatorSectors()->with('sector')->get();
+                                                @endphp
+                                                @if($facilitatorSectors->count() > 0)
+                                                    {{ $facilitatorSectors->pluck('sector.sector_name')->join(', ') }}
+                                                @else
+                                                    None assigned
+                                                @endif
+                                            @elseif($currentRole->target_entity === 'Sector' && $currentRole->sector)
                                                 - {{ $currentRole->sector->sector_name }}
                                             @endif
                                         </p>
@@ -341,6 +351,7 @@
                                             <option value="Facilitator">Facilitator</option>
                                         </select>
                                     </div>
+                                    <!-- Single Sector Selection (for Sector Head, Data Admin) -->
                                     <div class="col-span-12 lg:col-span-4" id="update_sector_area" style="display: none;">
                                         <label for="update_sector_id" class="form-label">Sector</label>
                                         <select name="sector_id" id="update_sector_id" class="form-control">
@@ -349,6 +360,20 @@
                                                 <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
                                             @endforeach
                                         </select>
+                                    </div>
+                                    <!-- Multiple Sector Selection (for Facilitator) -->
+                                    <div class="col-span-12 lg:col-span-4" id="update_facilitator_sectors_area" style="display: none;">
+                                        <label for="update_sector_ids" class="form-label">Sectors <span class="text-danger small">(select one or more)</span></label>
+                                        <select name="sector_ids[]" id="update_sector_ids" multiple class="form-control" style="min-height: 120px;">
+                                            @php
+                                                $currentFacilitatorRole = $currentRole && $currentRole->role === 'Facilitator' ? $currentRole : null;
+                                                $currentSectorIds = $currentFacilitatorRole ? $currentFacilitatorRole->facilitatorSectors()->pluck('sector_id')->toArray() : [];
+                                            @endphp
+                                            @foreach($sectors as $sektor)
+                                                <option value="{{$sektor->id}}" {{ in_array($sektor->id, old('sector_ids', $currentSectorIds)) ? 'selected' : '' }}>{{$sektor->sector_name}}</option>
+                                            @endforeach
+                                        </select>
+                                        <p class="text-xs text-muted mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple sectors</p>
                                     </div>
                                     <div class="col-span-12 lg:col-span-4 flex items-end">
                                         <button type="submit" class="btn btn-primary w-full">Update Role</button>
@@ -379,7 +404,16 @@
                                                     <td>{{ $role->role }}</td>
                                                     <td>{{ $role->target_entity }}</td>
                                                     <td>
-                                                        @if($role->target_entity === 'Sector' && $role->sector)
+                                                        @if($role->role === 'Facilitator')
+                                                            @php
+                                                                $facilitatorSectors = $role->facilitatorSectors()->with('sector')->get();
+                                                            @endphp
+                                                            @if($facilitatorSectors->count() > 0)
+                                                                {{ $facilitatorSectors->pluck('sector.sector_name')->join(', ') }}
+                                                            @else
+                                                                None assigned
+                                                            @endif
+                                                        @elseif($role->target_entity === 'Sector' && $role->sector)
                                                             {{ $role->sector->sector_name }}
                                                         @else
                                                             N/A
@@ -440,14 +474,34 @@
             // Role change handler for role update form
             $("#update_role").on('change', function () {
                 var selectedRole = $(this).val();
-                if (selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
+                var isFacilitator = selectedRole === 'Facilitator';
+                var needsSingleSector = selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin';
+                
+                // Show/hide single sector field
+                if (needsSingleSector) {
                     $("#update_sector_area").show();
                     $("#update_sector_id").prop('required', true);
                 } else {
                     $("#update_sector_area").hide();
-                    $("#update_sector_id").prop('required', false);
+                    $("#update_sector_id").prop('required', false).val('');
+                }
+                
+                // Show/hide multiple sectors field (for Facilitator)
+                if (isFacilitator) {
+                    $("#update_facilitator_sectors_area").show();
+                    $("#update_sector_ids").prop('required', true);
+                } else {
+                    $("#update_facilitator_sectors_area").hide();
+                    $("#update_sector_ids").prop('required', false);
+                    // Clear all selections
+                    $("#update_sector_ids option:selected").prop('selected', false);
                 }
             });
+            
+            // Initialize on page load if role is pre-selected
+            @if($currentRole && $currentRole->role === 'Facilitator')
+                $("#update_role").val('Facilitator').trigger('change');
+            @endif
         });
     </script>
 @endsection

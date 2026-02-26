@@ -169,7 +169,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($users as $user)
                 @php
+                    $userRole = $user->getCurrentRole();
                     $sector = $user->sector();
+                    $facilitatorSectors = null;
+                    if ($userRole && $userRole->role === 'Facilitator') {
+                        $facilitatorSectors = $userRole->facilitatorSectors()->with('sector')->get();
+                    }
                 @endphp
                 <div
                     class="bg-white rounded-xl border border-primary/10 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
@@ -183,9 +188,15 @@
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-lg font-bold text-slate-900 truncate">{{ $user->full_name }}</h3>
                                 <p class="text-sm text-slate-600 mt-1">
-                                    {{ $user->role() ? $user->role()->role : 'No Role' }}
+                                    {{ $userRole ? $userRole->role : 'No Role' }}
                                 </p>
-                                @if($sector)
+                                @if($facilitatorSectors && $facilitatorSectors->count() > 0)
+                                    <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                        <span class="material-icons text-sm">business</span>
+                                        <span
+                                            class="truncate">{{ $facilitatorSectors->pluck('sector.sector_name')->join(', ') }}</span>
+                                    </p>
+                                @elseif($sector)
                                     <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
                                         <span class="material-icons text-sm">business</span>
                                         {{ $sector->sector_name }}
@@ -279,10 +290,10 @@
                         <div class="space-y-6">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label for="full_name" class="block text-sm font-medium text-slate-700 mb-2">
+                                    <label for="add_full_name" class="block text-sm font-medium text-slate-700 mb-2">
                                         Full Name
                                     </label>
-                                    <input type="text" id="full_name" name="full_name"
+                                    <input type="text" id="add_full_name" name="full_name"
                                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all @error('full_name') border-red-500 @enderror"
                                            placeholder="Enter full name"
                                            value="{{ old('full_name') }}"
@@ -293,10 +304,10 @@
                                 </div>
 
                                 <div>
-                                    <label for="email" class="block text-sm font-medium text-slate-700 mb-2">
+                                    <label for="add_email" class="block text-sm font-medium text-slate-700 mb-2">
                                         Email
                                     </label>
-                                    <input type="email" id="email" name="email"
+                                    <input type="email" id="add_email" name="email"
                                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all @error('email') border-red-500 @enderror"
                                            placeholder="Enter email address"
                                            value="{{ old('email') }}"
@@ -307,10 +318,10 @@
                                 </div>
 
                                 <div>
-                                    <label for="phone_number" class="block text-sm font-medium text-slate-700 mb-2">
+                                    <label for="add_phone_number" class="block text-sm font-medium text-slate-700 mb-2">
                                         Phone Number
                                     </label>
-                                    <input type="tel" id="phone_number" name="phone_number"
+                                    <input type="tel" id="add_phone_number" name="phone_number"
                                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                            placeholder="Enter phone number"
                                            value="{{ old('phone_number') }}">
@@ -319,31 +330,29 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="role" class="block text-sm font-medium text-slate-700 mb-2">
+                                    <label for="add_role" class="block text-sm font-medium text-slate-700 mb-2">
                                         User Type / Role
                                     </label>
-                                    <select name="role" id="role"
+                                    <select name="role" id="add_role"
                                             class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all @error('role') border-red-500 @enderror"
                                             required>
                                         <option value="">Select Role</option>
-                                        <option
-                                            value="Governor" {{ old('role') == 'Governor'         ? 'selected' : '' }}>
+                                        <option value="Governor" {{ old('role') == 'Governor' ? 'selected' : '' }}>
                                             Governor
                                         </option>
                                         <option
-                                            value="System Admin" {{ old('role') == 'System Admin'     ? 'selected' : '' }}>
+                                            value="System Admin" {{ old('role') == 'System Admin' ? 'selected' : '' }}>
                                             System Admin
                                         </option>
                                         <option
-                                            value="Sector Head" {{ old('role') == 'Sector Head'      ? 'selected' : '' }}>
+                                            value="Sector Head" {{ old('role') == 'Sector Head' ? 'selected' : '' }}>
                                             Sector Head
                                         </option>
-                                        <option
-                                            value="Data Admin" {{ old('role') == 'Data Admin'       ? 'selected' : '' }}>
+                                        <option value="Data Admin" {{ old('role') == 'Data Admin' ? 'selected' : '' }}>
                                             Data Admin
                                         </option>
                                         <option
-                                            value="Coordinator" {{ old('role') == 'Coordinator'      ? 'selected' : '' }}>
+                                            value="Coordinator" {{ old('role') == 'Coordinator' ? 'selected' : '' }}>
                                             Coordinator
                                         </option>
                                         <option
@@ -351,7 +360,7 @@
                                             Deputy Coordinator
                                         </option>
                                         <option
-                                            value="Facilitator" {{ old('role') == 'Facilitator'      ? 'selected' : '' }}>
+                                            value="Facilitator" {{ old('role') == 'Facilitator' ? 'selected' : '' }}>
                                             Facilitator
                                         </option>
                                     </select>
@@ -360,11 +369,12 @@
                                     @enderror
                                 </div>
 
-                                <div id="sectorArea">   <!-- ← no style attribute here anymore -->
-                                    <label for="sector_id" class="block text-sm font-medium text-slate-700 mb-2">
+                                <!-- Single Sector Selection (Sector Head, Data Admin) -->
+                                <div id="sectorArea" style="display: none;">
+                                    <label for="add_sector_id" class="block text-sm font-medium text-slate-700 mb-2">
                                         Sector <span class="text-red-500 text-xs">(required for this role)</span>
                                     </label>
-                                    <select name="sector_id" id="sector_id"
+                                    <select name="sector_id" id="add_sector_id"
                                             class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all @error('sector_id') border-red-500 @enderror">
                                         <option value="">Select Sector</option>
                                         @foreach($sectors as $sektor)
@@ -375,6 +385,31 @@
                                         @endforeach
                                     </select>
                                     @error('sector_id')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <!-- Multiple Sector Selection (Facilitator) -->
+                                <div id="facilitatorSectorsArea" style="display: none;">
+                                    <label for="sector_ids" class="block text-sm font-medium text-slate-700 mb-2">
+                                        Sectors <span class="text-red-500 text-xs">(select one or more sectors)</span>
+                                    </label>
+                                    <select name="sector_ids[]" id="sector_ids" multiple
+                                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all @error('sector_ids') border-red-500 @enderror"
+                                            style="min-height: 120px;">
+                                        @foreach($sectors as $sektor)
+                                            <option
+                                                value="{{ $sektor->id }}" {{ in_array($sektor->id, old('sector_ids', [])) ? 'selected' : '' }}>
+                                                {{ $sektor->sector_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <p class="text-xs text-slate-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select
+                                        multiple sectors</p>
+                                    @error('sector_ids')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                    @enderror
+                                    @error('sector_ids.*')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                     @enderror
                                 </div>
@@ -400,43 +435,65 @@
 
 @section('js')
     <script>
+        // Wait for modal to be shown before attaching logic
         document.addEventListener('DOMContentLoaded', function () {
+            console.log("index.js loaded – waiting for modal show event");
 
-            // Try multiple ways to find the element
-            const roleSelectById = document.getElementById('role');
-            const roleSelectByQuery = document.querySelector('#addUserModal #role');
-            const roleSelectByForm = document.querySelector('#addUserModal select[name="role"]');
+            const modalElement = document.getElementById('addUserModal');
 
-            // Pick the most reliable one (usually the querySelector inside modal)
-            const roleSelect = roleSelectByQuery || roleSelectById || roleSelectByForm;
-
-            const sectorWrapper = document.getElementById('sectorArea');
-            const sectorSelect = document.getElementById('sector_id');
-
-            if (!roleSelect) {
-                console.error("ROLE SELECT NOT FOUND — check ID or modal timing");
-                return;
-            }
-            if (!sectorWrapper || !sectorSelect) {
-                console.error("Sector elements missing");
+            if (!modalElement) {
+                console.error("Modal element #addUserModal not found");
                 return;
             }
 
-            const rolesNeedingSector = ['Sector Head', 'Data Admin', 'Facilitator'];
+            modalElement.addEventListener('shown.tw.modal', function () {
+                console.log("Modal is now visible – initializing sector logic");
 
-            function toggleSectorField() {
-                const selected = roleSelect.value.trim();
-                const needed = rolesNeedingSector.includes(selected);
+                const roleSelect = document.getElementById('add_role');
+                const sectorWrapper = document.getElementById('sectorArea');
+                const facilitatorWrapper = document.getElementById('facilitatorSectorsArea');
+                const singleSectorSelect = document.getElementById('add_sector_id');
+                const multiSectorSelect = document.getElementById('sector_ids');
 
-                sectorWrapper.style.display = needed ? 'block' : 'none';
-                sectorSelect.required = needed;
-                if (!needed) sectorSelect.value = '';
-            }
+                if (!roleSelect || !sectorWrapper || !facilitatorWrapper || !singleSectorSelect || !multiSectorSelect) {
+                    console.error("One or more critical elements missing inside modal");
+                    console.log("add_role:", !!roleSelect);
+                    console.log("sectorArea:", !!sectorWrapper);
+                    console.log("facilitatorSectorsArea:", !!facilitatorWrapper);
+                    console.log("add_sector_id:", !!singleSectorSelect);
+                    console.log("sector_ids:", !!multiSectorSelect);
+                    return;
+                }
 
-            roleSelect.addEventListener('change', toggleSectorField);
+                console.log("All elements found – logic attached");
 
-            // Force initial check
-            toggleSectorField();
+                const singleSectorRoles = ['Sector Head', 'Data Admin'];
+                const multiSectorRole = 'Facilitator';
+
+                function updateVisibility() {
+                    const value = roleSelect.value.trim();
+                    console.log("Current role value:", value);
+
+                    const showSingle = singleSectorRoles.includes(value);
+                    const showMulti = value === multiSectorRole;
+
+                    sectorWrapper.style.display = showSingle ? 'block' : 'none';
+                    facilitatorWrapper.style.display = showMulti ? 'block' : 'none';
+
+                    singleSectorSelect.required = showSingle;
+                    multiSectorSelect.required = showMulti;
+
+                    if (!showSingle) singleSectorSelect.value = '';
+                    if (!showMulti) {
+                        Array.from(multiSectorSelect.options).forEach(opt => opt.selected = false);
+                    }
+                }
+
+                roleSelect.addEventListener('change', updateVisibility);
+
+                // Run once immediately (handles old() values / validation errors)
+                updateVisibility();
+            });
         });
     </script>
 @endsection

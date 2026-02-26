@@ -374,8 +374,15 @@ class User extends Authenticatable
         $sectorIds = [];
         $activeRoles = $this->activeRoles();
         foreach ($activeRoles as $role) {
-            if ($role->isRestrictedToAssignedSectors() && $role->entity_id > 0) {
-                $sectorIds[] = $role->entity_id;
+            if ($role->isRestrictedToAssignedSectors()) {
+                // For Facilitators, get sectors from facilitator_sectors pivot table
+                if ($role->role === \App\Models\UserRole::ROLE_FACILITATOR) {
+                    $facilitatorSectors = $role->facilitatorSectors()->pluck('sector_id')->toArray();
+                    $sectorIds = array_merge($sectorIds, $facilitatorSectors);
+                } elseif ($role->entity_id > 0) {
+                    // For other single-sector roles, use entity_id
+                    $sectorIds[] = $role->entity_id;
+                }
             }
         }
         return array_unique($sectorIds);
