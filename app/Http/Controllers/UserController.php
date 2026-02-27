@@ -146,6 +146,7 @@ class UserController extends Controller
 
     public function awaitingVerificationDelView(Request $request, $id)
     {
+        $user = Auth::user();
         $deliverable = Deliverable::find($id);
         $kpis = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
@@ -154,7 +155,7 @@ class UserController extends Controller
             ->groupBy('kpis.id')
             ->get();
 
-        return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable'));
+        return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
     }
 
     public function create()

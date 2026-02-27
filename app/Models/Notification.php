@@ -231,6 +231,50 @@ class Notification extends Model
         self::make($facilitator, $facilitator, $tracking, 'Confirmation Sent', $forme, 'System');
     }
 
+    /**
+     * Notify Data Admin/Sector Head when Facilitator rejects
+     */
+    public static function notifyDataAdminAfterFacilitatorRejection($tracking)
+    {
+        if (!$tracking->kpi || !$tracking->kpi->deliverable || !$tracking->kpi->deliverable->commitment) {
+            return;
+        }
+
+        $sector = $tracking->kpi->deliverable->commitment->sector;
+        if (!$sector) {
+            return;
+        }
+
+        // Get Data Admin users for this sector
+        $dataAdminRoles = UserRole::where('role', 'Data Admin')
+            ->where('role_status', UserRole::STATUS_ACTIVE)
+            ->where('entity_id', $sector->id)
+            ->get();
+
+        if ($dataAdminRoles->isEmpty()) {
+            return;
+        }
+
+        $dataAdminIds = $dataAdminRoles->pluck('user_id')->toArray();
+        $dataAdmins = User::whereIn('id', $dataAdminIds)->get();
+        $facilitator = Auth::user();
+
+        if ($dataAdmins->isEmpty() || !$facilitator) {
+            return;
+        }
+
+        $sectorName = $sector->sector_name ?? 'Unknown Sector';
+        $rejectionReason = $tracking->facilitator_rejection_reason ?? 'No reason provided';
+
+        $body = 'Facilitator has rejected performance tracking for ' . $tracking->kpi->kpi . ' from ' . $sectorName . '. Reason: ' . $rejectionReason . '. Please review and make necessary corrections.';
+        $forme = 'Your rejection for ' . $tracking->kpi->kpi . ' has been sent to Data Admin for corrections.';
+
+        foreach ($dataAdmins as $dataAdmin) {
+            self::make($facilitator, $dataAdmin, $tracking, 'Performance Tracking Rejected', $body, 'Tracking Rejected');
+        }
+        self::make($facilitator, $facilitator, $tracking, 'Rejection Sent', $forme, 'System');
+    }
+
     public static function make(User $sender, User $recipient, Model $model, $title, $body, $type, $do = 1)
     {
         $notification = new Notification();

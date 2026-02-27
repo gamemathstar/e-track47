@@ -397,25 +397,29 @@
                                                     @elseif($user->isDataAdmin())
                                                         {{-- Data Admin can only update existing records --}}
                                                         <span class="text-slate-400 text-sm">-</span>
-                                                        <small class="text-xs text-slate-500 block">PDCU must create first</small>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
                                                     @if($user->isDataAdmin() && $q1Track)
-                                                        {{-- Data Admin can update existing records --}}
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="1"
-                                                           data-track-id="{{ $q1Track->id }}"
-                                                           data-milestone="{{ $q1Track->milestone }}"
-                                                           data-actual-value="{{ $q1Track->actual_value }}"
-                                                           data-remarks="{{ $q1Track->remarks }}"
-                                                           data-tracking-date="{{ $q1Track->tracking_date ? \Carbon\Carbon::parse($q1Track->tracking_date)->format('Y-m-d') : '' }}"
-                                                           data-tw-target="#add-performance">
-                                                            <span class="material-symbols-outlined text-sm">edit</span>
-                                                            <span class="text-xs ml-1">Update</span>
-                                                        </a>
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q1Track->sector_head_approved_by || ($q1Track->sector_head_approved_by && $q1Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="1"
+                                                               data-track-id="{{ $q1Track->id }}"
+                                                               data-milestone="{{ $q1Track->milestone }}"
+                                                               data-actual-value="{{ $q1Track->actual_value }}"
+                                                               data-remarks="{{ $q1Track->remarks }}"
+                                                               data-tracking-date="{{ $q1Track->tracking_date ? \Carbon\Carbon::parse($q1Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
                                                     @endif
                                                     @if($user->isDeliveryUnit() && $q1Track)
                                                         @if($q1Track->actual_value)
@@ -481,25 +485,29 @@
                                                     @elseif($user->isDataAdmin())
                                                         {{-- Data Admin can only update existing records --}}
                                                         <span class="text-slate-400 text-sm">-</span>
-                                                        <small class="text-xs text-slate-500 block">PDCU must create first</small>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
                                                     @if($user->isDataAdmin() && $q2Track)
-                                                        {{-- Data Admin can update existing records --}}
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="2"
-                                                           data-track-id="{{ $q2Track->id }}"
-                                                           data-milestone="{{ $q2Track->milestone }}"
-                                                           data-actual-value="{{ $q2Track->actual_value }}"
-                                                           data-remarks="{{ $q2Track->remarks }}"
-                                                           data-tracking-date="{{ $q2Track->tracking_date ? \Carbon\Carbon::parse($q2Track->tracking_date)->format('Y-m-d') : '' }}"
-                                                           data-tw-target="#add-performance">
-                                                            <span class="material-symbols-outlined text-sm">edit</span>
-                                                            <span class="text-xs ml-1">Update</span>
-                                                        </a>
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q2Track->sector_head_approved_by || ($q2Track->sector_head_approved_by && $q2Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="2"
+                                                               data-track-id="{{ $q2Track->id }}"
+                                                               data-milestone="{{ $q2Track->milestone }}"
+                                                               data-actual-value="{{ $q2Track->actual_value }}"
+                                                               data-remarks="{{ $q2Track->remarks }}"
+                                                               data-tracking-date="{{ $q2Track->tracking_date ? \Carbon\Carbon::parse($q2Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
                                                     @endif
                                                     @if($user->isDeliveryUnit() && $q2Track)
                                                         @if($q2Track->actual_value)
@@ -565,25 +573,29 @@
                                                     @elseif($user->isDataAdmin())
                                                         {{-- Data Admin can only update existing records --}}
                                                         <span class="text-slate-400 text-sm">-</span>
-                                                        <small class="text-xs text-slate-500 block">PDCU must create first</small>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
                                                     @if($user->isDataAdmin() && $q3Track)
-                                                        {{-- Data Admin can update existing records --}}
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="3"
-                                                           data-track-id="{{ $q3Track->id }}"
-                                                           data-milestone="{{ $q3Track->milestone }}"
-                                                           data-actual-value="{{ $q3Track->actual_value }}"
-                                                           data-remarks="{{ $q3Track->remarks }}"
-                                                           data-tracking-date="{{ $q3Track->tracking_date ? \Carbon\Carbon::parse($q3Track->tracking_date)->format('Y-m-d') : '' }}"
-                                                           data-tw-target="#add-performance">
-                                                            <span class="material-symbols-outlined text-sm">edit</span>
-                                                            <span class="text-xs ml-1">Update</span>
-                                                        </a>
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q3Track->sector_head_approved_by || ($q3Track->sector_head_approved_by && $q3Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="3"
+                                                               data-track-id="{{ $q3Track->id }}"
+                                                               data-milestone="{{ $q3Track->milestone }}"
+                                                               data-actual-value="{{ $q3Track->actual_value }}"
+                                                               data-remarks="{{ $q3Track->remarks }}"
+                                                               data-tracking-date="{{ $q3Track->tracking_date ? \Carbon\Carbon::parse($q3Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
                                                     @endif
                                                     @if($user->isDeliveryUnit() && $q3Track)
                                                         @if($q3Track->actual_value)
@@ -649,25 +661,29 @@
                                                     @elseif($user->isDataAdmin())
                                                         {{-- Data Admin can only update existing records --}}
                                                         <span class="text-slate-400 text-sm">-</span>
-                                                        <small class="text-xs text-slate-500 block">PDCU must create first</small>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
                                                     @else
                                                         <span class="text-slate-400 text-sm">-</span>
                                                     @endif
                                                     @if($user->isDataAdmin() && $q4Track)
-                                                        {{-- Data Admin can update existing records --}}
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="4"
-                                                           data-track-id="{{ $q4Track->id }}"
-                                                           data-milestone="{{ $q4Track->milestone }}"
-                                                           data-actual-value="{{ $q4Track->actual_value }}"
-                                                           data-remarks="{{ $q4Track->remarks }}"
-                                                           data-tracking-date="{{ $q4Track->tracking_date ? \Carbon\Carbon::parse($q4Track->tracking_date)->format('Y-m-d') : '' }}"
-                                                           data-tw-target="#add-performance">
-                                                            <span class="material-symbols-outlined text-sm">edit</span>
-                                                            <span class="text-xs ml-1">Update</span>
-                                                        </a>
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q4Track->sector_head_approved_by || ($q4Track->sector_head_approved_by && $q4Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="4"
+                                                               data-track-id="{{ $q4Track->id }}"
+                                                               data-milestone="{{ $q4Track->milestone }}"
+                                                               data-actual-value="{{ $q4Track->actual_value }}"
+                                                               data-remarks="{{ $q4Track->remarks }}"
+                                                               data-tracking-date="{{ $q4Track->tracking_date ? \Carbon\Carbon::parse($q4Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
                                                     @endif
                                                     @if($user->isDeliveryUnit() && $q4Track)
                                                         @if($q4Track->actual_value)
@@ -689,12 +705,12 @@
                                                         @endif
                                                     @endif
                                                 </td>
-                                                <td class="px-6 py-4">
-                                        <span
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold {{ $statusBadgeClass }}">
-                                            {{ $statusText }}
-                                        </span>
-                                                </td>
+                                                {{--                                                <td class="px-6 py-4">--}}
+                                                {{--                                        <span--}}
+                                                {{--                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold {{ $statusBadgeClass }}">--}}
+                                                {{--                                            {{ $statusText }}--}}
+                                                {{--                                        </span>--}}
+                                                {{--                                                </td>--}}
                                                 <td class="px-6 py-4 text-right">
                                                     <div
                                                         class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -871,7 +887,8 @@
                                                required
                                                step="any" min="0"
                                                placeholder="Enter milestone value">
-                                        <small class="text-slate-500 text-xs mt-1">Set the milestone target for this quarter</small>
+                                        <small class="text-slate-500 text-xs mt-1">Set the milestone target for this
+                                            quarter</small>
                                     @else
                                         {{-- Data Admin sees milestone as readonly (set by PDCU) --}}
                                         <input id="milestone" type="number" class="form-control"
@@ -880,7 +897,8 @@
                                                readonly
                                                step="any" min="0"
                                                placeholder="Set by PDCU">
-                                        <small class="text-slate-500 text-xs mt-1" id="milestone-help-text">Milestone is set by PDCU and cannot be changed</small>
+                                        <small class="text-slate-500 text-xs mt-1" id="milestone-help-text">Milestone is
+                                            set by PDCU and cannot be changed</small>
                                     @endif
                                 </div>
 
@@ -920,49 +938,53 @@
 
             {{-- PDCU Set Milestone Modal (Simple - Only Milestone) --}}
             @if($user->isDeliveryUnit())
-            <div id="set-milestone-modal" class="modal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <form id="set-milestone-form" action="{{route('deliverable.store.tracking')}}" method="post">
-                            @csrf
-                            <input type="hidden" id="milestone-kpi-id" name="kpi_id">
-                            <input type="hidden" id="milestone-quarter" name="quarter">
-                            <input type="hidden" id="milestone-year" name="year" value="{{$year}}">
-                            <input type="hidden" id="milestone-track-id" name="track_id">
-                            <!-- BEGIN: Modal Header -->
-                            <div class="modal-header">
-                                <h2 class="font-medium text-base mr-auto">
-                                    Set Milestone for <span id="milestone-kpi-name"></span>
-                                </h2>
-                                <div class="text-sm text-slate-500">
-                                    Year: <span class="font-bold text-slate-700">{{ $year }}</span>
-                                </div>
-                            </div> <!-- END: Modal Header -->
-                            <!-- BEGIN: Modal Body -->
-                            <div class="modal-body">
-                                <div class="mb-4">
-                                    <label for="milestone-value" class="form-label">Quarter</label>
-                                    <div id="milestone-quarter-display" class="p-2 bg-slate-50 rounded text-sm font-medium"></div>
-                                </div>
-                                <div class="mb-4">
-                                    <label for="milestone-value" class="form-label">Milestone <span class="text-red-500">*</span></label>
-                                    <input id="milestone-value" type="number" class="form-control"
-                                           name="milestone" step="any" min="0" required
-                                           placeholder="Enter milestone value">
-                                    <small class="text-slate-500 text-xs mt-1">Set the milestone target for this quarter. Data Admin will fill in the actual performance data later.</small>
-                                </div>
-                            </div> <!-- END: Modal Body -->
-                            <!-- BEGIN: Modal Footer -->
-                            <div class="modal-footer">
-                                <button type="button" data-tw-dismiss="modal"
-                                        class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                </button>
-                                <button type="submit" class="btn btn-primary w-20">Save</button>
-                            </div> <!-- END: Modal Footer -->
-                        </form>
+                <div id="set-milestone-modal" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form id="set-milestone-form" action="{{route('deliverable.store.tracking')}}"
+                                  method="post">
+                                @csrf
+                                <input type="hidden" id="milestone-kpi-id" name="kpi_id">
+                                <input type="hidden" id="milestone-quarter" name="quarter">
+                                <input type="hidden" id="milestone-year" name="year" value="{{$year}}">
+                                <input type="hidden" id="milestone-track-id" name="track_id">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">
+                                        Set Milestone for <span id="milestone-kpi-name"></span>
+                                    </h2>
+                                    <div class="text-sm text-slate-500">
+                                        Year: <span class="font-bold text-slate-700">{{ $year }}</span>
+                                    </div>
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body">
+                                    <div class="mb-4">
+                                        <label for="milestone-value" class="form-label">Quarter</label>
+                                        <div id="milestone-quarter-display"
+                                             class="p-2 bg-slate-50 rounded text-sm font-medium"></div>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="milestone-value" class="form-label">Milestone <span
+                                                class="text-red-500">*</span></label>
+                                        <input id="milestone-value" type="number" class="form-control"
+                                               name="milestone" step="any" min="0" required
+                                               placeholder="Enter milestone value">
+                                        <small class="text-slate-500 text-xs mt-1">Set the milestone target for this
+                                            quarter. Data Admin will fill in the actual performance data later.</small>
+                                    </div>
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Save</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
             @endif
 
             <div id="update-performance" class="modal" tabindex="-1" aria-hidden="true">
@@ -1176,18 +1198,18 @@
                 $('#milestone-kpi-id').val($(this).data('id'));
                 var quarter = $(this).data('quarter');
                 $('#milestone-quarter').val(quarter);
-                
+
                 // Get existing milestone value and track_id if available
                 var existingMilestone = $(this).data('milestone');
                 var trackId = $(this).data('track-id');
-                
+
                 // Set track_id if it exists (for updates)
                 if (trackId) {
                     $('#milestone-track-id').val(trackId);
                 } else {
                     $('#milestone-track-id').val('');
                 }
-                
+
                 // Display quarter name
                 var quarterNames = {
                     '1': 'Q1 - First Quarter',
@@ -1196,7 +1218,7 @@
                     '4': 'Q4 - Fourth Quarter'
                 };
                 $('#milestone-quarter-display').html(quarterNames[quarter] || 'Quarter ' + quarter);
-                
+
                 // Clear milestone value
                 $('#milestone-value').val('');
             });
@@ -1206,13 +1228,13 @@
                 e.preventDefault();
                 var form = $(this);
                 var formData = new FormData(this);
-                
+
                 // Debug: Log form data
                 console.log('Form data being sent:');
                 for (var pair of formData.entries()) {
                     console.log(pair[0] + ': ' + pair[1]);
                 }
-                
+
                 var submitButton = form.find('button[type="submit"]');
                 var originalText = submitButton.html();
 
@@ -1241,7 +1263,7 @@
                                 $('#set-milestone-modal').removeClass('show').hide();
                                 $('#set-milestone-modal').attr('aria-hidden', 'true');
                             }
-                            
+
                             // Show success message using SweetAlert before reloading
                             Swal.fire({
                                 icon: 'success',
@@ -1251,7 +1273,7 @@
                                 confirmButtonText: 'OK',
                                 timer: 2000,
                                 timerProgressBar: true
-                            }).then(function() {
+                            }).then(function () {
                                 location.reload(); // Reload page to show new data
                             });
                         } else {
@@ -1293,11 +1315,11 @@
                 // Set the quarter selector to the clicked quarter
                 var quarter = $(this).data('quarter');
                 $('#quarter-select').val(quarter);
-                
+
                 // Check if this is an update (has track-id) or new entry
                 var trackId = $(this).data('track-id');
                 var isPDCU = $('#milestone').data('is-pdcu') === '1' || $('#milestone').data('is-pdcu') === 1;
-                
+
                 if (trackId) {
                     // This is an update (Data Admin updating existing record)
                     $('#track_id').val(trackId);
@@ -1308,7 +1330,7 @@
                     if (trackingDate) {
                         $('#tracking-date').val(trackingDate);
                     }
-                    
+
                     // For Data Admin updating, milestone is readonly
                     if (!isPDCU) {
                         $('#milestone').prop('readonly', true);
@@ -1322,7 +1344,7 @@
                     $('#remark').val('');
                     $('#files').val('');
                     $('#preview').empty();
-                    
+
                     // For PDCU creating new, milestone is editable and required
                     if (isPDCU) {
                         $('#milestone').prop('readonly', false);
@@ -1404,14 +1426,14 @@
                 $('#track_idX').val(trackId)
                 $('#delivery_department_remarkIx').val($(this).data('delivery_department_remark'))
                 $('#confirmation_statusIx').val($(this).data('confirmation_status'))
-                
+
                 // For PDCU users, populate the input field; for others, show in div
                 @if($user->isDeliveryUnit())
-                    $('#milestoneX').val(milestoneValue);
+                $('#milestoneX').val(milestoneValue);
                 @else
-                    $('#milestoneView').html(milestoneValue || '<span class="text-slate-400">Not set</span>');
+                $('#milestoneView').html(milestoneValue || '<span class="text-slate-400">Not set</span>');
                 @endif
-                
+
                 $('#remarkView').html($(this).data('remarks'))
                 $('#quarterView').html($(this).data('quarter'))
                 $('#actual_valueView').html($(this).data('actual_value'))

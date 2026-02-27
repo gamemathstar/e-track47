@@ -28,6 +28,8 @@ class PerformanceTracking extends Model
         'sector_head_approved_by',
         'facilitator_confirmed_at',
         'facilitator_confirmed_by',
+        'facilitator_decision',
+        'facilitator_rejection_reason',
         'coordinator_confirmed_at',
         'coordinator_confirmed_by'
     ];
