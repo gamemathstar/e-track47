@@ -11,15 +11,23 @@ class Kpi extends Model
 
     protected $fillable = [
         'deliverable_id',
+        'framework_id',
         'kpi',
+        'description',
         'target_value',
         'unit_of_measurement',
+        'status',
         'year',
     ];
 
     public function deliverable()
     {
         return $this->belongsTo(Deliverable::class);
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function performanceTracking()

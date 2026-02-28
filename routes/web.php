@@ -7,6 +7,7 @@ use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataEntryAccessController;
 use App\Http\Controllers\DeliverableController;
+use App\Http\Controllers\FrameworkController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\PublicGalleryController;
@@ -133,6 +134,19 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/lock-all', [DataEntryAccessController::class, 'lockAll'])->name('lock-all');
         Route::post('/unlock-all', [DataEntryAccessController::class, 'unlockAll'])->name('unlock-all');
         Route::post('/initialize-quarter', [DataEntryAccessController::class, 'initializeQuarter'])->name('initialize-quarter');
+    });
+
+    // Framework Management (PDCU Coordinators only)
+    Route::prefix('frameworks')->name('frameworks.')->group(function () {
+        Route::get('/', [FrameworkController::class, 'index'])->name('index');
+        Route::get('/create', [FrameworkController::class, 'create'])->name('create');
+        // Specific routes must come before parameterized routes
+        Route::post('/confirm-inherit', [FrameworkController::class, 'confirmInherit'])->name('confirm-inherit');
+        Route::post('/', [FrameworkController::class, 'store'])->name('store');
+        // Parameterized routes come last
+        Route::get('/{framework}', [FrameworkController::class, 'show'])->name('show');
+        Route::post('/{framework}/archive', [FrameworkController::class, 'archive'])->name('archive');
+        Route::post('/{framework}/activate', [FrameworkController::class, 'activate'])->name('activate');
     });
 });
 

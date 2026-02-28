@@ -15,6 +15,7 @@ class PerformanceTracking extends Model
 
     protected $fillable = [
         'kpi_id',
+        'framework_id',
         'quarter',
         'year',
         'milestone',
@@ -44,6 +45,11 @@ class PerformanceTracking extends Model
     public function kpi()
     {
         return $this->belongsTo(Kpi::class);
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function status()

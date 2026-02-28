@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CommitmentBudget;
+use App\Models\Framework;
 use App\Models\Sector;
 use App\Models\SectorBudget;
 use App\Models\SectorFile;
@@ -23,7 +24,17 @@ class SectorController extends Controller
 
     public function index(Request $request)
     {
-        $sectors = Sector::get();
+        // Get the active framework
+        $activeFramework = Framework::where('status', 'Active')->first();
+        
+        if ($activeFramework) {
+            // Load sectors from the active framework
+            $sectors = Sector::where('framework_id', $activeFramework->id)->get();
+        } else {
+            // If no active framework, return empty collection
+            $sectors = collect([]);
+        }
+        
         return view('pages.sector.index', compact('sectors'));
     }
 
@@ -35,7 +46,19 @@ class SectorController extends Controller
             // Add other validation rules as needed
         ]);
 
-        Sector::create($request->all());
+        // Get the active framework
+        $activeFramework = Framework::where('status', 'Active')->first();
+        
+        if (!$activeFramework) {
+            return redirect()->route('sectors.index')
+                ->with('failure', 'No active framework found. Please activate a framework first.');
+        }
+
+        // Create sector with active framework ID
+        $sectorData = $request->all();
+        $sectorData['framework_id'] = $activeFramework->id;
+        
+        Sector::create($sectorData);
 
         return redirect()->route('sectors.index')->with('success', 'MDA/Sector created successfully');
     }

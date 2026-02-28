@@ -35,7 +35,11 @@
                             <div class="side-menu__title"> All MDAs/Sectors</div>
                         </a>
                     </li>
-                    @foreach(\App\Models\Sector::get() as $sector)
+                    @php
+                        $activeFramework = \App\Models\Framework::where('status', 'Active')->first();
+                        $sectors = $activeFramework ? \App\Models\Sector::where('framework_id', $activeFramework->id)->get() : collect();
+                    @endphp
+                    @foreach($sectors as $sector)
                         <li>
                             <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">
                                 <div class="side-menu__icon"><i data-lucide="activity"></i></div>
@@ -102,6 +106,17 @@
                     <div class="side-menu__icon"><i data-lucide="key"></i></div>
                     <div class="side-menu__title">
                         Data Entry Management
+                    </div>
+                </a>
+            </li>
+        @endif
+        @if($user->isCoordinator())
+            <li>
+                <a href="{{route('frameworks.index')}}"
+                   class="side-menu {{ Request::is('frameworks*') ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="file-text"></i></div>
+                    <div class="side-menu__title">
+                        Framework Management
                     </div>
                 </a>
             </li>

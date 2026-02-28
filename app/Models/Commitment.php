@@ -17,7 +17,10 @@ class Commitment extends Model
         'description',
         'status',
         'budget',
+        'start_date',
+        'end_date',
         'sector_id',
+        'framework_id',
         'img_url',
     ];
 
@@ -26,6 +29,11 @@ class Commitment extends Model
         return $this->belongsToMany(User::class, 'users_commitments')
             ->withPivot('role')
             ->withTimestamps();
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function deliverables()
