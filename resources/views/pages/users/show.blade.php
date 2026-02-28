@@ -3,6 +3,7 @@
 @php
     $currentUser = auth()->user();
     $isViewingOwnProfile = $currentUser && $currentUser->id === $user->id && !$currentUser->isSystemAdmin();
+    $currentRole = $user->getCurrentRole();
 @endphp
 
 @section('content')
@@ -290,7 +291,6 @@
                         
                         <!-- Current Active Role -->
                         @php
-                            $currentRole = $user->getCurrentRole();
                             // Sort roles: Active first, then Revoked, then by created_at DESC
                             $allRoles = $user->roles()
                                 ->orderByRaw("CASE WHEN role_status = 'Active' THEN 0 ELSE 1 END")
