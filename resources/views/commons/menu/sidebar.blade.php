@@ -80,25 +80,6 @@
                 </li>
             @endif
         @endif
-        @if($user->isDeliveryUnit())
-            <li>
-                <a href="javascript:;" class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
-                    <div class="side-menu__icon"><i data-lucide="box"></i></div>
-                    <div class="side-menu__title">
-                        Delivery Unit
-                        <div class="side-menu__sub-icon "> <i data-lucide="chevron-down"></i> </div>
-                    </div>
-                </a>
-                <ul class="">
-                    <li>
-                        <a href="{{route('delivery.awaiting.verification')}}" class="side-menu">
-                            <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>
-                            <div class="side-menu__title">Confirmation </div>
-                        </a>
-                    </li>
-                </ul>
-            </li>
-        @endif
         @if($user->isCoordinator() || $user->isDeputyCoordinator())
             <li>
                 <a href="{{route('data-entry.index')}}"

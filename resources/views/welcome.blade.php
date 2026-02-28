@@ -149,8 +149,8 @@
                          src="{{asset('governor.jpeg')}}">
                     <div
                         class="absolute -bottom-6 -right-6 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-xl border border-primary/10 hidden md:block">
-                        <div class="text-3xl font-bold text-primary">X%</div>
-                        <div class="text-xs font-semibold text-slate-500 uppercase">Average Efficiency</div>
+                        <div class="text-3xl font-bold text-primary">{{ $averagePerformance ?? 0 }}%</div>
+                        <div class="text-xs font-semibold text-slate-500 uppercase">Average Performance</div>
                     </div>
                 </div>
             </div>

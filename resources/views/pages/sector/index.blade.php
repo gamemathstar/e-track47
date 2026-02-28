@@ -7,10 +7,20 @@
         Manage MDAs/Sectors
     </h2>
     <div class="grid grid-cols-12 gap-6 mt-5">
-        <div class="intro-y col-span-12 flex flex-wrap sm:flex-nowrap items-center mt-2">
-            <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
-                    data-tw-target="#header-footer-modal-preview">Add MDA/Sector
-            </button>
+        <div class="intro-y col-span-12 flex flex-wrap sm:flex-nowrap items-center justify-between mt-2">
+            <div class="flex flex-wrap sm:flex-nowrap items-center">
+                @if($user->isGovernor() || $user->isSystemAdmin() || $user->isCoordinator() || $user->isDeputyCoordinator())
+                    <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal"
+                            data-tw-target="#header-footer-modal-preview">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add MDA/Sector
+                    </button>
+                @endif
+            </div>
+            @if($user->isDeliveryUnit())
+                <a href="{{route('delivery.awaiting.verification')}}" class="btn btn-primary shadow-md">
+                    <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i> Confirmation
+                </a>
+            @endif
 
             <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
@@ -60,7 +70,7 @@
             @endif
             @if(session('failure'))
                 <div class="alert alert-danger-soft alert-dismissible show flex items-center mb-2" role="alert"><i
-                            data-lucide="alert-octagon" class="w-6 h-6 mr-2"></i> {{ session('failure') }}
+                        data-lucide="alert-octagon" class="w-6 h-6 mr-2"></i> {{ session('failure') }}
                     <button type="button" class="btn-close" data-tw-dismiss="alert" aria-label="Close">
                         <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
@@ -137,7 +147,7 @@
                                          class="lucide lucide-trash-2 w-4 h-4 mr-1">
                                         <polyline points="3 6 5 6 21 6"></polyline>
                                         <path
-                                                d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                            d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                                         <line x1="10" y1="11" x2="10" y2="17"></line>
                                         <line x1="14" y1="11" x2="14" y2="17"></line>
                                     </svg>
