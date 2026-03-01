@@ -96,9 +96,12 @@
                         <div class="relative">
                             <select name="year" id="filter_year"
                                     class="w-full bg-background-light border-primary/20 rounded-lg text-sm focus:ring-primary focus:border-primary appearance-none py-2 pl-3 pr-10">
+                                @php
+                                    $defaultYear = $activeFramework ? $activeFramework->year : date('Y');
+                                @endphp
                                 @foreach(range(date('Y'), 2024) as $yr)
                                     <option
-                                        value="{{ $yr }}" {{ request('year', date('Y')) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                                        value="{{ $yr }}" {{ request('year', $defaultYear) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                                 @endforeach
                             </select>
                             <span

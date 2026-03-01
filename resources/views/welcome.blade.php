@@ -49,7 +49,7 @@
             <div class="flex flex-col">
                 <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">PDCU</h1>
                 <p class="text-[10px] font-semibold uppercase tracking-widest text-primary">Performance Delivery
-                    Unit</p>
+                    Coordination Unit</p>
             </div>
         </div>
         <nav class="hidden items-center gap-8 md:flex">

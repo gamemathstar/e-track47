@@ -55,13 +55,15 @@
             <form id="statisticsFilterForm" method="GET" action="{{ route('dashboard.statistics') }}">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="space-y-1.5">
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Sectors / MDAs</label>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Sectors /
+                            MDAs</label>
                         <div class="relative">
                             <select name="sector_id" id="filter_sector"
                                     class="w-full bg-background-light border-primary/20 rounded-lg text-sm focus:ring-primary focus:border-primary appearance-none py-2 pl-3 pr-10">
                                 <option value="">All Sectors</option>
                                 @foreach($sectors as $sector)
-                                    <option value="{{ $sector->id }}" {{ request('sector_id') == $sector->id ? 'selected' : '' }}>{{ $sector->sector_name }}</option>
+                                    <option
+                                        value="{{ $sector->id }}" {{ request('sector_id') == $sector->id ? 'selected' : '' }}>{{ $sector->sector_name }}</option>
                                 @endforeach
                             </select>
                             <span
@@ -73,8 +75,12 @@
                         <div class="relative">
                             <select name="year" id="filter_year"
                                     class="w-full bg-background-light border-primary/20 rounded-lg text-sm focus:ring-primary focus:border-primary appearance-none py-2 pl-3 pr-10">
-                                @foreach(range(date('Y'), 2020) as $yr)
-                                    <option value="{{ $yr }}" {{ request('year', date('Y')) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                                @php
+                                    $defaultYear = $activeFramework ? $activeFramework->year : date('Y');
+                                @endphp
+                                @foreach(range(date('Y'), 2024) as $yr)
+                                    <option
+                                        value="{{ $yr }}" {{ request('year', $defaultYear) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                                 @endforeach
                             </select>
                             <span
@@ -84,13 +90,15 @@
                     <div class="space-y-1.5">
                         <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Quarter</label>
                         <div
-                            class="flex p-1 bg-background-light border border-primary/20 rounded-lg" id="quarterSelector">
-                            <input type="hidden" name="quarter" id="selected_quarter" value="{{ request('quarter', 'all') }}">
-                            <button type="button" data-quarter="all" 
+                            class="flex p-1 bg-background-light border border-primary/20 rounded-lg"
+                            id="quarterSelector">
+                            <input type="hidden" name="quarter" id="selected_quarter"
+                                   value="{{ request('quarter', 'all') }}">
+                            <button type="button" data-quarter="all"
                                     class="quarter-btn flex-1 py-1 text-xs font-bold rounded-md transition-colors hover:bg-primary/10 {{ request('quarter', 'all') == 'all' ? 'bg-primary text-white shadow-lg shadow-primary/20' : '' }}">
-                                All
+                                Annual
                             </button>
-                            <button type="button" data-quarter="1" 
+                            <button type="button" data-quarter="1"
                                     class="quarter-btn flex-1 py-1 text-xs font-bold rounded-md transition-colors hover:bg-primary/10 {{ request('quarter') == 1 ? 'bg-primary text-white shadow-lg shadow-primary/20' : '' }}">
                                 Q1
                             </button>
@@ -161,7 +169,8 @@
                     </p>
                     @if($stats['top_sector'] ?? null)
                         <div class="w-full bg-primary/10 rounded-full h-1.5 mt-4 overflow-hidden">
-                            <div class="bg-primary h-full rounded-full" style="width: {{ min(100, $stats['top_sector']->avg_performance ?? 0) }}%"></div>
+                            <div class="bg-primary h-full rounded-full"
+                                 style="width: {{ min(100, $stats['top_sector']->avg_performance ?? 0) }}%"></div>
                         </div>
                     @endif
                 </div>
@@ -179,7 +188,7 @@
                         <p class="text-xs mt-1 text-slate-400">MDAs requiring field review</p>
                     </div>
                     <a href="{{ route('delivery.awaiting.verification') }}"
-                        class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-500/20 transition-colors">
+                       class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-500/20 transition-colors">
                         Review List
                     </a>
                 </div>
@@ -195,9 +204,9 @@
                         <p class="text-sm text-slate-500">Comparison of Planned vs. Actual achievement rates (%)</p>
                     </div>
                     <div class="flex items-center gap-4 text-xs font-bold">
-                        <div class="flex items-center gap-1.5"><span
-                                class="w-3 h-3 rounded-sm bg-primary/20 border border-primary/30"></span> Target
-                        </div>
+                        {{--                        <div class="flex items-center gap-1.5"><span--}}
+                        {{--                                class="w-3 h-3 rounded-sm bg-primary/20 border border-primary/30"></span> Target--}}
+                        {{--                        </div>--}}
                         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-primary"></span>
                             Actual
                         </div>
@@ -208,11 +217,13 @@
                         <div class="grid grid-cols-[120px_1fr] items-center gap-4">
                             <span class="text-sm font-medium text-slate-400">{{ $sector->sector_name }}</span>
                             <div class="space-y-1">
+                                {{--                                <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">--}}
+                                {{--                                    <div class="bg-primary/20 h-full border-r border-primary/30"--}}
+                                {{--                                         style="width: 100%"></div>--}}
+                                {{--                                </div>--}}
                                 <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
-                                    <div class="bg-primary/20 h-full border-r border-primary/30" style="width: 100%"></div>
-                                </div>
-                                <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
-                                    <div class="bg-primary h-full" style="width: {{ min(100, $sector->avg_performance ?? 0) }}%"></div>
+                                    <div class="bg-primary h-full"
+                                         style="width: {{ min(100, $sector->avg_performance ?? 0) }}%"></div>
                                 </div>
                             </div>
                         </div>
@@ -283,181 +294,188 @@
             </div>
         </section>
         <!-- Detailed Breakdown Table -->
-        <section class="bg-white rounded-xl border border-primary/10 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-primary/10 flex items-center justify-between">
-                <h3 class="text-lg font-bold">Performance Breakdown by MDA</h3>
-                <div class="flex items-center gap-3">
-                    <div class="relative group">
-                        <input
-                            class="bg-background-light border-primary/20 rounded-lg text-xs py-1.5 pl-8 focus:ring-primary focus:border-primary w-64"
-                            placeholder="Search MDA or KPI..." type="text"/>
-                        <span
-                            class="material-symbols-outlined absolute left-2.5 top-1.5 text-slate-500 text-lg">search</span>
-                    </div>
-                    <button class="p-1.5 rounded-lg border border-primary/20 hover:bg-primary/10 transition-colors">
-                        <span class="material-symbols-outlined text-slate-400 text-xl">tune</span>
-                    </button>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                    <tr class="bg-background-light text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-primary/10">
-                        <th class="px-6 py-4">Sector / Lead MDA</th>
-                        <th class="px-6 py-4">Key Performance Indicator (KPI)</th>
-                        <th class="px-6 py-4 text-center">Baseline</th>
-                        <th class="px-6 py-4 text-center">Target {{ ($quarter ?? 'all') == 'all' ? '(All Q)' : '(Q' . $quarter . ')' }}</th>
-                        <th class="px-6 py-4 text-center">Actual {{ ($quarter ?? 'all') == 'all' ? '(All Q)' : '(Q' . $quarter . ')' }}</th>
-                        <th class="px-6 py-4 text-center">Variance</th>
-                        <th class="px-6 py-4 text-right">Status</th>
-                    </tr>
-                    </thead>
-                    <tbody class="text-sm divide-y divide-primary/5">
-                    @php
-                        $detailedBreakdown = $stats['detailed_breakdown'] ?? null;
-                    @endphp
-                    @forelse($detailedBreakdown as $row)
-                        @php
-                            $statusClass = '';
-                            $statusText = $row->status ?? 'Pending';
-                            if ($statusText == 'Exceptional' || $statusText == 'Target Met') {
-                                $statusClass = 'bg-primary/20 text-primary';
-                            } elseif ($statusText == 'At Risk') {
-                                $statusClass = 'bg-amber-500/20 text-amber-600';
-                            } elseif ($statusText == 'Delayed') {
-                                $statusClass = 'bg-red-500/20 text-red-500';
-                            } else {
-                                $statusClass = 'bg-slate-200 text-slate-600';
-                            }
-                            $variance = $row->variance ?? null;
-                            $varianceClass = $variance !== null ? ($variance >= 0 ? 'text-green-500' : 'text-red-500') : 'text-slate-400';
-                            $varianceSign = $variance !== null ? ($variance >= 0 ? '+' : '') : '';
-                        @endphp
-                        <tr class="hover:bg-primary/5 transition-colors cursor-pointer group">
-                            <td class="px-6 py-4">
-                                <div class="font-bold">{{ $row->sector_name }}</div>
-                                <div class="text-[10px] text-slate-500">{{ $row->commitment_name ?? 'N/A' }}</div>
-                            </td>
-                            <td class="px-6 py-4 max-w-xs">
-                                <span class="line-clamp-1 font-medium">{{ $row->kpi }}</span>
-                            </td>
-                            <td class="px-6 py-4 text-center text-slate-400">{{ $row->baseline ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}</td>
-                            <td class="px-6 py-4 text-center font-bold">{{ $row->target_value ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}</td>
-                            <td class="px-6 py-4 text-center font-bold {{ $row->actual_value ? 'text-primary' : 'text-slate-400' }}">
-                                {{ $row->actual_value ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}
-                            </td>
-                            <td class="px-6 py-4 text-center">
-                                @if($variance !== null)
-                                    <span class="{{ $varianceClass }} text-xs font-bold">{{ $varianceSign }}{{ number_format($variance, 1) }}%</span>
-                                @else
-                                    <span class="text-slate-400 text-xs">-</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <span class="px-2 py-0.5 rounded-full {{ $statusClass }} text-[10px] font-bold uppercase">{{ $statusText }}</span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                                No performance data available for the selected filters.
-                            </td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <div
-                class="px-6 py-4 bg-background-light border-t border-primary/10 flex items-center justify-between">
-                @php
-                    $detailedBreakdown = $stats['detailed_breakdown'] ?? null;
-                @endphp
-                @if($detailedBreakdown)
-                    <p class="text-[11px] text-slate-500">
-                        Showing {{ $detailedBreakdown->firstItem() ?? 0 }} to {{ $detailedBreakdown->lastItem() ?? 0 }} of {{ $detailedBreakdown->total() }} records analyzed in {{ ($quarter ?? 'all') == 'all' ? 'All Quarters' : 'Q' . $quarter }} {{ $year ?? date('Y') }}
-                    </p>
-                    <div class="flex items-center gap-2">
-                        @if($detailedBreakdown->onFirstPage())
-                            <button
-                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-not-allowed"
-                                disabled>
-                                <span class="material-symbols-outlined text-lg">chevron_left</span>
-                            </button>
-                        @else
-                            <a href="{{ $detailedBreakdown->previousPageUrl() }}"
-                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">
-                                <span class="material-symbols-outlined text-lg">chevron_left</span>
-                            </a>
-                        @endif
-                        
-                        <span class="text-xs font-bold px-2">Page {{ $detailedBreakdown->currentPage() }} of {{ $detailedBreakdown->lastPage() }}</span>
-                        
-                        @if($detailedBreakdown->hasMorePages())
-                            <a href="{{ $detailedBreakdown->nextPageUrl() }}"
-                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">
-                                <span class="material-symbols-outlined text-lg">chevron_right</span>
-                            </a>
-                        @else
-                            <button
-                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-not-allowed"
-                                disabled>
-                                <span class="material-symbols-outlined text-lg">chevron_right</span>
-                            </button>
-                        @endif
-                    </div>
-                @else
-                    <p class="text-[11px] text-slate-500">
-                        No records available
-                    </p>
-                @endif
-            </div>
-        </section>
+        {{--        <section class="bg-white rounded-xl border border-primary/10 shadow-sm overflow-hidden">--}}
+        {{--            <div class="px-6 py-4 border-b border-primary/10 flex items-center justify-between">--}}
+        {{--                <h3 class="text-lg font-bold">Performance Breakdown by MDA</h3>--}}
+        {{--                <div class="flex items-center gap-3">--}}
+        {{--                    <div class="relative group">--}}
+        {{--                        <input--}}
+        {{--                            class="bg-background-light border-primary/20 rounded-lg text-xs py-1.5 pl-8 focus:ring-primary focus:border-primary w-64"--}}
+        {{--                            placeholder="Search MDA or KPI..." type="text"/>--}}
+        {{--                        <span--}}
+        {{--                            class="material-symbols-outlined absolute left-2.5 top-1.5 text-slate-500 text-lg">search</span>--}}
+        {{--                    </div>--}}
+        {{--                    <button class="p-1.5 rounded-lg border border-primary/20 hover:bg-primary/10 transition-colors">--}}
+        {{--                        <span class="material-symbols-outlined text-slate-400 text-xl">tune</span>--}}
+        {{--                    </button>--}}
+        {{--                </div>--}}
+        {{--            </div>--}}
+        {{--            <div class="overflow-x-auto">--}}
+        {{--                <table class="w-full text-left border-collapse">--}}
+        {{--                    <thead>--}}
+        {{--                    <tr class="bg-background-light text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-primary/10">--}}
+        {{--                        <th class="px-6 py-4">Sector / Lead MDA</th>--}}
+        {{--                        <th class="px-6 py-4">Key Performance Indicator (KPI)</th>--}}
+        {{--                        <th class="px-6 py-4 text-center">Baseline</th>--}}
+        {{--                        <th class="px-6 py-4 text-center">--}}
+        {{--                            Target {{ ($quarter ?? 'all') == 'all' ? '(All Q)' : '(Q' . $quarter . ')' }}</th>--}}
+        {{--                        <th class="px-6 py-4 text-center">--}}
+        {{--                            Actual {{ ($quarter ?? 'all') == 'all' ? '(All Q)' : '(Q' . $quarter . ')' }}</th>--}}
+        {{--                        <th class="px-6 py-4 text-center">Variance</th>--}}
+        {{--                        <th class="px-6 py-4 text-right">Status</th>--}}
+        {{--                    </tr>--}}
+        {{--                    </thead>--}}
+        {{--                    <tbody class="text-sm divide-y divide-primary/5">--}}
+        {{--                    @php--}}
+        {{--                        $detailedBreakdown = $stats['detailed_breakdown'] ?? null;--}}
+        {{--                    @endphp--}}
+        {{--                    @forelse($detailedBreakdown as $row)--}}
+        {{--                        @php--}}
+        {{--                            $statusClass = '';--}}
+        {{--                            $statusText = $row->status ?? 'Pending';--}}
+        {{--                            if ($statusText == 'Exceptional' || $statusText == 'Target Met') {--}}
+        {{--                                $statusClass = 'bg-primary/20 text-primary';--}}
+        {{--                            } elseif ($statusText == 'At Risk') {--}}
+        {{--                                $statusClass = 'bg-amber-500/20 text-amber-600';--}}
+        {{--                            } elseif ($statusText == 'Delayed') {--}}
+        {{--                                $statusClass = 'bg-red-500/20 text-red-500';--}}
+        {{--                            } else {--}}
+        {{--                                $statusClass = 'bg-slate-200 text-slate-600';--}}
+        {{--                            }--}}
+        {{--                            $variance = $row->variance ?? null;--}}
+        {{--                            $varianceClass = $variance !== null ? ($variance >= 0 ? 'text-green-500' : 'text-red-500') : 'text-slate-400';--}}
+        {{--                            $varianceSign = $variance !== null ? ($variance >= 0 ? '+' : '') : '';--}}
+        {{--                        @endphp--}}
+        {{--                        <tr class="hover:bg-primary/5 transition-colors cursor-pointer group">--}}
+        {{--                            <td class="px-6 py-4">--}}
+        {{--                                <div class="font-bold">{{ $row->sector_name }}</div>--}}
+        {{--                                <div class="text-[10px] text-slate-500">{{ $row->commitment_name ?? 'N/A' }}</div>--}}
+        {{--                            </td>--}}
+        {{--                            <td class="px-6 py-4 max-w-xs">--}}
+        {{--                                <span class="line-clamp-1 font-medium">{{ $row->kpi }}</span>--}}
+        {{--                            </td>--}}
+        {{--                            <td class="px-6 py-4 text-center text-slate-400">{{ $row->baseline ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}</td>--}}
+        {{--                            <td class="px-6 py-4 text-center font-bold">{{ $row->target_value ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}</td>--}}
+        {{--                            <td class="px-6 py-4 text-center font-bold {{ $row->actual_value ? 'text-primary' : 'text-slate-400' }}">--}}
+        {{--                                {{ $row->actual_value ?? 'N/A' }} {{ $row->unit_of_measurement ?? '' }}--}}
+        {{--                            </td>--}}
+        {{--                            <td class="px-6 py-4 text-center">--}}
+        {{--                                @if($variance !== null)--}}
+        {{--                                    <span--}}
+        {{--                                        class="{{ $varianceClass }} text-xs font-bold">{{ $varianceSign }}{{ number_format($variance, 1) }}%</span>--}}
+        {{--                                @else--}}
+        {{--                                    <span class="text-slate-400 text-xs">-</span>--}}
+        {{--                                @endif--}}
+        {{--                            </td>--}}
+        {{--                            <td class="px-6 py-4 text-right">--}}
+        {{--                                <span--}}
+        {{--                                    class="px-2 py-0.5 rounded-full {{ $statusClass }} text-[10px] font-bold uppercase">{{ $statusText }}</span>--}}
+        {{--                            </td>--}}
+        {{--                        </tr>--}}
+        {{--                    @empty--}}
+        {{--                        <tr>--}}
+        {{--                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">--}}
+        {{--                                No performance data available for the selected filters.--}}
+        {{--                            </td>--}}
+        {{--                        </tr>--}}
+        {{--                    @endforelse--}}
+        {{--                    </tbody>--}}
+        {{--                </table>--}}
+        {{--            </div>--}}
+        {{--            <div--}}
+        {{--                class="px-6 py-4 bg-background-light border-t border-primary/10 flex items-center justify-between">--}}
+        {{--                @php--}}
+        {{--                    $detailedBreakdown = $stats['detailed_breakdown'] ?? null;--}}
+        {{--                @endphp--}}
+        {{--                @if($detailedBreakdown)--}}
+        {{--                    <p class="text-[11px] text-slate-500">--}}
+        {{--                        Showing {{ $detailedBreakdown->firstItem() ?? 0 }} to {{ $detailedBreakdown->lastItem() ?? 0 }}--}}
+        {{--                        of {{ $detailedBreakdown->total() }} records analyzed--}}
+        {{--                        in {{ ($quarter ?? 'all') == 'all' ? 'All Quarters' : 'Q' . $quarter }} {{ $year ?? date('Y') }}--}}
+        {{--                    </p>--}}
+        {{--                    <div class="flex items-center gap-2">--}}
+        {{--                        @if($detailedBreakdown->onFirstPage())--}}
+        {{--                            <button--}}
+        {{--                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-not-allowed"--}}
+        {{--                                disabled>--}}
+        {{--                                <span class="material-symbols-outlined text-lg">chevron_left</span>--}}
+        {{--                            </button>--}}
+        {{--                        @else--}}
+        {{--                            <a href="{{ $detailedBreakdown->previousPageUrl() }}"--}}
+        {{--                               class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">--}}
+        {{--                                <span class="material-symbols-outlined text-lg">chevron_left</span>--}}
+        {{--                            </a>--}}
+        {{--                        @endif--}}
+
+        {{--                        <span--}}
+        {{--                            class="text-xs font-bold px-2">Page {{ $detailedBreakdown->currentPage() }} of {{ $detailedBreakdown->lastPage() }}</span>--}}
+
+        {{--                        @if($detailedBreakdown->hasMorePages())--}}
+        {{--                            <a href="{{ $detailedBreakdown->nextPageUrl() }}"--}}
+        {{--                               class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">--}}
+        {{--                                <span class="material-symbols-outlined text-lg">chevron_right</span>--}}
+        {{--                            </a>--}}
+        {{--                        @else--}}
+        {{--                            <button--}}
+        {{--                                class="p-1.5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-not-allowed"--}}
+        {{--                                disabled>--}}
+        {{--                                <span class="material-symbols-outlined text-lg">chevron_right</span>--}}
+        {{--                            </button>--}}
+        {{--                        @endif--}}
+        {{--                    </div>--}}
+        {{--                @else--}}
+        {{--                    <p class="text-[11px] text-slate-500">--}}
+        {{--                        No records available--}}
+        {{--                    </p>--}}
+        {{--                @endif--}}
+        {{--            </div>--}}
+        {{--        </section>--}}
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const form = document.getElementById('statisticsFilterForm');
             const quarterButtons = document.querySelectorAll('.quarter-btn');
             const selectedQuarterInput = document.getElementById('selected_quarter');
             const sectorSelect = document.getElementById('filter_sector');
             const yearSelect = document.getElementById('filter_year');
-            
+
             // Function to submit the form
             function submitForm() {
                 form.submit();
             }
-            
+
             // Handle sector dropdown change
             if (sectorSelect) {
-                sectorSelect.addEventListener('change', function() {
+                sectorSelect.addEventListener('change', function () {
                     submitForm();
                 });
             }
-            
+
             // Handle year dropdown change
             if (yearSelect) {
-                yearSelect.addEventListener('change', function() {
+                yearSelect.addEventListener('change', function () {
                     submitForm();
                 });
             }
-            
+
             // Handle quarter button selection
             quarterButtons.forEach(button => {
-                button.addEventListener('click', function() {
+                button.addEventListener('click', function () {
                     const quarter = this.getAttribute('data-quarter');
-                    
+
                     // Update hidden input
                     selectedQuarterInput.value = quarter;
-                    
+
                     // Update button styles
                     quarterButtons.forEach(btn => {
                         btn.classList.remove('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
                         btn.classList.add('hover:bg-primary/10');
                     });
-                    
+
                     this.classList.remove('hover:bg-primary/10');
                     this.classList.add('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
-                    
+
                     // Auto-submit form when quarter changes
                     submitForm();
                 });
