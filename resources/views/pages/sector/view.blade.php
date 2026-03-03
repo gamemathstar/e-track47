@@ -111,12 +111,26 @@
                             @endif
                         </button>
                     @endif
-                    <button
-                        class="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all"
-                        data-tw-toggle="modal" data-tw-target="#sectorHeadModal">
-                        <span class="material-symbols-outlined text-[18px]">person</span>
-                        MDA/Sector Head
-                    </button>
+                    @php
+                        $user = Auth::user();
+                    @endphp
+                    @if($user && $user->isFacilitator())
+                        <a href="{{ route('delivery.awaiting.verification') }}"
+                           class="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all">
+                            <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                            Confirmation
+                            @if(isset($awaitingCount) && $awaitingCount > 0)
+                                <span
+                                    class="bg-primary text-white rounded-full px-2 py-0.5 text-xs font-bold">{{ $awaitingCount }}</span>
+                            @endif
+                        </a>
+                    @endif
+                    {{--                    <button--}}
+                    {{--                        class="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all"--}}
+                    {{--                        data-tw-toggle="modal" data-tw-target="#sectorHeadModal">--}}
+                    {{--                        <span class="material-symbols-outlined text-[18px]">person</span>--}}
+                    {{--                        MDA/Sector Head--}}
+                    {{--                    </button>--}}
                 </div>
             </div>
         </div>

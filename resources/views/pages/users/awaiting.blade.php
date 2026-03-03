@@ -44,7 +44,17 @@
 
                     @else
                     <center>
-                        Click <em class="text-success">Add New </em> to add deliverable.
+                        @php
+                            $user = Auth::user();
+                            $message = 'No performance tracking records are currently awaiting your action.';
+                            
+                            if ($user && $user->isFacilitator()) {
+                                $message = 'No performance tracking records are currently awaiting your review. All records have been processed or there are no records approved by Sector Heads yet.';
+                            } elseif ($user && ($user->isCoordinator() || $user->isDeputyCoordinator())) {
+                                $message = 'No performance tracking records are currently awaiting confirmation. All records have been confirmed or there are no unconfirmed records available.';
+                            }
+                        @endphp
+                        <p class="text-slate-500 mt-4">{{ $message }}</p>
                     </center>
                 @endif
 

@@ -143,18 +143,17 @@ class UserController extends Controller
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
             ->where('commitments.sector_id', $id);
         
-        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
         if ($user->isFacilitator()) {
             $query->where(function($q) use ($user) {
                 // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
                 $q->whereNotNull('performance_trackings.sector_head_approved_by')
                   ->whereNull('performance_trackings.facilitator_confirmed_by')
                   ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already rejected by this facilitator
+                  // OR records already processed by this facilitator (accepted or rejected)
                   ->orWhere(function($subQ) use ($user) {
                       $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
                            ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->where('performance_trackings.facilitator_decision', 'Reject')
                            ->whereNull('performance_trackings.coordinator_confirmed_by');
                   });
             });
@@ -178,18 +177,17 @@ class UserController extends Controller
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
             ->where('deliverables.commitment_id', $id);
         
-        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
         if ($user->isFacilitator()) {
             $query->where(function($q) use ($user) {
                 // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
                 $q->whereNotNull('performance_trackings.sector_head_approved_by')
                   ->whereNull('performance_trackings.facilitator_confirmed_by')
                   ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already rejected by this facilitator
+                  // OR records already processed by this facilitator (accepted or rejected)
                   ->orWhere(function($subQ) use ($user) {
                       $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
                            ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->where('performance_trackings.facilitator_decision', 'Reject')
                            ->whereNull('performance_trackings.coordinator_confirmed_by');
                   });
             });
@@ -212,18 +210,17 @@ class UserController extends Controller
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
             ->where('kpis.deliverable_id', $id);
         
-        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
         if ($user->isFacilitator()) {
             $query->where(function($q) use ($user) {
                 // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
                 $q->whereNotNull('performance_trackings.sector_head_approved_by')
                   ->whereNull('performance_trackings.facilitator_confirmed_by')
                   ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already rejected by this facilitator
+                  // OR records already processed by this facilitator (accepted or rejected)
                   ->orWhere(function($subQ) use ($user) {
                       $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
                            ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->where('performance_trackings.facilitator_decision', 'Reject')
                            ->whereNull('performance_trackings.coordinator_confirmed_by');
                   });
             });

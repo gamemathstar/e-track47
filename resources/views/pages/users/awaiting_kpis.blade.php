@@ -66,7 +66,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator {{ $q1Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q1Track->facilitator_decision == 'Reject' ? 'text-danger' : ($q1Track->facilitator_decision == 'Accept' ? 'text-success' : 'text-primary') }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q1Track->id }}"
@@ -119,7 +119,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator {{ $q2Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q2Track->facilitator_decision == 'Reject' ? 'text-danger' : ($q2Track->facilitator_decision == 'Accept' ? 'text-success' : 'text-primary') }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q2Track->id }}"
@@ -172,7 +172,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator {{ $q3Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q3Track->facilitator_decision == 'Reject' ? 'text-danger' : ($q3Track->facilitator_decision == 'Accept' ? 'text-success' : 'text-primary') }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q3Track->id }}"
@@ -225,7 +225,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator {{ $q4Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q4Track->facilitator_decision == 'Reject' ? 'text-danger' : ($q4Track->facilitator_decision == 'Accept' ? 'text-success' : 'text-primary') }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q4Track->id }}"

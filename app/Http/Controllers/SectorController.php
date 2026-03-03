@@ -134,7 +134,22 @@ class SectorController extends Controller
         $year = $request->input('year', date('Y'));
         $quarter = $request->input('quarter', null);
 
-        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id', 'user', 'year', 'quarter'));
+        // Calculate count of tracking records awaiting facilitator review
+        $awaitingCount = 0;
+        if ($user && $user->isFacilitator()) {
+            $query = DB::table('performance_trackings as pt')
+                ->join('kpis as k', 'pt.kpi_id', '=', 'k.id')
+                ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+                ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('pt.sector_head_approved_by')
+                ->whereNull('pt.facilitator_confirmed_by')
+                ->whereNull('pt.coordinator_confirmed_by');
+            
+            $awaitingCount = $query->distinct('pt.id')->count('pt.id');
+        }
+
+        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id', 'user', 'year', 'quarter', 'awaitingCount'));
     }
 
     public function show(Request $request, $id)
