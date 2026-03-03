@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataEntryAccess;
+use App\Models\Framework;
+use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\UserRole;
 use Carbon\Carbon;
@@ -33,18 +35,37 @@ class DataEntryAccessController extends Controller
         $year = $request->input('year', Carbon::now()->year);
         $quarter = $request->input('quarter', DataEntryAccess::getCurrentQuarter());
 
-        // Get all sectors
-        $sectors = Sector::select('id', 'sector_name')
-            ->orderBy('sector_name')
-            ->get();
+        // Get framework for the selected year
+        $framework = Framework::where('year', $year)->first();
+        
+        // Get sectors from the framework (or all sectors if no framework found)
+        if ($framework) {
+            $sectors = Sector::select('id', 'sector_name')
+                ->where('framework_id', $framework->id)
+                ->orderBy('sector_name')
+                ->get()
+                ->unique('id');
+            
+            // Get sector IDs for filtering
+            $sectorIds = $sectors->pluck('id')->toArray();
+        } else {
+            // Fallback: if no framework found, get all sectors (for backward compatibility)
+            $sectors = Sector::select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get()
+                ->unique('id');
+            
+            $sectorIds = $sectors->pluck('id')->toArray();
+        }
 
         // Initialize access records for all sectors if they don't exist
         $this->initializeQuarter($year, $quarter);
 
-        // Get access records for the selected quarter/year
+        // Get access records for the selected quarter/year, filtered by framework sectors
         $accessRecords = DataEntryAccess::with(['sector', 'grantedBy'])
             ->where('year', $year)
             ->where('quarter', $quarter)
+            ->whereIn('sector_id', $sectorIds)
             ->get()
             ->keyBy('sector_id');
 
@@ -75,6 +96,7 @@ class DataEntryAccessController extends Controller
         $totalSectors = $sectors->count();
         
         // Count open sectors (status is open or override, and deadline hasn't passed)
+        // Filter by selected year and quarter, and only count sectors from the framework
         $openCount = $accessRecords->filter(function ($record) use ($year, $quarter) {
             if (is_object($record) && isset($record->status)) {
                 // Ensure this record matches the selected year and quarter
@@ -104,6 +126,27 @@ class DataEntryAccessController extends Controller
             }
             return false;
         })->count();
+        
+        // Check if there are any performance tracking records for the selected year/quarter
+        $hasTrackingRecords = false;
+        if ($framework && !empty($sectorIds)) {
+            $trackingCount = DB::table('performance_trackings as pt')
+                ->join('kpis as k', 'pt.kpi_id', '=', 'k.id')
+                ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+                ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+                ->where('pt.year', $year)
+                ->where('pt.quarter', $quarter)
+                ->where('pt.framework_id', $framework->id)
+                ->whereIn('c.sector_id', $sectorIds)
+                ->count();
+            $hasTrackingRecords = $trackingCount > 0;
+        } else {
+            // If no framework, check for any tracking records for the year/quarter
+            $trackingCount = PerformanceTracking::where('year', $year)
+                ->where('quarter', $quarter)
+                ->count();
+            $hasTrackingRecords = $trackingCount > 0;
+        }
 
         // Get access log (recent overrides)
         $accessLog = DataEntryAccess::with(['sector', 'grantedBy'])
@@ -119,7 +162,8 @@ class DataEntryAccessController extends Controller
             'quarter',
             'totalSectors',
             'openCount',
-            'accessLog'
+            'accessLog',
+            'hasTrackingRecords'
         ));
     }
 
