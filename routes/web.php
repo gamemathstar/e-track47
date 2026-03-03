@@ -47,7 +47,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/statistics', [DashboardController::class, 'statistics'])->name('dashboard.statistics');
     Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
-    // User Resource
+// User Resource
     Route::get('users', [UserController::class, 'index'])->name("users.index");
     Route::get('delivery/tracking/awaiting/', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");
     Route::get('delivery/tracking/awaiting/comm/{id}/view', [UserController::class, 'awaitingVerificationCommView'])->name("delivery.awaiting.verification.comm.view");
@@ -67,7 +67,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('chart/sector/budget/distribution', [ChartController::class, 'budgetDistribution'])->name('chart.sector.budget.distribution');
     Route::get('chart/sector/budget/pending', [ChartController::class, 'pendingCompleted'])->name('chart.sector.pending.completed');
 
-    // MDA/Sector Resource
+// MDA/Sector Resource
     Route::get('sectors', [SectorController::class, 'index'])->name('sectors.index');
     Route::post('sectors/update', [SectorController::class, 'update'])->name('sectors.update');
     Route::post('sectors/save', [SectorController::class, 'store'])->name('sectors.save');
@@ -78,7 +78,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
     Route::get('sectors/{id}/details/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
-    // MDA/Sector Resource
+// MDA/Sector Resource
     Route::get('commitment', [CommitmentController::class, 'index'])->name('commitments.index');
     Route::post('commitment/update', [CommitmentController::class, 'update'])->name('commitments.update');
     Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
@@ -93,7 +93,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('deliverable/update', [DeliverableController::class, 'update'])->name('deliverable.update');
     Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
     Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');
-    //Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+//Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
     Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
     Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');

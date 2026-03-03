@@ -5,33 +5,33 @@
 @endphp
 <div class="flex items-center border-b border-slate-200/60 dark:border-darkmode-400 pb-5 mb-5">
     @if($user->isDeliveryUnit())
-        <div class="font-medium text-base truncate">
-            <a href="javascript:;" class="flex items-center ml-auto text-primary"
+    <div class="font-medium text-base truncate">
+        <a href="javascript:;" class="flex items-center ml-auto text-primary"
                id="editCommitmentBtn" 
                com-id="{{$commitment->id}}"
                com-title="{{$commitment->name}}"
                com-type="{{$commitment->type}}"
                com-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
                com-status="{{$commitment->status}}"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     icon-name="edit" data-lucide="edit" class="lucide lucide-edit w-4 h-4 mr-2">
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-                Edit Commitment
-            </a>
-        </div>
-        <a href="javascript:;" class="flex items-center ml-auto text-primary"  id="addDeliverableBtn" com-id="{{$commitment->id}}">
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                  icon-name="edit" data-lucide="edit" class="lucide lucide-edit w-4 h-4 mr-2">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            Add Deliverables
+            Edit Commitment
         </a>
+    </div>
+    <a href="javascript:;" class="flex items-center ml-auto text-primary"  id="addDeliverableBtn" com-id="{{$commitment->id}}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             icon-name="edit" data-lucide="edit" class="lucide lucide-edit w-4 h-4 mr-2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Add Deliverables
+    </a>
     @endif
     <hr>
 </div>

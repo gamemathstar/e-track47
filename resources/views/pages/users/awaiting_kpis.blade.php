@@ -66,7 +66,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator text-primary hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q1Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q1Track->id }}"
@@ -78,7 +78,7 @@
                                                 @else
                                                     <span>{{ $q1Track->actual_value }}</span>
                                                 @endif
-                                                @if(($user && $user->isFacilitator()) && $q1Track->actual_value && $q1Track->actual_value != 0 && $q1Track->sector_head_approved_by && !$q1Track->coordinator_confirmed_by)
+                                                @if(($user && $user->isFacilitator()) && $q1Track->actual_value && $q1Track->actual_value != 0 && $q1Track->sector_head_approved_by && !$q1Track->coordinator_confirmed_by && !$q1Track->facilitator_confirmed_by)
                                                     <a href="javascript:"
                                                        class="add-delivery-dept inline-flex items-center text-emerald-600 hover:text-emerald-700"
                                                        data-tw-toggle="modal"
@@ -119,7 +119,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator text-primary hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q2Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q2Track->id }}"
@@ -131,7 +131,7 @@
                                                 @else
                                                     <span>{{ $q2Track->actual_value }}</span>
                                                 @endif
-                                                @if(($user && $user->isFacilitator()) && $q2Track->actual_value && $q2Track->actual_value != 0 && $q2Track->sector_head_approved_by && !$q2Track->coordinator_confirmed_by)
+                                                @if(($user && $user->isFacilitator()) && $q2Track->actual_value && $q2Track->actual_value != 0 && $q2Track->sector_head_approved_by && !$q2Track->coordinator_confirmed_by && !$q2Track->facilitator_confirmed_by)
                                                     <a href="javascript:"
                                                        class="add-delivery-dept inline-flex items-center text-emerald-600 hover:text-emerald-700"
                                                        data-tw-toggle="modal"
@@ -172,7 +172,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator text-primary hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q3Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q3Track->id }}"
@@ -184,7 +184,7 @@
                                                 @else
                                                     <span>{{ $q3Track->actual_value }}</span>
                                                 @endif
-                                                @if(($user && $user->isFacilitator()) && $q3Track->actual_value && $q3Track->actual_value != 0 && $q3Track->sector_head_approved_by && !$q3Track->coordinator_confirmed_by)
+                                                @if(($user && $user->isFacilitator()) && $q3Track->actual_value && $q3Track->actual_value != 0 && $q3Track->sector_head_approved_by && !$q3Track->coordinator_confirmed_by && !$q3Track->facilitator_confirmed_by)
                                                     <a href="javascript:"
                                                        class="add-delivery-dept inline-flex items-center text-emerald-600 hover:text-emerald-700"
                                                        data-tw-toggle="modal"
@@ -225,7 +225,7 @@
                                                 @if($user && $user->isFacilitator())
                                                     {{-- For Facilitators: actual_value is clickable to view details --}}
                                                     <a href="javascript:;"
-                                                       class="view-facilitator text-primary hover:underline cursor-pointer"
+                                                       class="view-facilitator {{ $q4Track->facilitator_decision == 'Reject' ? 'text-danger' : 'text-primary' }} hover:underline cursor-pointer"
                                                        data-tw-toggle="modal"
                                                        data-tw-target="#view-performance"
                                                        data-id="{{ $q4Track->id }}"
@@ -237,7 +237,7 @@
                                                 @else
                                                     <span>{{ $q4Track->actual_value }}</span>
                                                 @endif
-                                                @if(($user && $user->isFacilitator()) && $q4Track->actual_value && $q4Track->actual_value != 0 && $q4Track->sector_head_approved_by && !$q4Track->coordinator_confirmed_by)
+                                                @if(($user && $user->isFacilitator()) && $q4Track->actual_value && $q4Track->actual_value != 0 && $q4Track->sector_head_approved_by && !$q4Track->coordinator_confirmed_by && !$q4Track->facilitator_confirmed_by)
                                                     <a href="javascript:"
                                                        class="add-delivery-dept inline-flex items-center text-emerald-600 hover:text-emerald-700"
                                                        data-tw-toggle="modal"

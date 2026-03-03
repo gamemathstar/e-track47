@@ -94,20 +94,38 @@ class UserController extends Controller
             ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
-            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed');
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id');
         
-        // If user is a Facilitator, filter to only show sectors assigned to them
-        if ($user->isFacilitator() && !$user->canAccessAllSectors()) {
-            $assignedSectorIds = $user->getAssignedSectorIds();
-            if (!empty($assignedSectorIds)) {
-                $query->whereIn('sectors.id', $assignedSectorIds);
-            } else {
-                // If no sectors assigned, return empty result
-                $query->whereRaw('1 = 0');
+        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already rejected by this facilitator
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->where('performance_trackings.facilitator_decision', 'Reject')
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+            
+            // Filter to only show sectors assigned to them
+            if (!$user->canAccessAllSectors()) {
+                $assignedSectorIds = $user->getAssignedSectorIds();
+                if (!empty($assignedSectorIds)) {
+                    $query->whereIn('sectors.id', $assignedSectorIds);
+                } else {
+                    // If no sectors assigned, return empty result
+                    $query->whereRaw('1 = 0');
+                }
             }
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
         }
-        // For Coordinators and Deputy Coordinators, show all sectors (no additional filter)
         
         $performanceTrackings = $query->groupBy('sectors.id')->get();
 
@@ -116,30 +134,71 @@ class UserController extends Controller
 
     public function awaitingVerificationView(Request $request, $id)
     {
+        $user = Auth::user();
         $sector = Sector::find($id);
-        $performanceTrackings = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
+        
+        $query = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('commitments.sector_id', $id)
-            ->groupBy('commitments.id')
-            ->get();
+            ->where('commitments.sector_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already rejected by this facilitator
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->where('performance_trackings.facilitator_decision', 'Reject')
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        }
+        
+        $performanceTrackings = $query->groupBy('commitments.id')->get();
 
         return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
     }
 
     public function awaitingVerificationCommView(Request $request, $id)
     {
+        $user = Auth::user();
         $commitment = Commitment::find($id);
-        $performanceTrackings = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
-//            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+        
+        $query = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('deliverables.commitment_id', $id)
-            ->groupBy('deliverables.id')
-            ->get();
+            ->where('deliverables.commitment_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already rejected by this facilitator
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->where('performance_trackings.facilitator_decision', 'Reject')
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        }
+        
+        $performanceTrackings = $query->groupBy('deliverables.id')->get();
 
         return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
     }
@@ -148,12 +207,34 @@ class UserController extends Controller
     {
         $user = Auth::user();
         $deliverable = Deliverable::find($id);
-        $kpis = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
+        
+        $query = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('kpis.deliverable_id', $id)
-            ->groupBy('kpis.id')
-            ->get();
+            ->where('kpis.deliverable_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already rejected by this facilitator
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->where('performance_trackings.facilitator_decision', 'Reject')
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records awaiting facilitator action
+            $query->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by');
+        }
+        
+        $kpis = $query->groupBy('kpis.id')->get();
 
         return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
     }

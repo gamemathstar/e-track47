@@ -610,6 +610,17 @@ class KpiController extends Controller
         }
 
         // Update tracking record based on decision
+        // NOTE: Facilitator is only allowed to update the following columns:
+        // - facilitator_confirmed_at
+        // - facilitator_confirmed_by
+        // - facilitator_decision
+        // Additionally, when accepting:
+        // - delivery_department_value
+        // - delivery_department_remark
+        // When rejecting:
+        // - facilitator_rejection_reason
+        //
+        // The confirmation_status field MUST NOT be modified here.
         $tracking->facilitator_confirmed_at = now();
         $tracking->facilitator_confirmed_by = $user->id;
         $tracking->facilitator_decision = $validated['facilitator_decision'];
@@ -617,17 +628,11 @@ class KpiController extends Controller
         if ($validated['facilitator_decision'] === 'Accept') {
             $tracking->delivery_department_value = $validated['delivery_department_value'];
             $tracking->delivery_department_remark = $validated['delivery_department_remark'];
+            // Clear any previous rejection reason
             $tracking->facilitator_rejection_reason = null;
-            $tracking->confirmation_status = 'Pending Coordinator Confirmation';
         } else {
-            // Reject - clear delivery department value and remark, set rejection reason
-            $tracking->delivery_department_value = null;
-            $tracking->delivery_department_remark = null;
+            // Reject - set rejection reason only
             $tracking->facilitator_rejection_reason = $validated['facilitator_rejection_reason'];
-            $tracking->confirmation_status = 'Rejected';
-            // Clear sector head approval to allow Data Admin to edit
-            $tracking->sector_head_approved_at = null;
-            $tracking->sector_head_approved_by = null;
         }
         
         $tracking->save();
