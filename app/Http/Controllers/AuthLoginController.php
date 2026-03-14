@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Commitment;
+use App\Models\Deliverable;
 use App\Models\Framework;
 use App\Models\Gallery;
+use App\Models\Kpi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class AuthLoginController extends Controller
 {
@@ -26,47 +28,19 @@ class AuthLoginController extends Controller
             ->limit(3)
             ->get();
 
-        // Calculate average performance for all MDAs from active framework
-        $averagePerformance = 0;
+        // Count commitments, deliverables and KPIs for the active framework
+        $commitmentsCount = 0;
+        $deliverablesCount = 0;
+        $kpisCount = 0;
         $activeFramework = Framework::where('status', 'Active')->first();
 
         if ($activeFramework) {
-            $year = date('Y');
-            $avgPerformance = DB::table('sectors as s')
-                ->join('commitments as c', function($join) use ($activeFramework) {
-                    $join->on('c.sector_id', '=', 's.id')
-                         ->where('c.framework_id', '=', $activeFramework->id);
-                })
-                ->join('deliverables as d', function($join) use ($activeFramework) {
-                    $join->on('d.commitment_id', '=', 'c.id')
-                         ->where('d.framework_id', '=', $activeFramework->id);
-                })
-                ->join('kpis as k', function($join) use ($activeFramework) {
-                    $join->on('k.deliverable_id', '=', 'd.id')
-                         ->where('k.framework_id', '=', $activeFramework->id);
-                })
-                ->join('performance_trackings as pt', function($join) use ($activeFramework) {
-                    $join->on('pt.kpi_id', '=', 'k.id')
-                         ->where('pt.framework_id', '=', $activeFramework->id);
-                })
-                ->where('s.framework_id', $activeFramework->id)
-                ->where('pt.year', '=', 2024)
-                ->whereNotNull('pt.actual_value')
-                ->whereNotNull('pt.milestone')
-                ->where('pt.milestone', '>', 0)
-                ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
-                ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"')
-                ->whereIn('pt.quarter', [1, 2, 3, 4])
-                ->select(DB::raw('AVG(CASE 
-                    WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101
-                    ELSE (pt.actual_value / pt.milestone) * 100
-                END) as avg_performance'))
-                ->value('avg_performance');
-
-            $averagePerformance = $avgPerformance ? round($avgPerformance, 1) : 0;
+            $commitmentsCount = Commitment::where('framework_id', $activeFramework->id)->count();
+            $deliverablesCount = Deliverable::where('framework_id', $activeFramework->id)->count();
+            $kpisCount = Kpi::where('framework_id', $activeFramework->id)->count();
         }
 
-        return view('welcome', compact('galleries', 'averagePerformance'));
+        return view('welcome', compact('galleries', 'commitmentsCount', 'deliverablesCount', 'kpisCount'));
     }
 
     public function showLoginForm()
