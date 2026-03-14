@@ -297,7 +297,7 @@
                                         @endif
                                         <a class="flex items-center text-primary hover:text-primary/80 tooltip"
                                            data-theme="dark" title="View Commitment"
-                                           href="{{route('commitments.deliverables',[$commitment->id])}}">
+                                           href="{{ commitment_deliverables_url($commitment->id) }}">
                                             <span class="material-symbols-outlined text-[20px]">visibility</span>
                                         </a>
                                         @if($user->isDeliveryUnit())
@@ -459,8 +459,15 @@
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        @php
+            $commitmentDeliverablesUrls = [];
+            foreach ($commitments as $c) {
+                $commitmentDeliverablesUrls[$c->id] = commitment_deliverables_url($c->id);
+            }
+        @endphp
+        var commitmentDeliverablesUrls = @json($commitmentDeliverablesUrls);
         $(function () {
-            url = "{{route('sectors.view',['id'=>$sector->id])}}/";
+            url = "{{ sector_view_url($sector->id) }}/";
 
 
             // Search functionality
@@ -490,8 +497,8 @@
 
         function loadCommitments(id) {
             $.ajax({
-                type: 'Post',
-                url: "{{route("commitments.deliverables",[''])}}/" + id,
+                type: 'POST',
+                url: commitmentDeliverablesUrls[id] || ("{{ route('commitments.deliverables.encrypted') }}?e="),
                 data: {_token: '{{ csrf_token() }}'},
                 success: function (data) {
                     $("#loadArea").html(data);

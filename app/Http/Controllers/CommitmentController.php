@@ -8,6 +8,7 @@ use App\Models\Deliverable;
 use App\Models\SectorBudget;
 use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 
 class CommitmentController extends Controller
 {
@@ -107,10 +108,47 @@ class CommitmentController extends Controller
         return redirect()->back()->with('success', 'Commitment photo changed successfully');
     }
 
+    /**
+     * Commitment deliverables via encrypted query param (canonical URL).
+     */
+    public function deliverablesFromEncrypted(Request $request)
+    {
+        if (!$request->filled('e')) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+        }
+        try {
+            $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+            $data = json_decode($payload, true);
+            if (!is_array($data) || empty($data['id'])) {
+                return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+            }
+            $commitment = Commitment::find((int) $data['id']);
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+        }
+        if (!$commitment) {
+            return redirect()->route('dashboard')->with('failure', 'Commitment not found.');
+        }
+
+        return $this->deliverablesWithCommitment($request, $commitment);
+    }
+
+    /**
+     * Commitment deliverables via path (GET redirects to encrypted URL).
+     */
     public function deliverables(Request $request, Commitment $commitment)
     {
+        if ($request->isMethod('GET')) {
+            return redirect()->to(commitment_deliverables_url($commitment->id));
+        }
 
+        return $this->deliverablesWithCommitment($request, $commitment);
+    }
+
+    private function deliverablesWithCommitment(Request $request, Commitment $commitment)
+    {
         $deliverables = $commitment->deliverables()->get();
+
         return view('pages.sector.deliverables', compact('commitment', 'deliverables'));
     }
 

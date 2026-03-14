@@ -61,7 +61,7 @@
                 Sectors
             </a>
             <span class="text-slate-400 text-sm">/</span>
-            <a class="text-primary hover:underline text-sm font-medium" href="{{ route('sectors.view', $commitment->sector_id ?? '') }}">
+            <a class="text-primary hover:underline text-sm font-medium" href="{{ sector_view_url($commitment->sector_id ?? 0) }}">
                 {{ $commitment->sector->sector_name ?? 'Sector' }}
             </a>
             <span class="text-slate-400 text-sm">/</span>
@@ -279,7 +279,7 @@
                             </td>
                             <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('deliverable.kpis',[$deliverable->id]) }}" class="text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
+                                    <a href="{{ deliverable_kpis_url($deliverable->id) }}" class="text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
                                         <span class="material-symbols-outlined text-[16px]">visibility</span>
                                         View KPIs
                                     </a>

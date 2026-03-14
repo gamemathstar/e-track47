@@ -7,6 +7,7 @@ use App\Models\Sector;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -18,7 +19,7 @@ class DashboardController extends Controller
     }
 
 
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         
@@ -31,7 +32,7 @@ class DashboardController extends Controller
             if ($userRole && $userRole->entity_id) {
                 $sector = Sector::find($userRole->entity_id);
                 if ($sector) {
-                    return redirect(route('sectors.view', [$userRole->entity_id]));
+                    return redirect(sector_view_url($userRole->entity_id));
                 }
             }
             
@@ -40,8 +41,46 @@ class DashboardController extends Controller
             session()->flash('failure', 'Your account is not associated with a valid sector. Please contact the administrator.');
         }
         
-        $year = date('Y');
-        
+        // Years for dropdown: only those that exist in frameworks table (descending)
+        $years = Framework::select('year')
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->map(fn ($y) => (int) $y)
+            ->values()
+            ->all();
+
+        if (empty($years)) {
+            $years = [(int) date('Y')];
+        }
+        $defaultYear = $years[0];
+        $year = $defaultYear;
+
+        // Resolve year from encrypted param (e) or plain (year); prefer encrypted
+        if ($request->filled('e')) {
+            try {
+                $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+                $decoded = json_decode($payload, true);
+                if (is_array($decoded) && isset($decoded['year']) && in_array((int) $decoded['year'], $years, true)) {
+                    $year = (int) $decoded['year'];
+                }
+            } catch (\Throwable $e) {
+                // Invalid or tampered payload — keep default year
+            }
+        } elseif ($request->filled('year')) {
+            $requestedYear = (int) $request->input('year');
+            if (in_array($requestedYear, $years, true)) {
+                $year = $requestedYear;
+            }
+            // Redirect so the URL contains only encrypted params (no plain year in address bar)
+            $encrypted = rawurlencode(Crypt::encrypt(json_encode(['year' => $year])));
+
+            return redirect()->route('dashboard', ['e' => $encrypted]);
+        }
+
+        // Framework(s) for the selected year — sectors/MDAs and all data are scoped to these
+        $frameworkIdsForYear = Framework::where('year', $year)->pluck('id')->all();
+
         // Determine which sectors the user can access
         $accessibleSectorIds = [];
         $hasAccessToAllSectors = false;
@@ -65,12 +104,13 @@ class DashboardController extends Controller
         }
 
         // Compute quarterly average performance per sector using performance_trackings
-        // Performance is the average of (actual_value / milestone) * 100 for valid numeric entries with milestone > 0
+        // Only sectors (and data) from frameworks with the selected year
         $rawQuarterly = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->whereIn('s.framework_id', $frameworkIdsForYear)
             ->where('pt.year', '=', $year)
             ->whereIn('pt.quarter', [1, 2, 3, 4])
             ->whereNotNull('d.end_date');
@@ -91,11 +131,16 @@ class DashboardController extends Controller
             ->orderBy('s.sector_name')
             ->get();
 
-        // Initialize sectors to ensure display even with no data
+        // Sectors/MDAs only from the framework(s) with the selected year
         if ($hasAccessToAllSectors) {
-            $allSectors = DB::table('sectors')->select('id', 'sector_name')->orderBy('sector_name')->get();
+            $allSectors = DB::table('sectors')
+                ->whereIn('framework_id', $frameworkIdsForYear)
+                ->select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get();
         } else {
             $allSectors = DB::table('sectors')
+                ->whereIn('framework_id', $frameworkIdsForYear)
                 ->whereIn('id', $accessibleSectorIds)
                 ->select('id', 'sector_name')
                 ->orderBy('sector_name')
@@ -119,11 +164,13 @@ class DashboardController extends Controller
             }
         }
         
-        // Calculate statistics filtered by accessible sectors
-        $commitmentsQuery = DB::table('commitments');
+        // Calculate statistics for the selected year's framework(s) only
+        $commitmentsQuery = DB::table('commitments')
+            ->whereIn('framework_id', $frameworkIdsForYear);
         $kpisQuery = DB::table('kpis as k')
             ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
-            ->join('commitments as c', 'd.commitment_id', '=', 'c.id');
+            ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+            ->whereIn('k.framework_id', $frameworkIdsForYear);
         
         if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
             $commitmentsQuery->whereIn('sector_id', $accessibleSectorIds);
@@ -133,15 +180,24 @@ class DashboardController extends Controller
         $commitments = $commitmentsQuery->count();
         $kpis = $kpisQuery->count('k.id');
         
-        // Calculate budget separately
-        $budgetQuery = DB::table('commitments');
+        // Budget for the selected year's framework(s)
+        $budgetQuery = DB::table('commitments')
+            ->whereIn('framework_id', $frameworkIdsForYear);
         if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
             $budgetQuery->whereIn('sector_id', $accessibleSectorIds);
         }
         $stateBudget = $budgetQuery->sum('budget') ?? 0;
 
+        // Encrypted URLs per year so the dropdown never exposes plain year in the URL
+        $yearEncryptedUrls = [];
+        foreach ($years as $y) {
+            $yearEncryptedUrls[$y] = route('dashboard', ['e' => rawurlencode(Crypt::encrypt(json_encode(['year' => $y])))]);
+        }
+
         return view('pages.dashboard.index', [
             'year' => $year,
+            'years' => $years,
+            'yearEncryptedUrls' => $yearEncryptedUrls,
             'sectorQuarterPerf' => $sectorQuarterPerf,
             'commitments' => $commitments,
             'kpis' => $kpis,

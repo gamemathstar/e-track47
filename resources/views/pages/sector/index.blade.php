@@ -93,7 +93,7 @@
                             {{$loop->iteration}}
                         </td>
                         <td>
-                            <a href="{{ $user->role()->role=='System Admin'?route("sectors.view",[$sector->id]):route("sectors.show",[$sector->id]) }}"
+                            <a href="{{ $user->role()->role=='System Admin' ? sector_view_url($sector->id) : route("sectors.show",[$sector->id]) }}"
                                class="font-medium whitespace-nowrap">{{$sector->sector_name}}
                             </a>
                             <div class="text-slate-500 text-xs whitespace-nowrap mt-0.5"></div>
@@ -129,7 +129,7 @@
                                 </a>
                                 <a class="flex items-center mr-3  items-center text-success tooltip" data-theme="dark"
                                    title="View MDA/Sector"
-                                   href="{{route('sectors.view',[$sector->id])}}">
+                                   href="{{ sector_view_url($sector->id) }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                          stroke-linejoin="round" icon-name="eye" data-lucide="eye"

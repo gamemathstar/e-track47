@@ -68,12 +68,12 @@
         <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
             <a class="hover:text-primary" href="{{ route('sectors.index') }}">Sectors</a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
-            <a class="hover:text-primary" href="{{ route('sectors.view', $deliverable->commitment->sector_id ?? '') }}">
+            <a class="hover:text-primary" href="{{ sector_view_url($deliverable->commitment->sector_id ?? 0) }}">
                 {{ $deliverable->commitment->sector->sector_name ?? 'Sector' }}
             </a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
             <a class="hover:text-primary"
-               href="{{ route('commitments.deliverables', $deliverable->commitment_id ?? '') }}">
+               href="{{ commitment_deliverables_url($deliverable->commitment_id ?? 0) }}">
                 {{ $deliverable->commitment->title(30) ?? 'Commitment' }}
             </a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
@@ -1452,7 +1452,7 @@
                 // Update the modal header immediately
                 $('#targetModalYear').text(selectedYear);
                 // Reload the page to get updated targets for the new year
-                document.location = "{{route('deliverable.kpis',[$deliverable->id])}}?year=" + selectedYear
+                document.location = "{{ deliverable_kpis_url($deliverable->id) }}" + (selectedYear ? "&year=" + selectedYear : "")
             });
 
             // Update target modal year when "Track Performance" button is clicked

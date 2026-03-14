@@ -76,6 +76,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('sectors/show/{id}/', [SectorController::class, 'show'])->name('sectors.show');
     Route::get('sectors/budget/', [SectorController::class, 'budget'])->name('sectors.budget');
     Route::get('sectors/delete/{sector}', [SectorController::class, 'destroy'])->name('sectors.delete');
+    Route::get('sectors/details', [SectorController::class, 'viewFromEncrypted'])->name('sectors.view.encrypted');
     Route::get('sectors/{id}/details/{id2?}', [SectorController::class, 'view'])->name('sectors.view');
 
 // MDA/Sector Resource
@@ -84,6 +85,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('commitment/save', [CommitmentController::class, 'store'])->name('commitments.save');
     Route::post('commitment/change/photo', [CommitmentController::class, 'changePhoto'])->name('commitments.change.photo');
     Route::post('commitment/budget/save', [CommitmentController::class, 'storeBudget'])->name('commitments.budget.save');
+    Route::any('commitment/deliverables', [CommitmentController::class, 'deliverablesFromEncrypted'])->name('commitments.deliverables.encrypted');
     Route::any('commitment/deliverables/{commitment}', [CommitmentController::class, 'deliverables'])->name('commitments.deliverables');
     Route::get('commitment/{commitment}/delete', [CommitmentController::class, 'delete'])->name('commitments.delete');
 
@@ -94,6 +96,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('deliverable/view', [DeliverableController::class, 'view'])->name('deliverable.view');
     Route::get('deliverables/{deliverable}/delete', [DeliverableController::class, 'delete'])->name('deliverables.delete');
 //Route::get('deliverable/add/kpi', [DeliverableController::class, 'addKPI'])->name('deliverable.add.kpi');
+    Route::get('deliverable/kpis', [DeliverableController::class, 'kpisFromEncrypted'])->name('deliverable.kpis.encrypted');
     Route::get('deliverable/kpis/{deliverable}', [DeliverableController::class, 'kpis'])->name('deliverable.kpis');
 
     Route::post('deliverable/add/kpi', [KpiController::class, 'store'])->name('deliverable.add.kpi');

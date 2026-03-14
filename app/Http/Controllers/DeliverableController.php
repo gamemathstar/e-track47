@@ -12,6 +12,7 @@ use App\Models\PerformanceTracking;
 use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -124,14 +125,47 @@ class DeliverableController extends Controller
         return view('pages.sector.deliverable', compact('deliverable', 'commitment'));
     }
 
+    /**
+     * Deliverable KPIs via encrypted query param (canonical URL).
+     */
+    public function kpisFromEncrypted(Request $request)
+    {
+        if (!$request->filled('e')) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+        }
+        try {
+            $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+            $data = json_decode($payload, true);
+            if (!is_array($data) || empty($data['id'])) {
+                return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+            }
+            $deliverable = Deliverable::find((int) $data['id']);
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+        }
+        if (!$deliverable) {
+            return redirect()->route('dashboard')->with('failure', 'Deliverable not found.');
+        }
+
+        return $this->kpisWithDeliverable($request, $deliverable);
+    }
+
+    /**
+     * Deliverable KPIs via path (redirects to encrypted URL).
+     */
     public function kpis(Request $request, Deliverable $deliverable)
+    {
+        $baseUrl = deliverable_kpis_url($deliverable->id);
+        $year = $request->filled('year') ? '&year=' . $request->input('year') : '';
+
+        return redirect()->to($baseUrl . $year);
+    }
+
+    private function kpisWithDeliverable(Request $request, Deliverable $deliverable)
     {
         $user = Auth::user();
         $kpis = $deliverable->kpis()->get();
         $year = $request->year ?: 2024;
-
-        // Note: PDCU filtering is now handled in the view using getYearTracks() and getQuarterTrack()
-        // with $onlyApproved parameter. This ensures consistent filtering across all queries.
 
         foreach ($kpis as $kpi) {
             $targt = KpiTarget::where(['year' => $year, 'kpi_id' => $kpi->id])->first();
@@ -148,6 +182,7 @@ class DeliverableController extends Controller
                 ->on('kpi_targets.year', "=", DB::raw($year));
         })
             ->where(['kpis.deliverable_id' => $deliverable->id])->get();
+
         return view('pages.sector.kpis', compact('deliverable', 'kpis', 'year', 'targets', 'user'));
     }
 

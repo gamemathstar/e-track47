@@ -41,7 +41,7 @@
                     @endphp
                     @foreach($sectors as $sector)
                         <li>
-                            <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">
+                            <a href="{{ sector_view_url($sector->id) }}" class="side-menu">
                                 <div class="side-menu__icon"><i data-lucide="activity"></i></div>
                                 <div class="side-menu__title"> {{$sector->sector_name}} </div>
                             </a>
@@ -70,7 +70,7 @@
                     <ul class="">
                         @foreach($facilitatorSectors as $sector)
                             <li>
-                                <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">
+                                <a href="{{ sector_view_url($sector->id) }}" class="side-menu">
                                     <div class="side-menu__icon"><i data-lucide="activity"></i></div>
                                     <div class="side-menu__title">{{ $sector->sector_name }}</div>
                                 </a>
@@ -125,7 +125,7 @@
         @endif
         @if($sector = $user->isSectorHead())
             <li>
-                <a href="{{route('sectors.view',[$sector->id])}}"
+                <a href="{{ sector_view_url($sector->id) }}"
                    class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="box"></i></div>
                     <div class="side-menu__title">
@@ -136,7 +136,7 @@
         @endif
         @if($sector = $user->isDataAdmin())
             <li>
-                <a href="{{route('sectors.view',[$sector->id])}}"
+                <a href="{{ sector_view_url($sector->id) }}"
                    class="side-menu {{ Request::is('sectors*') ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="box"></i></div>
                     <div class="side-menu__title">
@@ -162,7 +162,7 @@
         {{--                </li>--}}
         {{--                @foreach(\App\Models\Sector::get() as $sector)--}}
         {{--                    <li>--}}
-        {{--                        <a href="{{route('sectors.view',[$sector->id])}}" class="side-menu">--}}
+        {{--                        <a href="{{ sector_view_url($sector->id) }}" class="side-menu">--}}
         {{--                            <div class="side-menu__icon"> <i data-lucide="activity"></i> </div>--}}
         {{--                            <div class="side-menu__title"> {{$sector->name}} </div>--}}
         {{--                        </a>--}}
@@ -170,6 +170,7 @@
         {{--                @endforeach--}}
         {{--            </ul>--}}
         {{--        </li>--}}
+        @if(!$user->isSystemAdmin())
             <li>
                 <a href="{{route('reports.index')}}"
                    class="side-menu {{ Request::is('reports*') ? 'side-menu--active' : '' }}">
@@ -179,7 +180,6 @@
                     </div>
                 </a>
             </li>
-        @if(!$user->isSystemAdmin())
             <li>
                 <a href="{{route('users.view', [$user->id])}}"
                    class="side-menu {{ Request::is('users/view/' . $user->id) ? 'side-menu--active' : '' }}">
