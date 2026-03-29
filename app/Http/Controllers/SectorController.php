@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\CommitmentBudget;
+use App\Models\Framework;
 use App\Models\Sector;
 use App\Models\SectorBudget;
 use App\Models\SectorFile;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -22,7 +25,17 @@ class SectorController extends Controller
 
     public function index(Request $request)
     {
-        $sectors = Sector::get();
+        // Get the active framework
+        $activeFramework = Framework::where('status', 'Active')->first();
+
+        if ($activeFramework) {
+            // Load sectors from the active framework
+            $sectors = Sector::where('framework_id', $activeFramework->id)->get();
+        } else {
+            // If no active framework, return empty collection
+            $sectors = collect([]);
+        }
+
         return view('pages.sector.index', compact('sectors'));
     }
 
@@ -34,7 +47,19 @@ class SectorController extends Controller
             // Add other validation rules as needed
         ]);
 
-        Sector::create($request->all());
+        // Get the active framework
+        $activeFramework = Framework::where('status', 'Active')->first();
+
+        if (!$activeFramework) {
+            return redirect()->route('sectors.index')
+                ->with('failure', 'No active framework found. Please activate a framework first.');
+        }
+
+        // Create sector with active framework ID
+        $sectorData = $request->all();
+        $sectorData['framework_id'] = $activeFramework->id;
+
+        Sector::create($sectorData);
 
         return redirect()->route('sectors.index')->with('success', 'MDA/Sector created successfully');
     }
@@ -94,28 +119,80 @@ class SectorController extends Controller
         return back();
     }
 
+    /**
+     * Sector details via encrypted query param (canonical URL).
+     */
+    public function viewFromEncrypted(Request $request)
+    {
+        if (!$request->filled('e')) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid sector link.');
+        }
+        try {
+            $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+            $data = json_decode($payload, true);
+            if (!is_array($data) || empty($data['id'])) {
+                return redirect()->route('dashboard')->with('failure', 'Invalid sector link.');
+            }
+            $id = (int) $data['id'];
+            $comm_id = isset($data['comm_id']) ? $data['comm_id'] : null;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid sector link.');
+        }
+
+        return $this->viewWithIds($request, $id, $comm_id);
+    }
+
+    /**
+     * Sector details via path (redirects to encrypted URL so the address bar hides the id).
+     */
     public function view(Request $request, $id, $comm_id = null)
     {
+        return redirect()->to(sector_view_url($id, $comm_id));
+    }
+
+    /**
+     * Load sector and render the sector view (shared by encrypted and path routes).
+     */
+    private function viewWithIds(Request $request, $id, $comm_id = null)
+    {
         $sector = Sector::find($id);
-        
-        // Check if sector exists
+
         if (!$sector) {
             return redirect()->route('dashboard')->with('failure', 'Sector not found.');
         }
-        
-        $commitments = $sector->__commitments()->orderBy('created_at', 'desc')->get();
-        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id'));
+
+        $commitments = $sector->__commitments()->orderBy('created_at', 'asc')->get();
+        $user = Auth::user();
+
+        $year = $request->input('year', date('Y'));
+        $quarter = $request->input('quarter', null);
+
+        $awaitingCount = 0;
+        if ($user && $user->isFacilitator()) {
+            $query = DB::table('performance_trackings as pt')
+                ->join('kpis as k', 'pt.kpi_id', '=', 'k.id')
+                ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
+                ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+                ->where('c.sector_id', $sector->id)
+                ->whereNotNull('pt.sector_head_approved_by')
+                ->whereNull('pt.facilitator_confirmed_by')
+                ->whereNull('pt.coordinator_confirmed_by');
+
+            $awaitingCount = $query->distinct('pt.id')->count('pt.id');
+        }
+
+        return view('pages.sector.view', compact('sector', 'commitments', 'comm_id', 'user', 'year', 'quarter', 'awaitingCount'));
     }
 
     public function show(Request $request, $id)
     {
         $sector = Sector::find($id);
-        
+
         // Check if sector exists
         if (!$sector) {
             return redirect()->route('dashboard')->with('failure', 'Sector not found.');
         }
-        
+
         $commitments = $sector->__commitments()->get();
         $baseYear = 2023;
         $targetYear = 2024;
@@ -321,7 +398,6 @@ class SectorController extends Controller
 
     public function targets(Request $request)
     {
-
 
 
     }

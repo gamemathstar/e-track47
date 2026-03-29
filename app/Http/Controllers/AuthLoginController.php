@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Commitment;
+use App\Models\Deliverable;
+use App\Models\Framework;
 use App\Models\Gallery;
+use App\Models\Kpi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -24,7 +28,19 @@ class AuthLoginController extends Controller
             ->limit(3)
             ->get();
 
-        return view('welcome', compact('galleries'));
+        // Count commitments, deliverables and KPIs for the active framework
+        $commitmentsCount = 0;
+        $deliverablesCount = 0;
+        $kpisCount = 0;
+        $activeFramework = Framework::where('status', 'Active')->first();
+
+        if ($activeFramework) {
+            $commitmentsCount = Commitment::where('framework_id', $activeFramework->id)->count();
+            $deliverablesCount = Deliverable::where('framework_id', $activeFramework->id)->count();
+            $kpisCount = Kpi::where('framework_id', $activeFramework->id)->count();
+        }
+
+        return view('welcome', compact('galleries', 'commitmentsCount', 'deliverablesCount', 'kpisCount'));
     }
 
     public function showLoginForm()
@@ -54,7 +70,7 @@ class AuthLoginController extends Controller
 
     public function credentials(Request $request)
     {
-        return ['email'=>$request->email,'password'=>$request->password];
+        return ['email' => $request->email, 'password' => $request->password];
     }
 
     protected function attemptLogin(Request $request)
@@ -70,17 +86,18 @@ class AuthLoginController extends Controller
 
 //        $this->clearLoginAttempts($request);
 
-        return  redirect()->intended($this->redirectPath());
+        return redirect()->intended($this->redirectPath());
     }
 
-    protected function redirectPath(){
+    protected function redirectPath()
+    {
         $user = Auth::user();
-        
+
         // Redirect Governor users to statistics page
         if ($user && $user->isGovernor()) {
             return route("dashboard.statistics");
         }
-        
+
         return route("dashboard");
     }
 

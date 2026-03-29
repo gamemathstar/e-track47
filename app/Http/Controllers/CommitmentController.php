@@ -8,6 +8,7 @@ use App\Models\Deliverable;
 use App\Models\SectorBudget;
 use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 
 class CommitmentController extends Controller
 {
@@ -40,6 +41,13 @@ class CommitmentController extends Controller
 
     public function store(Request $request)
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        
+        // Only PDCU users can create commitments
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can create commitments.');
+        }
+
         // Check data entry access
         $request->validate([
             'sector_id' => "required",
@@ -100,20 +108,79 @@ class CommitmentController extends Controller
         return redirect()->back()->with('success', 'Commitment photo changed successfully');
     }
 
+    /**
+     * Commitment deliverables via encrypted query param (canonical URL).
+     */
+    public function deliverablesFromEncrypted(Request $request)
+    {
+        if (!$request->filled('e')) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+        }
+        try {
+            $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+            $data = json_decode($payload, true);
+            if (!is_array($data) || empty($data['id'])) {
+                return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+            }
+            $commitment = Commitment::find((int) $data['id']);
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid commitment link.');
+        }
+        if (!$commitment) {
+            return redirect()->route('dashboard')->with('failure', 'Commitment not found.');
+        }
+
+        return $this->deliverablesWithCommitment($request, $commitment);
+    }
+
+    /**
+     * Commitment deliverables via path (GET redirects to encrypted URL).
+     */
     public function deliverables(Request $request, Commitment $commitment)
     {
+        if ($request->isMethod('GET')) {
+            return redirect()->to(commitment_deliverables_url($commitment->id));
+        }
 
+        return $this->deliverablesWithCommitment($request, $commitment);
+    }
+
+    private function deliverablesWithCommitment(Request $request, Commitment $commitment)
+    {
         $deliverables = $commitment->deliverables()->get();
+
         return view('pages.sector.deliverables', compact('commitment', 'deliverables'));
     }
 
     public function update(Request $request)
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        
+        // Only PDCU users can update commitments
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can update commitments.');
+        }
+
         $request->validate([
             'commitment_id' => 'required|exists:commitments,id',
         ]);
 
         $commitment = Commitment::find($request->commitment_id);
+        
+        // Check if data is locked (confirmed by Coordinator)
+        if ($commitment) {
+            // Check if any performance tracking for this commitment's deliverables is confirmed
+            $hasConfirmedTracking = \App\Models\PerformanceTracking::whereHas('kpi.deliverable', function($q) use ($commitment) {
+                $q->where('commitment_id', $commitment->id);
+            })
+            ->where('confirmation_status', 'Confirmed')
+            ->whereNotNull('coordinator_confirmed_at')
+            ->exists();
+            
+            if ($hasConfirmedTracking) {
+                return redirect()->back()->with('failure', 'This commitment has confirmed performance tracking and cannot be modified.');
+            }
+        }
         
         // Check data entry access
         if ($commitment) {
@@ -157,6 +224,25 @@ class CommitmentController extends Controller
 
     public function delete(Commitment $commitment)
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        
+        // Only PDCU users can delete commitments
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can delete commitments.');
+        }
+
+        // Check if data is locked (confirmed by Coordinator)
+        $hasConfirmedTracking = \App\Models\PerformanceTracking::whereHas('kpi.deliverable', function($q) use ($commitment) {
+            $q->where('commitment_id', $commitment->id);
+        })
+        ->where('confirmation_status', 'Confirmed')
+        ->whereNotNull('coordinator_confirmed_at')
+        ->exists();
+        
+        if ($hasConfirmedTracking) {
+            return redirect()->back()->with('failure', 'This commitment has confirmed performance tracking and cannot be deleted.');
+        }
+
         // Check data entry access
         $accessCheck = $this->checkDataEntryAccess($commitment->sector_id);
         if ($accessCheck) {

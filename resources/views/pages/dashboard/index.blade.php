@@ -139,12 +139,16 @@
                         @endif
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button
-                        class="px-4 py-2 border border-primary/20 text-slate-600 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm font-medium">
-                        <span class="material-icons text-sm">filter_list</span>
-                        Filter
-                    </button>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <label for="year" class="text-sm font-medium text-slate-600 whitespace-nowrap">Year</label>
+                        <select name="year" id="year" onchange="if(this.value) location.href=this.value"
+                                class="min-w-[7rem] rounded-lg border border-primary/20 text-slate-900 bg-white px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                            @foreach($years ?? [] as $y)
+                                <option value="{{ $yearEncryptedUrls[$y] ?? '#' }}" {{ (int)$y === (int)$year ? 'selected' : '' }}>{{ $y }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <a href="{{ route('reports.comprehensive') }}"
                        class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all flex items-center gap-2 text-sm font-bold">
                         <span class="material-icons text-sm">download</span>

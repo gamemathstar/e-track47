@@ -11,15 +11,23 @@ class Kpi extends Model
 
     protected $fillable = [
         'deliverable_id',
+        'framework_id',
         'kpi',
+        'description',
         'target_value',
         'unit_of_measurement',
+        'status',
         'year',
     ];
 
     public function deliverable()
     {
         return $this->belongsTo(Deliverable::class);
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function performanceTracking()
@@ -43,5 +51,45 @@ class Kpi extends Model
     public function quarter($quarter=1)
     {
         return $this->performanceTracking()->where('quarter',$quarter)->first();
+    }
+
+    /**
+     * Get performance tracking for a specific quarter and year
+     *
+     * @param int $quarter Quarter number (1-4)
+     * @param int $year Year
+     * @param bool $onlyApproved If true, only return records approved by Sector Head
+     * @return PerformanceTracking|null
+     */
+    public function getQuarterTrack($quarter, $year, $onlyApproved = false)
+    {
+        $query = $this->performanceTracking()
+            ->where('quarter', $quarter)
+            ->where('year', $year);
+        
+        if ($onlyApproved) {
+            $query->whereNotNull('sector_head_approved_at');
+        }
+        
+        return $query->first();
+    }
+
+    /**
+     * Get all performance tracking records for a specific year
+     *
+     * @param int $year Year
+     * @param bool $onlyApproved If true, only return records approved by Sector Head
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getYearTracks($year, $onlyApproved = false)
+    {
+        $query = $this->performanceTracking()
+            ->where('year', $year);
+        
+        if ($onlyApproved) {
+            $query->whereNotNull('sector_head_approved_at');
+        }
+        
+        return $query->orderBy('quarter', 'ASC')->get();
     }
 }

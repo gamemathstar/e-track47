@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Commitment;
 use App\Models\Deliverable;
+use App\Models\FacilitatorSector;
 use App\Models\Kpi;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
@@ -18,68 +19,221 @@ use function Laravel\Prompts\password;
 class UserController extends Controller
 {
     //
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::all();
+        $query = User::query();
+
+        // Search filter (name or email)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Role filter
+        if ($request->filled('role')) {
+            $role = $request->input('role');
+            $query->whereHas('roles', function ($q) use ($role) {
+                $q->where('role', $role)
+                    ->where('role_status', UserRole::STATUS_ACTIVE);
+            });
+        }
+
+        // Sector filter
+        if ($request->filled('sector_id')) {
+            $sectorId = $request->input('sector_id');
+            $query->where(function($q) use ($sectorId) {
+                // For single-sector roles (Sector Head, Data Admin)
+                $q->whereHas('roles', function ($roleQuery) use ($sectorId) {
+                    $roleQuery->where('entity_id', $sectorId)
+                        ->where('role_status', UserRole::STATUS_ACTIVE)
+                        ->whereIn('role', [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_DATA_ADMIN]);
+                })
+                // For Facilitators with multiple sectors
+                ->orWhereHas('roles', function ($roleQuery) use ($sectorId) {
+                    $roleQuery->where('role', UserRole::ROLE_FACILITATOR)
+                        ->where('role_status', UserRole::STATUS_ACTIVE)
+                        ->whereHas('facilitatorSectors', function ($fsQuery) use ($sectorId) {
+                            $fsQuery->where('sector_id', $sectorId);
+                        });
+                });
+            });
+        }
+
+        // Paginate results - Order by role priority (Governor first), then by name
+        $users = $query->orderByRaw("
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM user_roles 
+                    WHERE user_roles.user_id = users.id 
+                    AND user_roles.role = 'Governor' 
+                    AND user_roles.role_status = 'Active'
+                ) THEN 0
+                ELSE 1
+            END
+        ")->orderBy('full_name', 'asc')->paginate(12)->withQueryString();
         $sectors = Sector::all();
-        return view('pages.users.index', compact('users', 'sectors'));
+
+        // Get all unique roles for filter dropdown
+        $roles = UserRole::where('role_status', UserRole::STATUS_ACTIVE)
+            ->distinct()
+            ->pluck('role')
+            ->sort()
+            ->values();
+
+        return view('pages.users.index', compact('users', 'sectors', 'roles'));
     }
 
     public function awaitingVerification(Request $request)
     {
-        $performanceTrackings = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
+        $user = Auth::user();
+        
+        $query = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
             ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
-            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->groupBy('sectors.id')
-            ->get();
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id');
+        
+        // If user is a Facilitator, show records awaiting their action OR already rejected by them
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already rejected by this facilitator
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->where('performance_trackings.facilitator_decision', 'Reject')
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+            
+            // Filter to only show sectors assigned to them
+            if (!$user->canAccessAllSectors()) {
+                $assignedSectorIds = $user->getAssignedSectorIds();
+                if (!empty($assignedSectorIds)) {
+                    $query->whereIn('sectors.id', $assignedSectorIds);
+                } else {
+                    // If no sectors assigned, return empty result
+                    $query->whereRaw('1 = 0');
+                }
+            }
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        }
+        
+        $performanceTrackings = $query->groupBy('sectors.id')->get();
 
         return view('pages.users.awaiting', compact('performanceTrackings'));
     }
 
     public function awaitingVerificationView(Request $request, $id)
     {
+        $user = Auth::user();
         $sector = Sector::find($id);
-        $performanceTrackings = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
+        
+        $query = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('commitments.sector_id', $id)
-            ->groupBy('commitments.id')
-            ->get();
+            ->where('commitments.sector_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already processed by this facilitator (accepted or rejected)
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        }
+        
+        $performanceTrackings = $query->groupBy('commitments.id')->get();
 
         return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
     }
 
     public function awaitingVerificationCommView(Request $request, $id)
     {
+        $user = Auth::user();
         $commitment = Commitment::find($id);
-        $performanceTrackings = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
-//            ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
+        
+        $query = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('deliverables.commitment_id', $id)
-            ->groupBy('deliverables.id')
-            ->get();
+            ->where('deliverables.commitment_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already processed by this facilitator (accepted or rejected)
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
+            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
+        }
+        
+        $performanceTrackings = $query->groupBy('deliverables.id')->get();
 
         return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
     }
 
     public function awaitingVerificationDelView(Request $request, $id)
     {
+        $user = Auth::user();
         $deliverable = Deliverable::find($id);
-        $kpis = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
+        
+        $query = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('performance_trackings.confirmation_status', 'Not Confirmed')
-            ->where('kpis.deliverable_id', $id)
-            ->groupBy('kpis.id')
-            ->get();
+            ->where('kpis.deliverable_id', $id);
+        
+        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
+        if ($user->isFacilitator()) {
+            $query->where(function($q) use ($user) {
+                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
+                $q->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by')
+                  // OR records already processed by this facilitator (accepted or rejected)
+                  ->orWhere(function($subQ) use ($user) {
+                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                           ->whereNull('performance_trackings.coordinator_confirmed_by');
+                  });
+            });
+        } else {
+            // For Coordinators and Deputy Coordinators, show records awaiting facilitator action
+            $query->whereNotNull('performance_trackings.sector_head_approved_by')
+                  ->whereNull('performance_trackings.facilitator_confirmed_by')
+                  ->whereNull('performance_trackings.coordinator_confirmed_by');
+        }
+        
+        $kpis = $query->groupBy('kpis.id')->get();
 
-        return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable'));
+        return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
     }
 
     public function create()
@@ -120,13 +274,17 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email,' . ($request->id ?? 'NULL'),
             'phone_number' => 'nullable|string|max:20',
             'role' => 'required|in:' . implode(',', [
-                UserRole::ROLE_GOVERNOR,
-                UserRole::ROLE_SYSTEM_ADMIN,
-                UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN,
-                UserRole::ROLE_DELIVERY_DEPARTMENT,
-            ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . '|exists:sectors,id',
+                    UserRole::ROLE_GOVERNOR,
+                    UserRole::ROLE_SYSTEM_ADMIN,
+                    UserRole::ROLE_SECTOR_HEAD,
+                    UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                    UserRole::ROLE_DATA_ADMIN,
+                    UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+                    UserRole::ROLE_COORDINATOR,
+                    UserRole::ROLE_DEPUTY_COORDINATOR,
+                    UserRole::ROLE_FACILITATOR,
+                ]),
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . '|exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
@@ -138,7 +296,7 @@ class UserController extends Controller
                 $user = User::findOrFail($request->id);
             } else {
                 $user = new User();
-                $user->password = bcrypt('JSUSER321'); // Default password
+                $user->password = bcrypt('123456'); // Default password
             }
 
             $user->full_name = $validated['full_name'];
@@ -156,9 +314,10 @@ class UserController extends Controller
 
                 // Determine entity_id
                 $entityId = 0;
-                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_FACILITATOR])) {
+                if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN])) {
                     $entityId = $validated['sector_id'] ?? 0;
                 }
+                // Facilitators use facilitator_sectors pivot table (entity_id = 0)
                 // Coordinators and Deputy Coordinators have entity_id = 0 (access all sectors)
 
                 // Check if user already has an active role
@@ -167,7 +326,10 @@ class UserController extends Controller
                     ->first();
 
                 if ($existingRole) {
-                    // Revoke existing active role
+                    // Revoke existing active role and remove facilitator sectors
+                    if ($existingRole->role === UserRole::ROLE_FACILITATOR) {
+                        FacilitatorSector::where('user_role_id', $existingRole->id)->delete();
+                    }
                     $existingRole->revoke();
                 }
 
@@ -179,6 +341,16 @@ class UserController extends Controller
                 $userRole->entity_id = $entityId;
                 $userRole->role_status = UserRole::STATUS_ACTIVE;
                 $userRole->save();
+
+                // For Facilitators, save multiple sectors in pivot table
+                if ($validated['role'] === UserRole::ROLE_FACILITATOR && !empty($validated['sector_ids'])) {
+                    foreach ($validated['sector_ids'] as $sectorId) {
+                        FacilitatorSector::create([
+                            'user_role_id' => $userRole->id,
+                            'sector_id' => $sectorId,
+                        ]);
+                    }
+                }
 
                 $message = isset($request->id) ? 'User updated successfully.' : 'User created successfully.';
                 return back()->with('success', $message);
@@ -219,7 +391,7 @@ class UserController extends Controller
 
         try {
             $user = User::findOrFail($validated['id']);
-            
+
             if ($validated['password'] === $validated['confirm_password']) {
                 $user->password = bcrypt($validated['password']);
                 $user->save();
@@ -266,19 +438,25 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'role' => 'required|in:' . implode(',', [
-                UserRole::ROLE_GOVERNOR,
-                UserRole::ROLE_SYSTEM_ADMIN,
-                UserRole::ROLE_SECTOR_HEAD,
-                UserRole::ROLE_SECTOR_ADMIN,
-                UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
-                UserRole::ROLE_COORDINATOR,
-                UserRole::ROLE_DEPUTY_COORDINATOR,
-                UserRole::ROLE_FACILITATOR,
-            ]),
-            'sector_id' => 'required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_FACILITATOR . '|exists:sectors,id',
+                    UserRole::ROLE_GOVERNOR,
+                    UserRole::ROLE_SYSTEM_ADMIN,
+                    UserRole::ROLE_SECTOR_HEAD,
+                    UserRole::ROLE_SECTOR_ADMIN, // Deprecated
+                    UserRole::ROLE_DATA_ADMIN,
+                    UserRole::ROLE_DELIVERY_DEPARTMENT, // For backward compatibility
+                    UserRole::ROLE_COORDINATOR,
+                    UserRole::ROLE_DEPUTY_COORDINATOR,
+                    UserRole::ROLE_FACILITATOR,
+                ]),
+            'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . '|exists:sectors,id',
+            'sector_ids' => 'nullable|required_if:role,' . UserRole::ROLE_FACILITATOR . '|array',
+            'sector_ids.*' => 'exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
+            'sector_ids.required_if' => 'Please select at least one sector for Facilitator role.',
+            'sector_ids.array' => 'Sectors must be provided as an array.',
+            'sector_ids.*.exists' => 'One or more selected sectors do not exist.',
         ]);
 
         try {
@@ -292,10 +470,23 @@ class UserController extends Controller
 
             // Determine entity_id
             $entityId = 0;
-            if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_FACILITATOR])) {
+            if (in_array($validated['role'], [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_SECTOR_ADMIN, UserRole::ROLE_DATA_ADMIN])) {
                 $entityId = $validated['sector_id'] ?? 0;
             }
+            // Facilitators use facilitator_sectors pivot table (entity_id = 0)
             // Coordinators and Deputy Coordinators have entity_id = 0 (access all sectors)
+
+            // Get existing active roles to clean up facilitator sectors
+            $existingActiveRoles = UserRole::where('user_id', $user->id)
+                ->where('role_status', UserRole::STATUS_ACTIVE)
+                ->get();
+
+            // Delete facilitator sectors for existing facilitator roles
+            foreach ($existingActiveRoles as $existingRole) {
+                if ($existingRole->role === UserRole::ROLE_FACILITATOR) {
+                    FacilitatorSector::where('user_role_id', $existingRole->id)->delete();
+                }
+            }
 
             // Revoke all existing active roles
             UserRole::where('user_id', $user->id)
@@ -310,6 +501,16 @@ class UserController extends Controller
             $userRole->entity_id = $entityId;
             $userRole->role_status = UserRole::STATUS_ACTIVE;
             $userRole->save();
+
+            // For Facilitators, save multiple sectors in pivot table
+            if ($validated['role'] === UserRole::ROLE_FACILITATOR && !empty($validated['sector_ids'])) {
+                foreach ($validated['sector_ids'] as $sectorId) {
+                    FacilitatorSector::create([
+                        'user_role_id' => $userRole->id,
+                        'sector_id' => $sectorId,
+                    ]);
+                }
+            }
 
             return back()->with('success', 'User role updated successfully.');
         } catch (\Exception $e) {

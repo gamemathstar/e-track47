@@ -12,6 +12,7 @@ use App\Models\PerformanceTracking;
 use App\Traits\ChecksDataEntryAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -28,11 +29,18 @@ class DeliverableController extends Controller
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+
+        // Only PDCU users can create deliverables
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can create deliverables.');
+        }
+
         // Check data entry access
         $request->validate([
             'commitment_id' => "required",
         ]);
-        
+
         $sectorId = $this->getSectorIdFromCommitment($request->commitment_id);
         if ($sectorId) {
             $accessCheck = $this->checkDataEntryAccess($sectorId);
@@ -58,20 +66,30 @@ class DeliverableController extends Controller
 
     public function storeTracking(Request $request)
     {
-        $request->validate([
+        $user = Auth::user();
+        if (!$user) {
+            return redirect()->back()->with('failure', 'User not authenticated');
+        }
+
+        $isPDCU = $user->isDeliveryUnit();
+
+        // Define validation rules - milestone is not editable in verify modal
+        $validationRules = [
             'id' => 'required|exists:performance_trackings,id',
             'delivery_department_remark' => "required",
             'confirmation_status' => "required",
-        ]);
+        ];
+
+        $request->validate($validationRules);
 
         $pt = PerformanceTracking::find($request->id);
         if (!$pt) {
             return redirect()->back()->with('failure', 'Performance tracking record not found');
         }
 
-        $user = Auth::user();
-        if (!$user) {
-            return redirect()->back()->with('failure', 'User not authenticated');
+        // For PDCU users, only allow verifying records that are approved by Sector Head
+        if ($isPDCU && !$pt->isVisibleToPDCU()) {
+            return redirect()->back()->with('failure', 'This performance tracking record is not yet approved by Sector Head and cannot be verified.');
         }
 
         $userRole = $user->role();
@@ -80,6 +98,7 @@ class DeliverableController extends Controller
         }
 
         // Note: delivery_department_value field removed from form as per requirements
+        // Milestone is not editable in verify modal - it's set by PDCU during creation
         $pt->delivery_department_remark = $request->delivery_department_remark;
         $pt->confirmation_status = $request->confirmation_status;
         $pt->save();
@@ -106,8 +125,45 @@ class DeliverableController extends Controller
         return view('pages.sector.deliverable', compact('deliverable', 'commitment'));
     }
 
+    /**
+     * Deliverable KPIs via encrypted query param (canonical URL).
+     */
+    public function kpisFromEncrypted(Request $request)
+    {
+        if (!$request->filled('e')) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+        }
+        try {
+            $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+            $data = json_decode($payload, true);
+            if (!is_array($data) || empty($data['id'])) {
+                return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+            }
+            $deliverable = Deliverable::find((int) $data['id']);
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('failure', 'Invalid deliverable link.');
+        }
+        if (!$deliverable) {
+            return redirect()->route('dashboard')->with('failure', 'Deliverable not found.');
+        }
+
+        return $this->kpisWithDeliverable($request, $deliverable);
+    }
+
+    /**
+     * Deliverable KPIs via path (redirects to encrypted URL).
+     */
     public function kpis(Request $request, Deliverable $deliverable)
     {
+        $baseUrl = deliverable_kpis_url($deliverable->id);
+        $year = $request->filled('year') ? '&year=' . $request->input('year') : '';
+
+        return redirect()->to($baseUrl . $year);
+    }
+
+    private function kpisWithDeliverable(Request $request, Deliverable $deliverable)
+    {
+        $user = Auth::user();
         $kpis = $deliverable->kpis()->get();
         $year = $request->year ?: 2024;
 
@@ -123,10 +179,11 @@ class DeliverableController extends Controller
         }
         $targets = Kpi::leftJoin("kpi_targets", function ($join) use ($year) {
             $join->on("kpi_targets.kpi_id", "=", "kpis.id")
-                ->on('year', "=", DB::raw($year));
+                ->on('kpi_targets.year', "=", DB::raw($year));
         })
-            ->where(['deliverable_id' => $deliverable->id])->get();
-        return view('pages.sector.kpis', compact('deliverable', 'kpis', 'year', 'targets'));
+            ->where(['kpis.deliverable_id' => $deliverable->id])->get();
+
+        return view('pages.sector.kpis', compact('deliverable', 'kpis', 'year', 'targets', 'user'));
     }
 
     public function addKPI(Request $request)
@@ -152,12 +209,33 @@ class DeliverableController extends Controller
 
     public function update(Request $request)
     {
+        $user = Auth::user();
+
+        // Only PDCU users can update deliverables
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can update deliverables.');
+        }
+
         $request->validate([
             'deliverable_id' => 'required|exists:deliverables,id',
         ]);
 
         $deliverable = Deliverable::find($request->deliverable_id);
-        
+
+        // Check if data is locked (confirmed by Coordinator)
+        if ($deliverable) {
+            $hasConfirmedTracking = PerformanceTracking::whereHas('kpi', function ($q) use ($deliverable) {
+                $q->where('deliverable_id', $deliverable->id);
+            })
+                ->where('confirmation_status', 'Confirmed')
+                ->whereNotNull('coordinator_confirmed_at')
+                ->exists();
+
+            if ($hasConfirmedTracking) {
+                return redirect()->back()->with('failure', 'This deliverable has confirmed performance tracking and cannot be modified.');
+            }
+        }
+
         // Check data entry access
         if ($deliverable) {
             $sectorId = $this->getSectorIdFromDeliverable($request->deliverable_id);
@@ -194,6 +272,25 @@ class DeliverableController extends Controller
 
     public function delete(Deliverable $deliverable)
     {
+        $user = Auth::user();
+
+        // Only PDCU users can delete deliverables
+        if (!$user->isDeliveryUnit()) {
+            return redirect()->back()->with('failure', 'Only PDCU staff can delete deliverables.');
+        }
+
+        // Check if data is locked (confirmed by Coordinator)
+        $hasConfirmedTracking = PerformanceTracking::whereHas('kpi', function ($q) use ($deliverable) {
+            $q->where('deliverable_id', $deliverable->id);
+        })
+            ->where('confirmation_status', 'Confirmed')
+            ->whereNotNull('coordinator_confirmed_at')
+            ->exists();
+
+        if ($hasConfirmedTracking) {
+            return redirect()->back()->with('failure', 'This deliverable has confirmed performance tracking and cannot be deleted.');
+        }
+
         // Check data entry access
         $sectorId = $this->getSectorIdFromDeliverable($deliverable->id);
         if ($sectorId) {

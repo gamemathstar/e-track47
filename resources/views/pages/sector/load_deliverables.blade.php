@@ -1,12 +1,18 @@
+@php
+    if (!isset($user)) {
+        $user = \Illuminate\Support\Facades\Auth::user();
+    }
+@endphp
 <div class="flex items-center border-b border-slate-200/60 dark:border-darkmode-400 pb-5 mb-5">
+    @if($user->isDeliveryUnit())
     <div class="font-medium text-base truncate">
         <a href="javascript:;" class="flex items-center ml-auto text-primary"
-           id="editCommitmentBtn" 
-           com-id="{{$commitment->id}}"
-           com-title="{{$commitment->name}}"
-           com-type="{{$commitment->type}}"
-           com-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
-           com-status="{{$commitment->status}}"
+               id="editCommitmentBtn" 
+               com-id="{{$commitment->id}}"
+               com-title="{{$commitment->name}}"
+               com-type="{{$commitment->type}}"
+               com-description="{{ htmlspecialchars($commitment->description, ENT_QUOTES, 'UTF-8') }}"
+               com-status="{{$commitment->status}}"
         >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -26,6 +32,7 @@
         </svg>
         Add Deliverables
     </a>
+    @endif
     <hr>
 </div>
 <div class="text-center text-primary text-2xl pb-5">

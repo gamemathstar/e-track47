@@ -15,6 +15,12 @@ class Sector extends Model
     protected $fillable = [
         'sector_name',
         'description',
+        'code',
+        'ministry',
+        'department',
+        'agency',
+        'status',
+        'framework_id',
     ];
 
     public function countKPI()
@@ -38,6 +44,11 @@ class Sector extends Model
     public function commitments()
     {
         return $this->hasMany(Commitment::class);
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function __commitments()

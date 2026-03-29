@@ -61,7 +61,7 @@
                 Sectors
             </a>
             <span class="text-slate-400 text-sm">/</span>
-            <a class="text-primary hover:underline text-sm font-medium" href="{{ route('sectors.view', $commitment->sector_id ?? '') }}">
+            <a class="text-primary hover:underline text-sm font-medium" href="{{ sector_view_url($commitment->sector_id ?? 0) }}">
                 {{ $commitment->sector->sector_name ?? 'Sector' }}
             </a>
             <span class="text-slate-400 text-sm">/</span>
@@ -161,10 +161,17 @@
                 <h2 class="text-2xl font-bold text-slate-900">Deliverables</h2>
                 <p class="text-slate-500 text-sm">Detailed list of action items for this commitment</p>
             </div>
-            <button class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-primary/90 transition-all active:scale-95" data-tw-toggle="modal" data-tw-target="#header-footer-modal-preview">
-                <span class="material-symbols-outlined text-[20px]">add_circle</span>
-                Add Deliverable
-            </button>
+            @php
+                if (!isset($user)) {
+                    $user = \Illuminate\Support\Facades\Auth::user();
+                }
+            @endphp
+            @if($user->isDeliveryUnit())
+                <button class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-primary/90 transition-all active:scale-95" data-tw-toggle="modal" data-tw-target="#header-footer-modal-preview">
+                    <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                    Add Deliverable
+                </button>
+            @endif
         </div>
 
         @if(session('success'))
@@ -272,16 +279,23 @@
                             </td>
                             <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('deliverable.kpis',[$deliverable->id]) }}" class="text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
+                                    <a href="{{ deliverable_kpis_url($deliverable->id) }}" class="text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
                                         <span class="material-symbols-outlined text-[16px]">visibility</span>
                                         View KPIs
                                     </a>
-                                    <a class="text-amber-600 hover:text-amber-700 tooltip edit-deliverable" data-theme="dark" title="Edit Deliverable" href="javascript:;" data-tw-toggle="modal" data-tw-target="#edit-deliverable-modal" data-id="{{$deliverable->id}}" data-deliverable="{{$deliverable->deliverable}}" data-start-date="{{$deliverable->start_date ? date('Y-m-d', strtotime($deliverable->start_date)) : ''}}" data-end-date="{{$deliverable->end_date ? date('Y-m-d', strtotime($deliverable->end_date)) : ''}}" data-status="{{$deliverable->status}}">
-                                        <span class="material-symbols-outlined text-[20px]">edit</span>
-                                    </a>
-                                    <a class="text-red-600 hover:text-red-700 tooltip" data-theme="dark" title="Delete Deliverable" href="javascript:;" data-tw-toggle="modal" data-tw-target="#delete-modal-preview{{ $deliverable->id }}">
-                                        <span class="material-symbols-outlined text-[20px]">delete</span>
-                                    </a>
+                                    @php
+                                        if (!isset($user)) {
+                                            $user = \Illuminate\Support\Facades\Auth::user();
+                                        }
+                                    @endphp
+                                    @if($user->isDeliveryUnit())
+                                        <a class="text-amber-600 hover:text-amber-700 tooltip edit-deliverable" data-theme="dark" title="Edit Deliverable" href="javascript:;" data-tw-toggle="modal" data-tw-target="#edit-deliverable-modal" data-id="{{$deliverable->id}}" data-deliverable="{{$deliverable->deliverable}}" data-start-date="{{$deliverable->start_date ? date('Y-m-d', strtotime($deliverable->start_date)) : ''}}" data-end-date="{{$deliverable->end_date ? date('Y-m-d', strtotime($deliverable->end_date)) : ''}}" data-status="{{$deliverable->status}}">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                                        </a>
+                                        <a class="text-red-600 hover:text-red-700 tooltip" data-theme="dark" title="Delete Deliverable" href="javascript:;" data-tw-toggle="modal" data-tw-target="#delete-modal-preview{{ $deliverable->id }}">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                                        </a>
+                                    @endif
                                 </div>
                                 <div id="delete-modal-preview{{$deliverable->id}}" class="modal" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">

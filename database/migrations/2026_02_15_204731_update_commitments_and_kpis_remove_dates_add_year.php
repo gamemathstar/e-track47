@@ -11,16 +11,28 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Remove date fields from commitments table
-        Schema::table('commitments', function (Blueprint $table) {
-            $table->dropColumn(['start_date', 'end_date', 'duration_in_days']);
-        });
+        // Remove date fields from commitments table (if they exist)
+        if (Schema::hasColumn('commitments', 'start_date')) {
+            Schema::table('commitments', function (Blueprint $table) {
+                $table->dropColumn(['start_date', 'end_date', 'duration_in_days']);
+            });
+        }
 
-        // Remove date fields from kpis table and add year field
-        Schema::table('kpis', function (Blueprint $table) {
-            $table->dropColumn(['start_date', 'end_date']);
-            $table->integer('year')->nullable()->after('unit_of_measurement');
-        });
+        // Add year field to kpis table if it doesn't exist
+        if (!Schema::hasColumn('kpis', 'year')) {
+            Schema::table('kpis', function (Blueprint $table) {
+                // Remove date fields if they exist
+                if (Schema::hasColumn('kpis', 'start_date')) {
+                    $table->dropColumn(['start_date', 'end_date']);
+                }
+                // Add year field
+                if (Schema::hasColumn('kpis', 'unit_of_measurement')) {
+                    $table->integer('year')->nullable()->after('unit_of_measurement');
+                } else {
+                    $table->integer('year')->nullable();
+                }
+            });
+        }
     }
 
     /**

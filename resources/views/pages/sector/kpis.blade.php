@@ -68,12 +68,12 @@
         <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
             <a class="hover:text-primary" href="{{ route('sectors.index') }}">Sectors</a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
-            <a class="hover:text-primary" href="{{ route('sectors.view', $deliverable->commitment->sector_id ?? '') }}">
+            <a class="hover:text-primary" href="{{ sector_view_url($deliverable->commitment->sector_id ?? 0) }}">
                 {{ $deliverable->commitment->sector->sector_name ?? 'Sector' }}
             </a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
             <a class="hover:text-primary"
-               href="{{ route('commitments.deliverables', $deliverable->commitment_id ?? '') }}">
+               href="{{ commitment_deliverables_url($deliverable->commitment_id ?? 0) }}">
                 {{ $deliverable->commitment->title(30) ?? 'Commitment' }}
             </a>
             <span class="material-symbols-outlined text-xs">chevron_right</span>
@@ -110,18 +110,22 @@
                     </div>
                 </div>
                 <div class="w-full lg:w-72 flex flex-col gap-3">
-                    <button
-                        class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-md shadow-primary/20"
-                        data-tw-toggle="modal" data-tw-target="#header-footer-modal-preview">
-                        <span class="material-symbols-outlined">add</span>
-                        Add New KPI
-                    </button>
-                    <button
-                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all"
-                        data-tw-toggle="modal" data-tw-target="#targetModal">
-                        <span class="material-symbols-outlined">target</span>
-                        Set Target
-                    </button>
+                    @if($user->isDeliveryUnit())
+                        <button
+                            class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-md shadow-primary/20"
+                            data-tw-toggle="modal" data-tw-target="#header-footer-modal-preview">
+                            <span class="material-symbols-outlined">add</span>
+                            Add New KPI
+                        </button>
+                    @endif
+                    @if($user->isDeliveryUnit())
+                        <button
+                            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all"
+                            data-tw-toggle="modal" data-tw-target="#targetModal">
+                            <span class="material-symbols-outlined">target</span>
+                            Set Target
+                        </button>
+                    @endif
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium text-slate-600">Year:</label>
                         <select id="changeYear" class="form-control flex-1 text-sm">
@@ -271,11 +275,14 @@
                                             <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                                                 KPI Name
                                             </th>
-                                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Unit
+                                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
+                                                Base Value
                                             </th>
                                             <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
-                                                Target Value
+                                                Target
+                                            </th>
+                                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                                Unit
                                             </th>
                                             <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
                                                 1<sup>st</sup> QPT
@@ -289,9 +296,6 @@
                                             <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
                                                 4<sup>th</sup> QPT
                                             </th>
-                                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
-                                                Target
-                                            </th>
                                             <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
                                                 Actions
                                             </th>
@@ -300,7 +304,15 @@
                                         <tbody class="divide-y divide-slate-100">
                                         @foreach($kpis as $kpi)
                                             @php
-                                                $tracks = $kpi->performanceTracking()->get();
+                                                // For PDCU users, only show tracks approved by Sector Head
+                                                $onlyApproved = $user->isDeliveryUnit();
+                                                // Filter tracks by year
+                                                $tracks = $kpi->getYearTracks($year, $onlyApproved);
+                                                // Get tracks by quarter for proper display
+                                                $q1Track = $kpi->getQuarterTrack(1, $year, $onlyApproved);
+                                                $q2Track = $kpi->getQuarterTrack(2, $year, $onlyApproved);
+                                                $q3Track = $kpi->getQuarterTrack(3, $year, $onlyApproved);
+                                                $q4Track = $kpi->getQuarterTrack(4, $year, $onlyApproved);
                                                 $trgt = $kpi->kpiTargets($year)->first();
                                                 $latestTrack = $tracks->sortByDesc('updated_at')->first();
                                                 $statusBgClass = 'bg-primary';
@@ -335,237 +347,392 @@
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="px-6 py-4 text-sm text-slate-600">{{ $kpi->unit_of_measurement }}</td>
                                                 <td class="px-6 py-4 text-sm font-bold text-center">{{ $kpi->target_value }}</td>
-                                                <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>0)
-                                                        @php $track = $tracks[0]; @endphp
-                                                        <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
-                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
-                                                           data-qt="1st QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
-                                                        </a>
-                                                        @if($track->milestone && $track->milestone > 0)
-                                                            <div
-                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
-                                                                <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
-                                                            </div>
-                                                        @endif
-                                                    @elseif($user->isSectorHead())
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="1"
-                                                           data-tw-target="#add-performance">
-                                                            <span
-                                                                class="material-symbols-outlined text-lg">add_circle</span>
-                                                        </a>
-                                                    @else
-                                                        <span class="text-slate-400 text-sm">-</span>
-                                                    @endif
-                                                    @if($user->isDeliveryUnit() && count($tracks)>0)
-                                                        @php $track = $tracks[0]; @endphp
-                                                        @if($track->actual_value)
-                                                            <a href="javascript:"
-                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
-                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
-                                                               data-tw-target="#update-performance">
-                                                                <span
-                                                                    class="material-symbols-outlined text-sm">edit</span>
-                                                            </a>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>1)
-                                                        @php $track = $tracks[1]; @endphp
-                                                        <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
-                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
-                                                           data-qt="2nd QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
-                                                        </a>
-                                                        @if($track->milestone && $track->milestone > 0)
-                                                            <div
-                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
-                                                                <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
-                                                            </div>
-                                                        @endif
-                                                    @elseif(count($tracks)>0 && $user->isSectorHead())
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="2"
-                                                           data-tw-target="#add-performance">
-                                                            <span
-                                                                class="material-symbols-outlined text-lg">add_circle</span>
-                                                        </a>
-                                                    @else
-                                                        <span class="text-slate-400 text-sm">-</span>
-                                                    @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>1)
-                                                        @php $track = $tracks[1]; @endphp
-                                                        @if($track->actual_value)
-                                                            <a href="javascript:"
-                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
-                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
-                                                               data-tw-target="#update-performance">
-                                                                <span
-                                                                    class="material-symbols-outlined text-sm">edit</span>
-                                                            </a>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>2)
-                                                        @php $track = $tracks[2]; @endphp
-                                                        <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
-                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
-                                                           data-qt="3rd QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
-                                                        </a>
-                                                        @if($track->milestone && $track->milestone > 0)
-                                                            <div
-                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
-                                                                <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
-                                                            </div>
-                                                        @endif
-                                                    @elseif(count($tracks)>1 && $user->isSectorHead())
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="3"
-                                                           data-tw-target="#add-performance">
-                                                            <span
-                                                                class="material-symbols-outlined text-lg">add_circle</span>
-                                                        </a>
-                                                    @else
-                                                        <span class="text-slate-400 text-sm">-</span>
-                                                    @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>2)
-                                                        @php $track = $tracks[2]; @endphp
-                                                        @if($track->actual_value)
-                                                            <a href="javascript:"
-                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
-                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
-                                                               data-tw-target="#update-performance">
-                                                                <span
-                                                                    class="material-symbols-outlined text-sm">edit</span>
-                                                            </a>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td class="px-6 py-4 text-center">
-                                                    @if(count($tracks)>3)
-                                                        @php $track = $tracks[3]; @endphp
-                                                        <a href="javascript:;" data-tw-toggle="modal"
-                                                           data-tw-target="#view-performance" data-id="{{ $track->id }}"
-                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
-                                                           data-qt="4th QT"
-                                                           class="view text-sm font-bold {{ $track->confirmation_status=='Confirmed'?'text-emerald-600':($track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
-                                                            {{ $track->actual_value }}
-                                                        </a>
-                                                        @if($track->milestone && $track->milestone > 0)
-                                                            <div
-                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
-                                                                <div class="bg-primary h-full"
-                                                                     style="width: {{ min(100, ($track->actual_value / $track->milestone) * 100) }}%"></div>
-                                                            </div>
-                                                        @endif
-                                                    @elseif(count($tracks)>2 && $user->isSectorHead())
-                                                        <a href="javascript:"
-                                                           class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
-                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                           data-id="{{ $kpi->id }}" data-quarter="4"
-                                                           data-tw-target="#add-performance">
-                                                            <span
-                                                                class="material-symbols-outlined text-lg">add_circle</span>
-                                                        </a>
-                                                    @else
-                                                        <span class="text-slate-400 text-sm">-</span>
-                                                    @endif
-                                                    @if($user->isDeliveryDepartment() && count($tracks)>3)
-                                                        @php $track = $tracks[3]; @endphp
-                                                        @if($track->actual_value)
-                                                            <a href="javascript:"
-                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
-                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
-                                                               data-id="{{ $track->id }}"
-                                                               data-quarter="{{ $track->quarter }}"
-                                                               data-milestone="{{ $track->milestone }}"
-                                                               data-actual_value="{{ $track->actual_value }}"
-                                                               data-remarks="{{ $track->remarks }}"
-                                                               data-delivery_department_value="{{ $track->delivery_department_value }}"
-                                                               data-delivery_department_remark="{{ $track->delivery_department_remark }}"
-                                                               data-confirmation_status="{{ $track->confirmation_status }}"
-                                                               data-tw-target="#update-performance">
-                                                                <span
-                                                                    class="material-symbols-outlined text-sm">edit</span>
-                                                            </a>
-                                                        @endif
-                                                    @endif
-                                                </td>
                                                 <td class="px-6 py-4 text-center">
                                                     @php $trgt = $kpi->kpiTargets($year)->first(); @endphp
                                                     <span class="text-sm font-bold">{{$trgt?$trgt->target:"--"}}</span>
                                                 </td>
-                                                <td class="px-6 py-4">
-                                        <span
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold {{ $statusBadgeClass }}">
-                                            {{ $statusText }}
-                                        </span>
+                                                <td class="px-6 py-4 text-sm text-slate-600">{{ $kpi->unit_of_measurement }}</td>
+                                                <td class="px-6 py-4 text-center">
+                                                    @if($q1Track)
+                                                        <a href="javascript:;" data-tw-toggle="modal"
+                                                           data-tw-target="#view-performance"
+                                                           data-id="{{ $q1Track->id }}"
+                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
+                                                           data-qt="1st QT"
+                                                           class="view text-sm font-bold {{ $q1Track->confirmation_status=='Confirmed'?'text-emerald-600':($q1Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q1Track->actual_value ?? '-' }}
+                                                        </a>
+                                                        @if($q1Track->milestone && $q1Track->milestone > 0 && $q1Track->actual_value)
+                                                            <div
+                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
+                                                                <div class="bg-primary h-full"
+                                                                     style="width: {{ min(100, ($q1Track->actual_value / $q1Track->milestone) * 100) }}%"></div>
+                                                            </div>
+                                                        @endif
+                                                        {{-- Show plus button for PDCU if no actual_value yet (before Data Admin submits) --}}
+                                                        @if($user->isDeliveryUnit() && $q1Track && !$q1Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="1"
+                                                               data-milestone="{{ $q1Track->milestone ?? '' }}"
+                                                               data-track-id="{{ $q1Track->id }}"
+                                                               data-tw-target="#set-milestone-modal">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">add_circle</span>
+                                                            </a>
+                                                        @endif
+                                                    @elseif($user->isDeliveryUnit())
+                                                        {{-- PDCU can create new records with milestone only --}}
+                                                        <a href="javascript:"
+                                                           class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
+                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                           data-id="{{ $kpi->id }}" data-quarter="1"
+                                                           data-milestone=""
+                                                           data-tw-target="#set-milestone-modal">
+                                                            <span
+                                                                class="material-symbols-outlined text-lg">add_circle</span>
+                                                        </a>
+                                                    @elseif($user->isDataAdmin())
+                                                        {{-- Data Admin can only update existing records --}}
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
+                                                    @else
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                    @endif
+                                                    @if($user->isDataAdmin() && $q1Track)
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q1Track->sector_head_approved_by || ($q1Track->sector_head_approved_by && $q1Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="1"
+                                                               data-track-id="{{ $q1Track->id }}"
+                                                               data-milestone="{{ $q1Track->milestone }}"
+                                                               data-actual-value="{{ $q1Track->actual_value }}"
+                                                               data-remarks="{{ $q1Track->remarks }}"
+                                                               data-tracking-date="{{ $q1Track->tracking_date ? \Carbon\Carbon::parse($q1Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                    @if($user->isDeliveryUnit() && $q1Track)
+                                                        @if($q1Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $q1Track->id }}"
+                                                               data-quarter="{{ $q1Track->quarter }}"
+                                                               data-milestone="{{ $q1Track->milestone }}"
+                                                               data-actual_value="{{ $q1Track->actual_value }}"
+                                                               data-remarks="{{ $q1Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q1Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q1Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q1Track->confirmation_status }}"
+                                                               data-tw-target="#update-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
                                                 </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    @if($q2Track)
+                                                        <a href="javascript:;" data-tw-toggle="modal"
+                                                           data-tw-target="#view-performance"
+                                                           data-id="{{ $q2Track->id }}"
+                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
+                                                           data-qt="2nd QT"
+                                                           class="view text-sm font-bold {{ $q2Track->confirmation_status=='Confirmed'?'text-emerald-600':($q2Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q2Track->actual_value ?? '-' }}
+                                                        </a>
+                                                        @if($q2Track->milestone && $q2Track->milestone > 0 && $q2Track->actual_value)
+                                                            <div
+                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
+                                                                <div class="bg-primary h-full"
+                                                                     style="width: {{ min(100, ($q2Track->actual_value / $q2Track->milestone) * 100) }}%"></div>
+                                                            </div>
+                                                        @endif
+                                                        {{-- Show plus button for PDCU if no actual_value yet (before Data Admin submits) --}}
+                                                        @if($user->isDeliveryUnit() && $q2Track && !$q2Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="2"
+                                                               data-milestone="{{ $q2Track->milestone ?? '' }}"
+                                                               data-track-id="{{ $q2Track->id }}"
+                                                               data-tw-target="#set-milestone-modal">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">add_circle</span>
+                                                            </a>
+                                                        @endif
+                                                    @elseif($user->isDeliveryUnit())
+                                                        {{-- PDCU can create new records with milestone only --}}
+                                                        <a href="javascript:"
+                                                           class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
+                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                           data-id="{{ $kpi->id }}" data-quarter="2"
+                                                           data-milestone=""
+                                                           data-tw-target="#set-milestone-modal">
+                                                            <span
+                                                                class="material-symbols-outlined text-lg">add_circle</span>
+                                                        </a>
+                                                    @elseif($user->isDataAdmin())
+                                                        {{-- Data Admin can only update existing records --}}
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
+                                                    @else
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                    @endif
+                                                    @if($user->isDataAdmin() && $q2Track)
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q2Track->sector_head_approved_by || ($q2Track->sector_head_approved_by && $q2Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="2"
+                                                               data-track-id="{{ $q2Track->id }}"
+                                                               data-milestone="{{ $q2Track->milestone }}"
+                                                               data-actual-value="{{ $q2Track->actual_value }}"
+                                                               data-remarks="{{ $q2Track->remarks }}"
+                                                               data-tracking-date="{{ $q2Track->tracking_date ? \Carbon\Carbon::parse($q2Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                    @if($user->isDeliveryUnit() && $q2Track)
+                                                        @if($q2Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $q2Track->id }}"
+                                                               data-quarter="{{ $q2Track->quarter }}"
+                                                               data-milestone="{{ $q2Track->milestone }}"
+                                                               data-actual_value="{{ $q2Track->actual_value }}"
+                                                               data-remarks="{{ $q2Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q2Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q2Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q2Track->confirmation_status }}"
+                                                               data-tw-target="#update-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    @if($q3Track)
+                                                        <a href="javascript:;" data-tw-toggle="modal"
+                                                           data-tw-target="#view-performance"
+                                                           data-id="{{ $q3Track->id }}"
+                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
+                                                           data-qt="3rd QT"
+                                                           class="view text-sm font-bold {{ $q3Track->confirmation_status=='Confirmed'?'text-emerald-600':($q3Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q3Track->actual_value ?? '-' }}
+                                                        </a>
+                                                        @if($q3Track->milestone && $q3Track->milestone > 0 && $q3Track->actual_value)
+                                                            <div
+                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
+                                                                <div class="bg-primary h-full"
+                                                                     style="width: {{ min(100, ($q3Track->actual_value / $q3Track->milestone) * 100) }}%"></div>
+                                                            </div>
+                                                        @endif
+                                                        {{-- Show plus button for PDCU if no actual_value yet (before Data Admin submits) --}}
+                                                        @if($user->isDeliveryUnit() && $q3Track && !$q3Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="3"
+                                                               data-milestone="{{ $q3Track->milestone ?? '' }}"
+                                                               data-track-id="{{ $q3Track->id }}"
+                                                               data-tw-target="#set-milestone-modal">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">add_circle</span>
+                                                            </a>
+                                                        @endif
+                                                    @elseif($user->isDeliveryUnit())
+                                                        {{-- PDCU can create new records with milestone only --}}
+                                                        <a href="javascript:"
+                                                           class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
+                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                           data-id="{{ $kpi->id }}" data-quarter="3"
+                                                           data-milestone=""
+                                                           data-tw-target="#set-milestone-modal">
+                                                            <span
+                                                                class="material-symbols-outlined text-lg">add_circle</span>
+                                                        </a>
+                                                    @elseif($user->isDataAdmin())
+                                                        {{-- Data Admin can only update existing records --}}
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
+                                                    @else
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                    @endif
+                                                    @if($user->isDataAdmin() && $q3Track)
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q3Track->sector_head_approved_by || ($q3Track->sector_head_approved_by && $q3Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="3"
+                                                               data-track-id="{{ $q3Track->id }}"
+                                                               data-milestone="{{ $q3Track->milestone }}"
+                                                               data-actual-value="{{ $q3Track->actual_value }}"
+                                                               data-remarks="{{ $q3Track->remarks }}"
+                                                               data-tracking-date="{{ $q3Track->tracking_date ? \Carbon\Carbon::parse($q3Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                    @if($user->isDeliveryUnit() && $q3Track)
+                                                        @if($q3Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $q3Track->id }}"
+                                                               data-quarter="{{ $q3Track->quarter }}"
+                                                               data-milestone="{{ $q3Track->milestone }}"
+                                                               data-actual_value="{{ $q3Track->actual_value }}"
+                                                               data-remarks="{{ $q3Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q3Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q3Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q3Track->confirmation_status }}"
+                                                               data-tw-target="#update-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    @if($q4Track)
+                                                        <a href="javascript:;" data-tw-toggle="modal"
+                                                           data-tw-target="#view-performance"
+                                                           data-id="{{ $q4Track->id }}"
+                                                           data-kpi="{{ $kpi->kpi }}" data-kpi-id="{{$kpi->id}}"
+                                                           data-qt="4th QT"
+                                                           class="view text-sm font-bold {{ $q4Track->confirmation_status=='Confirmed'?'text-emerald-600':($q4Track->confirmation_status=='Rejected'?'text-red-600':'text-slate-600') }} hover:underline">
+                                                            {{ $q4Track->actual_value ?? '-' }}
+                                                        </a>
+                                                        @if($q4Track->milestone && $q4Track->milestone > 0 && $q4Track->actual_value)
+                                                            <div
+                                                                class="w-24 bg-slate-100 h-1.5 rounded-full mt-2 mx-auto overflow-hidden">
+                                                                <div class="bg-primary h-full"
+                                                                     style="width: {{ min(100, ($q4Track->actual_value / $q4Track->milestone) * 100) }}%"></div>
+                                                            </div>
+                                                        @endif
+                                                        {{-- Show plus button for PDCU if no actual_value yet (before Data Admin submits) --}}
+                                                        @if($user->isDeliveryUnit() && $q4Track && !$q4Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="4"
+                                                               data-milestone="{{ $q4Track->milestone ?? '' }}"
+                                                               data-track-id="{{ $q4Track->id }}"
+                                                               data-tw-target="#set-milestone-modal">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">add_circle</span>
+                                                            </a>
+                                                        @endif
+                                                    @elseif($user->isDeliveryUnit())
+                                                        {{-- PDCU can create new records with milestone only --}}
+                                                        <a href="javascript:"
+                                                           class="set-milestone text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center"
+                                                           data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                           data-id="{{ $kpi->id }}" data-quarter="4"
+                                                           data-milestone=""
+                                                           data-tw-target="#set-milestone-modal">
+                                                            <span
+                                                                class="material-symbols-outlined text-lg">add_circle</span>
+                                                        </a>
+                                                    @elseif($user->isDataAdmin())
+                                                        {{-- Data Admin can only update existing records --}}
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                        <small class="text-xs text-slate-500 block">PDCU must create
+                                                            first</small>
+                                                    @else
+                                                        <span class="text-slate-400 text-sm">-</span>
+                                                    @endif
+                                                    @if($user->isDataAdmin() && $q4Track)
+                                                        {{-- Data Admin can update only if: NOT approved by Sector Head OR rejected by Facilitator --}}
+                                                        @if(!$q4Track->sector_head_approved_by || ($q4Track->sector_head_approved_by && $q4Track->facilitator_decision === 'Reject'))
+                                                            <a href="javascript:"
+                                                               class="add text-primary hover:bg-primary/10 p-2 rounded-lg inline-flex items-center mt-2"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $kpi->id }}" data-quarter="4"
+                                                               data-track-id="{{ $q4Track->id }}"
+                                                               data-milestone="{{ $q4Track->milestone }}"
+                                                               data-actual-value="{{ $q4Track->actual_value }}"
+                                                               data-remarks="{{ $q4Track->remarks }}"
+                                                               data-tracking-date="{{ $q4Track->tracking_date ? \Carbon\Carbon::parse($q4Track->tracking_date)->format('Y-m-d') : '' }}"
+                                                               data-tw-target="#add-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                                <span class="text-xs ml-1">Update</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                    @if($user->isDeliveryUnit() && $q4Track)
+                                                        @if($q4Track->actual_value)
+                                                            <a href="javascript:"
+                                                               class="updM text-primary hover:bg-primary/10 p-1 rounded inline-flex items-center"
+                                                               data-tw-toggle="modal" data-kpi="{{ $kpi->kpi }}"
+                                                               data-id="{{ $q4Track->id }}"
+                                                               data-quarter="{{ $q4Track->quarter }}"
+                                                               data-milestone="{{ $q4Track->milestone }}"
+                                                               data-actual_value="{{ $q4Track->actual_value }}"
+                                                               data-remarks="{{ $q4Track->remarks }}"
+                                                               data-delivery_department_value="{{ $q4Track->delivery_department_value }}"
+                                                               data-delivery_department_remark="{{ $q4Track->delivery_department_remark }}"
+                                                               data-confirmation_status="{{ $q4Track->confirmation_status }}"
+                                                               data-tw-target="#update-performance">
+                                                                <span
+                                                                    class="material-symbols-outlined text-sm">edit</span>
+                                                            </a>
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                                {{--                                                <td class="px-6 py-4">--}}
+                                                {{--                                        <span--}}
+                                                {{--                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold {{ $statusBadgeClass }}">--}}
+                                                {{--                                            {{ $statusText }}--}}
+                                                {{--                                        </span>--}}
+                                                {{--                                                </td>--}}
                                                 <td class="px-6 py-4 text-right">
                                                     <div
                                                         class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <a class="p-1.5 text-amber-600 hover:text-amber-700 rounded hover:bg-amber-50 tooltip edit-kpi"
-                                                           data-theme="dark" title="Edit KPI" href="javascript:;"
-                                                           data-tw-toggle="modal" data-tw-target="#edit-kpi-modal"
-                                                           data-id="{{$kpi->id}}" data-kpi="{{$kpi->kpi}}"
-                                                           data-target-value="{{$kpi->target_value}}"
-                                                           data-unit-of-measurement="{{$kpi->unit_of_measurement}}"
-                                                           data-year="{{$kpi->year ?? ''}}">
-                                                            <span class="material-symbols-outlined text-lg">edit</span>
-                                                        </a>
-                                                        <a class="p-1.5 text-red-600 hover:text-red-700 rounded hover:bg-red-50 tooltip"
-                                                           data-theme="dark" title="Delete KPI" href="javascript:;"
-                                                           data-tw-toggle="modal"
-                                                           data-tw-target="#delete-modal-preview{{ $kpi->id }}">
-                                                            <span
-                                                                class="material-symbols-outlined text-lg">delete</span>
-                                                        </a>
+                                                        @if($user->isDeliveryUnit())
+                                                            <a class="p-1.5 text-amber-600 hover:text-amber-700 rounded hover:bg-amber-50 tooltip edit-kpi"
+                                                               data-theme="dark" title="Edit KPI" href="javascript:;"
+                                                               data-tw-toggle="modal" data-tw-target="#edit-kpi-modal"
+                                                               data-id="{{$kpi->id}}" data-kpi="{{$kpi->kpi}}"
+                                                               data-target-value="{{$kpi->target_value}}"
+                                                               data-unit-of-measurement="{{$kpi->unit_of_measurement}}"
+                                                               data-year="{{$kpi->year ?? ''}}">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">edit</span>
+                                                            </a>
+                                                            <a class="p-1.5 text-red-600 hover:text-red-700 rounded hover:bg-red-50 tooltip"
+                                                               data-theme="dark" title="Delete KPI" href="javascript:;"
+                                                               data-tw-toggle="modal"
+                                                               data-tw-target="#delete-modal-preview{{ $kpi->id }}">
+                                                                <span
+                                                                    class="material-symbols-outlined text-lg">delete</span>
+                                                            </a>
+                                                        @endif
                                                     </div>
                                                     <div id="delete-modal-preview{{$kpi->id}}" class="modal"
                                                          tabindex="-1"
@@ -622,304 +789,392 @@
             </div>
 
             <div id="header-footer-modal-preview" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('deliverable.add.kpi')}}" method="post">
-                                @csrf
-                                <input type="hidden" name="deliverable_id" value="{{$deliverable->id}}">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Add KPI
-                                        to {{$deliverable->deliverable}}</h2>
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form action="{{route('deliverable.add.kpi')}}" method="post">
+                            @csrf
+                            <input type="hidden" name="deliverable_id" value="{{$deliverable->id}}">
+                            <!-- BEGIN: Modal Header -->
+                            <div class="modal-header">
+                                <h2 class="font-medium text-base mr-auto">Add KPI
+                                    to {{$deliverable->deliverable}}</h2>
 
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="modal-form-1" class="form-label">KPI</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="kpi" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Baseline Value</label>
-                                        <input id="modal-form-1" type="number" class="form-control"
-                                               name="target_value" step="any" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Unit of Measurement</label>
-                                        <input id="modal-form-1" type="text" class="form-control"
-                                               name="unit_of_measurement" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="modal-form-1" class="form-label">Year</label>
-                                        <input id="modal-form-1" type="number" class="form-control"
-                                               name="year" min="2000" max="2100" value="{{ date('Y') }}" required>
-                                    </div>
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Save</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
+                            </div> <!-- END: Modal Header -->
+                            <!-- BEGIN: Modal Body -->
+                            <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="modal-form-1" class="form-label">KPI</label>
+                                    <input id="modal-form-1" type="text" class="form-control"
+                                           name="kpi" required>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="modal-form-1" class="form-label">Baseline Value</label>
+                                    <input id="modal-form-1" type="number" class="form-control"
+                                           name="target_value" step="any" required>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="modal-form-1" class="form-label">Unit of Measurement</label>
+                                    <input id="modal-form-1" type="text" class="form-control"
+                                           name="unit_of_measurement" required>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="modal-form-1" class="form-label">Year</label>
+                                    <input id="modal-form-1" type="number" class="form-control"
+                                           name="year" min="2000" max="2100" value="{{ date('Y') }}" required>
+                                </div>
+                            </div> <!-- END: Modal Body -->
+                            <!-- BEGIN: Modal Footer -->
+                            <div class="modal-footer">
+                                <button type="button" data-tw-dismiss="modal"
+                                        class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary w-20">Save</button>
+                            </div> <!-- END: Modal Footer -->
+                        </form>
                     </div>
-                </div> <!-- END: Modal Content -->
+                </div>
+            </div> <!-- END: Modal Content -->
 
-                <div id="add-performance" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('deliverable.store.tracking')}}" enctype="multipart/form-data"
-                                  method="post">
-                                @csrf
-                                <input type="hidden" id="kpi_id" name="kpi_id">
-                                <input type="hidden" id="track_id" name="id">
-                                <input type="hidden" id="quarterX" name="quarter">
-                                <input type="hidden" id="year" name="year" value="{{$year}}">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">
-                                        Add Performance Tracking to <span id="kpi"></span>
-                                    </h2>
-
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="tracking-date" class="form-label">Tracking Date</label>
-                                        <input id="tracking-date" type="date" class="form-control"
-                                               {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
-                                               name="tracking_date" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="milestone" class="form-label">Milestone</label>
-                                        <input id="milestone" type="number" class="form-control"
-                                               {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
-                                               name="milestone" required>
-                                    </div>
-
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="actual-value" class="form-label">Actual Delivery</label>
-                                        <input id="actual-value" type="number" class="form-control"
-                                               name="actual_value" step="any"
-                                               {{--                                               value="{{ $track?$track->actual_value:'' }}"--}}
-                                               {{--                                               placeholder="In {{ $kpi->unit_of_measurement }}"--}}
-                                               required>
-                                    </div>
-
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="remark" class="form-label">Remark</label>
-                                        <textarea name="remarks" id="remark"
-                                                  class="form-control"></textarea>
-                                    </div>
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="files" class="form-label">Optional Attachments(s)</label>
-                                        <input type="file" name="files[]" id="files" class="form-control mb-2" multiple
-                                               accept=".jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx,.pdf">
-                                    </div>
-
-                                    <div class="col-span-12 sm:col-span-12" id="preview"></div>
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Save</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
-                    </div>
-                </div> <!-- END: Modal Content -->
-
-                <div id="update-performance" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('deliverable.tracking.save')}}" method="post">
-                                @csrf
-                                <input type="hidden" id="track_idX" name="id">
-                                <input type="hidden" id="quarterX" name="quarter">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">
-                                        Verify Performance Tracking to <span id="kpi"></span>
-                                    </h2>
-
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="milestone" class="form-label">Milestone:</label>
-                                        <div id="milestoneView"></div>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="milestone" class="form-label">Actual Value:</label>
-                                        <div id="actual_valueView"></div>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="milestone" class="form-label">Quarter:</label>
-                                        <div id="quarterView"></div>
-                                    </div>
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="milestone" class="form-label">Remark:</label>
-                                        <div id="remarkView"></div>
-                                    </div>
-
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label class="form-label font-semibold">Attached Evidence(s):</label>
-                                        <div id="evidenceView" class="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                            <p class="text-sm text-gray-500">Loading evidence...</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="remark" class="form-label">Remark</label>
-                                        <textarea name="delivery_department_remark" id="delivery_department_remarkIx"
-                                                  class="form-control"></textarea>
-                                    </div>
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="remark" class="form-label">Status</label>
-                                        <select name="confirmation_status" id="confirmation_statusIx" required>
-                                            <option value="">Select</option>
-                                            <option>Confirmed</option>
-                                            <option>Rejected</option>
-                                        </select>
-                                    </div>
-
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Save</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
-                    </div>
-                </div> <!-- END: Modal Content -->
-
-                <div id="view-performance" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
+            <div id="add-performance" class="modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form id="add-performance-form" action="{{route('deliverable.store.tracking')}}"
+                              enctype="multipart/form-data"
+                              method="post">
+                            @csrf
+                            <input type="hidden" id="kpi_id" name="kpi_id">
+                            <input type="hidden" id="track_id" name="track_id">
+                            <input type="hidden" id="year" name="year" value="{{$year}}">
+                            <!-- BEGIN: Modal Header -->
                             <div class="modal-header">
                                 <h2 class="font-medium text-base mr-auto">
-                                    Performance Tracking for <span id="kpi_title"></span> (<span id="quarter"></span>)
+                                    Add Performance Tracking to <span id="kpi"></span>
                                 </h2>
-                            </div>
+                                <div class="text-sm text-slate-500">
+                                    Year: <span class="font-bold text-slate-700">{{ $year }}</span>
+                                </div>
+                            </div> <!-- END: Modal Header -->
+                            <!-- BEGIN: Modal Body -->
                             <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                <div class="col-span-12 sm:col-span-12" id="track-details"></div>
-                                <div class="col-span-12 sm:col-span-12 mt-3" id="attachments"></div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="quarter-select" class="form-label">Quarter <span
+                                            class="text-red-500">*</span></label>
+                                    <select id="quarter-select" name="quarter" class="form-control" required>
+                                        <option value="">Select Quarter</option>
+                                        <option value="1">Q1 - First Quarter</option>
+                                        <option value="2">Q2 - Second Quarter</option>
+                                        <option value="3">Q3 - Third Quarter</option>
+                                        <option value="4">Q4 - Fourth Quarter</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="tracking-date" class="form-label">Tracking Date</label>
+                                    <input id="tracking-date" type="date" class="form-control"
+                                           {{--                                               value="{{$track?Carbon::parse($track->tracking_date)->format('Y-m-d'):''}}"--}}
+                                           name="tracking_date" required>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="milestone" class="form-label">Milestone
+                                        @if($user->isDeliveryUnit())
+                                            <span class="text-red-500">*</span>
+                                        @endif
+                                    </label>
+                                    @if($user->isDeliveryUnit())
+                                        {{-- PDCU can set milestone when creating new records --}}
+                                        <input id="milestone" type="number" class="form-control"
+                                               name="milestone"
+                                               data-is-pdcu="1"
+                                               required
+                                               step="any" min="0"
+                                               placeholder="Enter milestone value">
+                                        <small class="text-slate-500 text-xs mt-1">Set the milestone target for this
+                                            quarter</small>
+                                    @else
+                                        {{-- Data Admin sees milestone as readonly (set by PDCU) --}}
+                                        <input id="milestone" type="number" class="form-control"
+                                               name="milestone"
+                                               data-is-pdcu="0"
+                                               readonly
+                                               step="any" min="0"
+                                               placeholder="Set by PDCU">
+                                        <small class="text-slate-500 text-xs mt-1" id="milestone-help-text">Milestone is
+                                            set by PDCU and cannot be changed</small>
+                                    @endif
+                                </div>
+
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="actual-value" class="form-label">Actual Delivery</label>
+                                    <input id="actual-value" type="number" class="form-control"
+                                           name="actual_value" step="any"
+                                           {{--                                               value="{{ $track?$track->actual_value:'' }}"--}}
+                                           {{--                                               placeholder="In {{ $kpi->unit_of_measurement }}"--}}
+                                           required>
+                                </div>
+
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="remark" class="form-label">Remark</label>
+                                    <textarea name="remarks" id="remark"
+                                              class="form-control"></textarea>
+                                </div>
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="files" class="form-label">Optional Attachments(s)</label>
+                                    <input type="file" name="files[]" id="files" class="form-control mb-2" multiple
+                                           accept=".jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx,.pdf">
+                                </div>
+
+                                <div class="col-span-12 sm:col-span-12" id="preview"></div>
+                            </div> <!-- END: Modal Body -->
+                            <!-- BEGIN: Modal Footer -->
+                            <div class="modal-footer">
+                                <button type="button" data-tw-dismiss="modal"
+                                        class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary w-20">Save</button>
+                            </div> <!-- END: Modal Footer -->
+                        </form>
+                    </div>
+                </div>
+            </div> <!-- END: Modal Content -->
+
+            {{-- PDCU Set Milestone Modal (Simple - Only Milestone) --}}
+            @if($user->isDeliveryUnit())
+                <div id="set-milestone-modal" class="modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form id="set-milestone-form" action="{{route('deliverable.store.tracking')}}"
+                                  method="post">
+                                @csrf
+                                <input type="hidden" id="milestone-kpi-id" name="kpi_id">
+                                <input type="hidden" id="milestone-quarter" name="quarter">
+                                <input type="hidden" id="milestone-year" name="year" value="{{$year}}">
+                                <input type="hidden" id="milestone-track-id" name="track_id">
+                                <!-- BEGIN: Modal Header -->
+                                <div class="modal-header">
+                                    <h2 class="font-medium text-base mr-auto">
+                                        Set Milestone for <span id="milestone-kpi-name"></span>
+                                    </h2>
+                                    <div class="text-sm text-slate-500">
+                                        Year: <span class="font-bold text-slate-700">{{ $year }}</span>
+                                    </div>
+                                </div> <!-- END: Modal Header -->
+                                <!-- BEGIN: Modal Body -->
+                                <div class="modal-body">
+                                    <div class="mb-4">
+                                        <label for="milestone-value" class="form-label">Quarter</label>
+                                        <div id="milestone-quarter-display"
+                                             class="p-2 bg-slate-50 rounded text-sm font-medium"></div>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="milestone-value" class="form-label">Milestone <span
+                                                class="text-red-500">*</span></label>
+                                        <input id="milestone-value" type="number" class="form-control"
+                                               name="milestone" step="any" min="0" required
+                                               placeholder="Enter milestone value">
+                                        <small class="text-slate-500 text-xs mt-1">Set the milestone target for this
+                                            quarter. Data Admin will fill in the actual performance data later.</small>
+                                    </div>
+                                </div> <!-- END: Modal Body -->
+                                <!-- BEGIN: Modal Footer -->
+                                <div class="modal-footer">
+                                    <button type="button" data-tw-dismiss="modal"
+                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-primary w-20">Save</button>
+                                </div> <!-- END: Modal Footer -->
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <div id="update-performance" class="modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form action="{{route('deliverable.tracking.save')}}" method="post">
+                            @csrf
+                            <input type="hidden" id="track_idX" name="id">
+                            <input type="hidden" id="quarterX" name="quarter">
+                            <!-- BEGIN: Modal Header -->
+                            <div class="modal-header">
+                                <h2 class="font-medium text-base mr-auto">
+                                    Verify Performance Tracking to <span id="kpi"></span>
+                                </h2>
+
+                            </div> <!-- END: Modal Header -->
+                            <!-- BEGIN: Modal Body -->
+                            <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="milestone" class="form-label">Milestone:</label>
+                                    <div id="milestoneView" class="p-2 bg-slate-50 rounded"></div>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="milestone" class="form-label">Actual Value:</label>
+                                    <div id="actual_valueView"></div>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="milestone" class="form-label">Quarter:</label>
+                                    <div id="quarterView"></div>
+                                </div>
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="milestone" class="form-label">Remark:</label>
+                                    <div id="remarkView"></div>
+                                </div>
+
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label class="form-label font-semibold">Attached Evidence(s):</label>
+                                    <div id="evidenceView"
+                                         class="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <p class="text-sm text-gray-500">Loading evidence...</p>
+                                    </div>
+                                </div>
+
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="remark" class="form-label">Remark</label>
+                                    <textarea name="delivery_department_remark" id="delivery_department_remarkIx"
+                                              class="form-control"></textarea>
+                                </div>
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="remark" class="form-label">Status</label>
+                                    <select name="confirmation_status" id="confirmation_statusIx" required>
+                                        <option value="">Select</option>
+                                        <option>Confirmed</option>
+                                        <option>Rejected</option>
+                                    </select>
+                                </div>
+
+                            </div> <!-- END: Modal Body -->
+                            <!-- BEGIN: Modal Footer -->
+                            <div class="modal-footer">
+                                <button type="button" data-tw-dismiss="modal"
+                                        class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary w-20">Save</button>
+                            </div> <!-- END: Modal Footer -->
+                        </form>
+                    </div>
+                </div>
+            </div> <!-- END: Modal Content -->
+
+            <div id="view-performance" class="modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="font-medium text-base mr-auto">
+                                Performance Tracking for <span id="kpi_title"></span> (<span id="quarter"></span>)
+                            </h2>
+                        </div>
+                        <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                            <div class="col-span-12 sm:col-span-12" id="track-details"></div>
+                            <div class="col-span-12 sm:col-span-12 mt-3" id="attachments"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" data-tw-dismiss="modal"
+                                    class="btn btn-outline-secondary w-20 mr-1">Close
+                            </button>
+                            {{--                                <button type="button" class="btn btn-primary w-20">Edit</button>--}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="targetModal" class="modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="font-medium text-base mr-auto">
+                                Target for <span id="targetModalYear">{{$year}}</span>
+                            </h2>
+                        </div>
+                        <form action="{{route('kpis.target.save')}}" method="post">
+                            @csrf
+                            <div class="modal-body">
+                                <table class="table table-bordered" style="width: 100%">
+                                    <tr>
+                                        <th>KPI</th>
+                                        <th>Base Value</th>
+                                        <th>Target Value</th>
+                                    </tr>
+                                    @foreach($targets as $target)
+                                        <tr>
+                                            <td>{{$target->kpi}}</td>
+                                            <td>{{$target->target_value}} ({{$target->unit_of_measurement}})</td>
+                                            <td>
+
+                                                <input type="text" name="target[{{$target->id}}]"
+                                                       class="form-control" value="{{$target->target}}">
+                                                ({{$target->unit_of_measurement}})
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </table>
                             </div>
                             <div class="modal-footer">
+                                <button type="submit" data-tw-dismiss="modal"
+                                        class="btn btn-secondary w-20 mr-1">Save
+                                </button>
                                 <button type="button" data-tw-dismiss="modal"
                                         class="btn btn-outline-secondary w-20 mr-1">Close
                                 </button>
                                 {{--                                <button type="button" class="btn btn-primary w-20">Edit</button>--}}
                             </div>
-                        </div>
+                        </form>
+
                     </div>
                 </div>
+            </div>
 
-                <div id="targetModal" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
+            <!-- Edit KPI Modal -->
+            <div id="edit-kpi-modal" class="modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form action="{{route('kpi.update')}}" method="post">
+                            @csrf
+                            <input type="hidden" name="kpi_id" id="edit-kpi-id">
+                            <!-- BEGIN: Modal Header -->
                             <div class="modal-header">
-                                <h2 class="font-medium text-base mr-auto">
-                                    Target for <span id="targetModalYear">{{$year}}</span>
-                                </h2>
-                            </div>
-                            <form action="{{route('kpis.target.save')}}" method="post">
-                                @csrf
-                                <div class="modal-body">
-                                    <table class="table table-bordered" style="width: 100%">
-                                        <tr>
-                                            <th>KPI</th>
-                                            <th>Base Value</th>
-                                            <th>Target Value</th>
-                                        </tr>
-                                        @foreach($targets as $target)
-                                            <tr>
-                                                <td>{{$target->kpi}}</td>
-                                                <td>{{$target->target_value}} ({{$target->unit_of_measurement}})</td>
-                                                <td>
-
-                                                    <input type="text" name="target[{{$target->id}}]"
-                                                           class="form-control" value="{{$target->target}}">
-                                                    ({{$target->unit_of_measurement}})
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </table>
+                                <h2 class="font-medium text-base mr-auto">Edit KPI</h2>
+                            </div> <!-- END: Modal Header -->
+                            <!-- BEGIN: Modal Body -->
+                            <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                                <div class="col-span-12 sm:col-span-12">
+                                    <label for="edit-kpi-title" class="form-label">KPI</label>
+                                    <input id="edit-kpi-title" type="text" class="form-control"
+                                           name="kpi" required>
                                 </div>
-                                <div class="modal-footer">
-                                    <button type="submit" data-tw-dismiss="modal"
-                                            class="btn btn-secondary w-20 mr-1">Save
-                                    </button>
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Close
-                                    </button>
-                                    {{--                                <button type="button" class="btn btn-primary w-20">Edit</button>--}}
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="edit-kpi-target-value" class="form-label">Baseline Value</label>
+                                    <input id="edit-kpi-target-value" type="number" class="form-control"
+                                           name="target_value" step="any" required>
                                 </div>
-                            </form>
-
-                        </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="edit-kpi-unit" class="form-label">Unit of Measurement</label>
+                                    <input id="edit-kpi-unit" type="text" class="form-control"
+                                           name="unit_of_measurement" required>
+                                </div>
+                                <div class="col-span-6 sm:col-span-6">
+                                    <label for="edit-kpi-year" class="form-label">Year</label>
+                                    <input id="edit-kpi-year" type="number" class="form-control"
+                                           name="year" min="2000" max="2100" required>
+                                </div>
+                            </div> <!-- END: Modal Body -->
+                            <!-- BEGIN: Modal Footer -->
+                            <div class="modal-footer">
+                                <button type="button" data-tw-dismiss="modal"
+                                        class="btn btn-outline-secondary w-20 mr-1">Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary w-20">Update</button>
+                            </div> <!-- END: Modal Footer -->
+                        </form>
                     </div>
                 </div>
-
-                <!-- Edit KPI Modal -->
-                <div id="edit-kpi-modal" class="modal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <form action="{{route('kpi.update')}}" method="post">
-                                @csrf
-                                <input type="hidden" name="kpi_id" id="edit-kpi-id">
-                                <!-- BEGIN: Modal Header -->
-                                <div class="modal-header">
-                                    <h2 class="font-medium text-base mr-auto">Edit KPI</h2>
-                                </div> <!-- END: Modal Header -->
-                                <!-- BEGIN: Modal Body -->
-                                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
-                                    <div class="col-span-12 sm:col-span-12">
-                                        <label for="edit-kpi-title" class="form-label">KPI</label>
-                                        <input id="edit-kpi-title" type="text" class="form-control"
-                                               name="kpi" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="edit-kpi-target-value" class="form-label">Baseline Value</label>
-                                        <input id="edit-kpi-target-value" type="number" class="form-control"
-                                               name="target_value" step="any" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="edit-kpi-unit" class="form-label">Unit of Measurement</label>
-                                        <input id="edit-kpi-unit" type="text" class="form-control"
-                                               name="unit_of_measurement" required>
-                                    </div>
-                                    <div class="col-span-6 sm:col-span-6">
-                                        <label for="edit-kpi-year" class="form-label">Year</label>
-                                        <input id="edit-kpi-year" type="number" class="form-control"
-                                               name="year" min="2000" max="2100" required>
-                                    </div>
-                                </div> <!-- END: Modal Body -->
-                                <!-- BEGIN: Modal Footer -->
-                                <div class="modal-footer">
-                                    <button type="button" data-tw-dismiss="modal"
-                                            class="btn btn-outline-secondary w-20 mr-1">Cancel
-                                    </button>
-                                    <button type="submit" class="btn btn-primary w-20">Update</button>
-                                </div> <!-- END: Modal Footer -->
-                            </form>
-                        </div>
-                    </div>
-                </div> <!-- END: Modal Content -->
+            </div> <!-- END: Modal Content -->
         </div>
     </div>
 
 @endsection
 @section('js')
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         $(function () {
             // Edit KPI functionality
@@ -937,26 +1192,256 @@
                 $('#edit-kpi-year').val(kpiYear);
             });
 
+            // Handle Set Milestone Modal (PDCU only - creates record with milestone only)
+            $('body .set-milestone').on('click', function () {
+                $('#milestone-kpi-name').html($(this).data('kpi'));
+                $('#milestone-kpi-id').val($(this).data('id'));
+                var quarter = $(this).data('quarter');
+                $('#milestone-quarter').val(quarter);
+
+                // Get existing milestone value and track_id if available
+                var existingMilestone = $(this).data('milestone');
+                var trackId = $(this).data('track-id');
+
+                // Set track_id if it exists (for updates)
+                if (trackId) {
+                    $('#milestone-track-id').val(trackId);
+                } else {
+                    $('#milestone-track-id').val('');
+                }
+
+                // Display quarter name
+                var quarterNames = {
+                    '1': 'Q1 - First Quarter',
+                    '2': 'Q2 - Second Quarter',
+                    '3': 'Q3 - Third Quarter',
+                    '4': 'Q4 - Fourth Quarter'
+                };
+                $('#milestone-quarter-display').html(quarterNames[quarter] || 'Quarter ' + quarter);
+
+                // Clear milestone value
+                $('#milestone-value').val('');
+            });
+
+            // Handle Set Milestone Form Submission
+            $('#set-milestone-form').on('submit', function (e) {
+                e.preventDefault();
+                var form = $(this);
+                var formData = new FormData(this);
+
+                // Debug: Log form data
+                console.log('Form data being sent:');
+                for (var pair of formData.entries()) {
+                    console.log(pair[0] + ': ' + pair[1]);
+                }
+
+                var submitButton = form.find('button[type="submit"]');
+                var originalText = submitButton.html();
+
+                submitButton.prop('disabled', true).html('Saving...');
+                $('.error-message').remove();
+                $('.form-control').removeClass('border-red-500');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            // Close the modal immediately by triggering dismiss
+                            var modalElement = document.getElementById('set-milestone-modal');
+                            if (modalElement) {
+                                // Remove the modal backdrop and hide the modal
+                                $('body').removeClass('modal-open');
+                                $('.modal-backdrop').remove();
+                                $('#set-milestone-modal').removeClass('show').hide();
+                                $('#set-milestone-modal').attr('aria-hidden', 'true');
+                            }
+
+                            // Show success message using SweetAlert before reloading
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success!',
+                                text: response.message || 'Milestone saved successfully.',
+                                showConfirmButton: true,
+                                confirmButtonText: 'OK',
+                                timer: 2000,
+                                timerProgressBar: true
+                            }).then(function () {
+                                location.reload(); // Reload page to show new data
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'An error occurred.',
+                                confirmButtonText: 'OK'
+                            });
+                            submitButton.prop('disabled', false).html(originalText);
+                        }
+                    },
+                    error: function (xhr) {
+                        submitButton.prop('disabled', false).html(originalText);
+                        if (xhr.status === 422) {
+                            console.log('Validation errors:', xhr.responseJSON);
+                            var errors = xhr.responseJSON.errors;
+                            $.each(errors, function (field, messages) {
+                                var input = form.find('[name="' + field + '"]');
+                                input.addClass('border-red-500');
+                                input.after('<div class="error-message text-red-500 text-xs mt-1">' + messages[0] + '</div>');
+                            });
+                            // Also show alert with all errors
+                            var errorMessages = [];
+                            $.each(errors, function (field, messages) {
+                                errorMessages.push(field + ': ' + messages[0]);
+                            });
+                            alert('Validation errors:\n' + errorMessages.join('\n'));
+                        } else {
+                            alert('An error occurred: ' + (xhr.responseJSON?.message || 'Please try again'));
+                        }
+                    }
+                });
+            });
+
             $('body .add').on('click', function () {
                 $('#kpi').html($(this).data('kpi'))
                 $('#kpi_id').val($(this).data('id'))
-                $('#quarterX').val($(this).data('quarter'))
+                // Set the quarter selector to the clicked quarter
+                var quarter = $(this).data('quarter');
+                $('#quarter-select').val(quarter);
+
+                // Check if this is an update (has track-id) or new entry
+                var trackId = $(this).data('track-id');
+                var isPDCU = $('#milestone').data('is-pdcu') === '1' || $('#milestone').data('is-pdcu') === 1;
+
+                if (trackId) {
+                    // This is an update (Data Admin updating existing record)
+                    $('#track_id').val(trackId);
+                    $('#milestone').val($(this).data('milestone') || '');
+                    $('#actual-value').val($(this).data('actual-value') || '');
+                    $('#remark').val($(this).data('remarks') || '');
+                    var trackingDate = $(this).data('tracking-date');
+                    if (trackingDate) {
+                        $('#tracking-date').val(trackingDate);
+                    }
+
+                    // For Data Admin updating, milestone is readonly
+                    if (!isPDCU) {
+                        $('#milestone').prop('readonly', true);
+                    }
+                } else {
+                    // This is a new entry (PDCU creating new record)
+                    $('#track_id').val('');
+                    $('#milestone').val('');
+                    $('#tracking-date').val('');
+                    $('#actual-value').val('');
+                    $('#remark').val('');
+                    $('#files').val('');
+                    $('#preview').empty();
+
+                    // For PDCU creating new, milestone is editable and required
+                    if (isPDCU) {
+                        $('#milestone').prop('readonly', false);
+                        $('#milestone').prop('required', true);
+                    }
+                }
+            });
+
+            // Handle Add Performance Tracking form submission with AJAX
+            $('#add-performance-form').on('submit', function (e) {
+                e.preventDefault();
+
+                var form = $(this);
+                var formData = new FormData(this);
+                var submitButton = form.find('button[type="submit"]');
+                var originalText = submitButton.html();
+
+                submitButton.prop('disabled', true).html('Saving...');
+                $('.error-message').remove();
+                $('.form-control').removeClass('border-red-500');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            // Reload page to show new data (modal will close automatically on reload)
+                            if (response.redirect) {
+                                window.location.href = response.redirect;
+                            } else {
+                                location.reload();
+                            }
+                        } else {
+                            alert(response.message || 'An error occurred.');
+                            submitButton.prop('disabled', false).html(originalText);
+                        }
+                    },
+                    error: function (xhr) {
+                        submitButton.prop('disabled', false).html(originalText);
+                        if (xhr.status === 422) {
+                            var errors = xhr.responseJSON.errors;
+                            $.each(errors, function (field, messages) {
+                                var input = form.find('[name="' + field + '"]');
+                                input.addClass('border-red-500');
+                                input.after('<div class="error-message text-red-500 text-xs mt-1">' + messages[0] + '</div>');
+                            });
+                        } else {
+                            var errorMsg = xhr.responseJSON?.message || 'An error occurred. Please try again.';
+                            alert(errorMsg);
+                        }
+                    }
+                });
+            });
+
+            // Make milestone readonly for non-PDCU users when editing existing records
+            $('#add-performance').on('show.bs.modal', function () {
+                var trackId = $('#track_id').val();
+                var isPDCU = $('#milestone').data('is-pdcu') === '1' || $('#milestone').data('is-pdcu') === 1;
+                if (trackId && trackId !== '' && !isPDCU) {
+                    $('#milestone').prop('readonly', true);
+                    $('#milestone-help-text').text('Milestone can only be set by PDCU users (Coordinator, Deputy Coordinator, or Facilitator)');
+                } else if (!isPDCU) {
+                    // For new entries, milestone is readonly for non-PDCU
+                    $('#milestone').prop('readonly', true);
+                    $('#milestone-help-text').text('Milestone can only be set by PDCU users (Coordinator, Deputy Coordinator, or Facilitator)');
+                }
             });
 
             $('body .updM').on('click', function () {
                 let trackId = $(this).data('id')
+                let milestoneValue = $(this).data('milestone') || '';
                 $('#track_idX').val(trackId)
                 $('#delivery_department_remarkIx').val($(this).data('delivery_department_remark'))
                 $('#confirmation_statusIx').val($(this).data('confirmation_status'))
-                $('#milestoneView').html($(this).data('milestone'))
+
+                // For PDCU users, populate the input field; for others, show in div
+                @if($user->isDeliveryUnit())
+                $('#milestoneX').val(milestoneValue);
+                @else
+                $('#milestoneView').html(milestoneValue || '<span class="text-slate-400">Not set</span>');
+                @endif
+
                 $('#remarkView').html($(this).data('remarks'))
                 $('#quarterView').html($(this).data('quarter'))
                 $('#actual_valueView').html($(this).data('actual_value'))
-                
+
                 // Load evidence attachments
                 $.get('{{ route('deliverable.kpi.tracking.files',[':id']) }}'.replace(':id', trackId), function (data) {
                     $('#evidenceView').html(data)
-                }).fail(function() {
+                }).fail(function () {
                     $('#evidenceView').html('<p class="text-sm text-gray-500">No evidence attached.</p>')
                 })
             });
@@ -967,7 +1452,7 @@
                 // Update the modal header immediately
                 $('#targetModalYear').text(selectedYear);
                 // Reload the page to get updated targets for the new year
-                document.location = "{{route('deliverable.kpis',[$deliverable->id])}}?year=" + selectedYear
+                document.location = "{{ deliverable_kpis_url($deliverable->id) }}" + (selectedYear ? "&year=" + selectedYear : "")
             });
 
             // Update target modal year when "Track Performance" button is clicked
@@ -992,6 +1477,7 @@
                     $('#attachments').html(data)
                 })
             })
+
 
             $(document).on('change', '#files', function () {
                 const files = this.files;

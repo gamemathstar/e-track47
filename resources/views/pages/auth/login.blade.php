@@ -54,8 +54,7 @@
                     <div class="flex flex-col">
                         <h1 class="text-xl font-bold tracking-tight leading-none">PDCU</h1>
                         <p class="text-[10px] font-semibold uppercase tracking-widest text-white/90">Performance
-                            Delivery
-                            Unit</p>
+                            Delivery Coordination Unit</p>
                     </div>
                 </a>
             </div>
@@ -94,7 +93,7 @@
                         <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
                             PDCU</h1>
                         <p class="text-[10px] font-semibold uppercase tracking-widest text-primary">Performance Delivery
-                            Unit</p>
+                            Coordination Unit</p>
                     </div>
                 </a>
             </div>

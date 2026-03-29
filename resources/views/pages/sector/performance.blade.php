@@ -37,4 +37,23 @@
         <th class="whitespace-nowrap">Status</th>
         <td>{{ $track->confirmation_status }}</td>
     </tr>
+    @if($track->facilitator_decision)
+        <tr>
+            <th class="whitespace-nowrap {{ $track->facilitator_decision === 'Reject' ? 'text-danger' : 'text-success' }}">Facilitator Decision</th>
+            <td class="{{ $track->facilitator_decision === 'Reject' ? 'text-danger' : 'text-success' }} font-semibold">
+                {{ $track->facilitator_decision === 'Reject' ? 'Rejected' : 'Accepted' }}
+                @if($track->facilitator_confirmed_at)
+                    <small class="text-slate-500 block mt-1">
+                        ({{ Carbon::parse($track->facilitator_confirmed_at)->format('d M, Y h:i A') }})
+                    </small>
+                @endif
+            </td>
+        </tr>
+        @if($track->facilitator_decision === 'Reject' && $track->facilitator_rejection_reason)
+            <tr>
+                <th class="whitespace-nowrap text-danger">Rejection Reason</th>
+                <td class="text-danger">{{ $track->facilitator_rejection_reason }}</td>
+            </tr>
+        @endif
+    @endif
 </table>

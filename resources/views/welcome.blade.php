@@ -49,7 +49,7 @@
             <div class="flex flex-col">
                 <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">PDCU</h1>
                 <p class="text-[10px] font-semibold uppercase tracking-widest text-primary">Performance Delivery
-                    Unit</p>
+                    Coordination Unit</p>
             </div>
         </div>
         <nav class="hidden items-center gap-8 md:flex">
@@ -145,12 +145,21 @@
                 </div>
                 <div class="relative">
                     <div class="absolute -inset-4 rounded-xl bg-primary/5"></div>
-                    <img alt="Government Performance Meeting" class="relative rounded-xl shadow-2xl"
-                         src="{{asset('governor.jpeg')}}">
-                    <div
-                        class="absolute -bottom-6 -right-6 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-xl border border-primary/10 hidden md:block">
-                        <div class="text-3xl font-bold text-primary">94%</div>
-                        <div class="text-xs font-semibold text-slate-500 uppercase">Average Efficiency</div>
+                    <img alt="PDCU Logo" class="relative rounded-xl shadow-2xl w-full min-h-[320px] object-contain"
+                         src="{{asset('jg_logo.png')}}">
+                    <div class="absolute -bottom-6 -right-6 left-6 md:left-auto flex flex-wrap gap-3 justify-center md:justify-end">
+                        <div class="rounded-xl bg-white dark:bg-slate-800 px-5 py-4 shadow-xl border border-primary/10">
+                            <div class="text-2xl font-bold text-primary">{{ $commitmentsCount ?? 0 }}</div>
+                            <div class="text-xs font-semibold text-slate-500 uppercase">Commitments</div>
+                        </div>
+                        <div class="rounded-xl bg-white dark:bg-slate-800 px-5 py-4 shadow-xl border border-primary/10">
+                            <div class="text-2xl font-bold text-primary">{{ $deliverablesCount ?? 0 }}</div>
+                            <div class="text-xs font-semibold text-slate-500 uppercase">Deliverables</div>
+                        </div>
+                        <div class="rounded-xl bg-white dark:bg-slate-800 px-5 py-4 shadow-xl border border-primary/10">
+                            <div class="text-2xl font-bold text-primary">{{ $kpisCount ?? 0 }}</div>
+                            <div class="text-xs font-semibold text-slate-500 uppercase">KPIs</div>
+                        </div>
                     </div>
                 </div>
             </div>

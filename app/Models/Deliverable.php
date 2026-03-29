@@ -12,11 +12,11 @@ class Deliverable extends Model
 
     protected $fillable = [
         'commitment_id',
+        'framework_id',
         'deliverable',
-        'budget',
-        'start_date',
-        'end_date',
+        'description',
         'status',
+        'due_date',
     ];
 
     // Define relationships or additional methods as needed
@@ -45,6 +45,11 @@ class Deliverable extends Model
     public function commitment()
     {
         return $this->belongsTo(Commitment::class);
+    }
+
+    public function framework()
+    {
+        return $this->belongsTo(Framework::class);
     }
 
     public function progress()

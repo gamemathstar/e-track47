@@ -98,8 +98,13 @@
             <div class="bg-white p-6 rounded-xl border border-primary/10 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-slate-500 mb-1">Submission Rate</p>
-                    <h3 class="text-2xl font-bold">{{ $openCount > 0 ? round(($openCount / $totalSectors) * 100, 1) : 0 }}
-                        %</h3>
+                    <h3 class="text-2xl font-bold">
+                        @if(isset($hasTrackingRecords) && !$hasTrackingRecords)
+                            N/A
+                        @else
+                            {{ $openCount > 0 && $totalSectors > 0 ? round(($openCount / $totalSectors) * 100, 1) : 0 }}%
+                        @endif
+                    </h3>
                     <span
                         class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mt-2 inline-block">Q{{ $quarter }} {{ $year }}</span>
                 </div>

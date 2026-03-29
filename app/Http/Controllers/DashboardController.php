@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Framework;
 use App\Models\Sector;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -17,20 +19,20 @@ class DashboardController extends Controller
     }
 
 
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         
-        // Allow Governor, Delivery Unit, System Admin, Sector Head, and Sector Admin to access dashboard
+        // Allow Governor, Delivery Unit, System Admin, Sector Head, and Data Admin to access dashboard
         // Only redirect other roles (if any) to their specific views
-        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin() && !$user->isSectorHead() && !$user->isSectorAdmin()) {
+        if (!$user->isGovernor() && !$user->isDeliveryUnit() && !$user->isSystemAdmin() && !$user->isSectorHead() && !$user->isDataAdmin()) {
             $userRole = UserRole::where(['user_id' => $user->id, 'role_status' => 'active'])->first();
             
             // Check if user role exists and has a valid entity_id
             if ($userRole && $userRole->entity_id) {
                 $sector = Sector::find($userRole->entity_id);
                 if ($sector) {
-                    return redirect(route('sectors.view', [$userRole->entity_id]));
+                    return redirect(sector_view_url($userRole->entity_id));
                 }
             }
             
@@ -39,8 +41,46 @@ class DashboardController extends Controller
             session()->flash('failure', 'Your account is not associated with a valid sector. Please contact the administrator.');
         }
         
-        $year = date('Y');
-        
+        // Years for dropdown: only those that exist in frameworks table (descending)
+        $years = Framework::select('year')
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->map(fn ($y) => (int) $y)
+            ->values()
+            ->all();
+
+        if (empty($years)) {
+            $years = [(int) date('Y')];
+        }
+        $defaultYear = $years[0];
+        $year = $defaultYear;
+
+        // Resolve year from encrypted param (e) or plain (year); prefer encrypted
+        if ($request->filled('e')) {
+            try {
+                $payload = Crypt::decrypt(rawurldecode($request->input('e')));
+                $decoded = json_decode($payload, true);
+                if (is_array($decoded) && isset($decoded['year']) && in_array((int) $decoded['year'], $years, true)) {
+                    $year = (int) $decoded['year'];
+                }
+            } catch (\Throwable $e) {
+                // Invalid or tampered payload — keep default year
+            }
+        } elseif ($request->filled('year')) {
+            $requestedYear = (int) $request->input('year');
+            if (in_array($requestedYear, $years, true)) {
+                $year = $requestedYear;
+            }
+            // Redirect so the URL contains only encrypted params (no plain year in address bar)
+            $encrypted = rawurlencode(Crypt::encrypt(json_encode(['year' => $year])));
+
+            return redirect()->route('dashboard', ['e' => $encrypted]);
+        }
+
+        // Framework(s) for the selected year — sectors/MDAs and all data are scoped to these
+        $frameworkIdsForYear = Framework::where('year', $year)->pluck('id')->all();
+
         // Determine which sectors the user can access
         $accessibleSectorIds = [];
         $hasAccessToAllSectors = false;
@@ -51,7 +91,7 @@ class DashboardController extends Controller
             $hasAccessToAllSectors = true;
         } else {
             // User has access to specific sector(s)
-            $userSector = $user->isSectorHead() ?: $user->isSectorAdmin();
+            $userSector = $user->isSectorHead() ?: $user->isDataAdmin();
             if ($userSector) {
                 $accessibleSectorIds = [$userSector->id];
             } else {
@@ -64,12 +104,13 @@ class DashboardController extends Controller
         }
 
         // Compute quarterly average performance per sector using performance_trackings
-        // Performance is the average of (actual_value / milestone) * 100 for valid numeric entries with milestone > 0
+        // Only sectors (and data) from frameworks with the selected year
         $rawQuarterly = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
             ->join('kpis as k', 'k.deliverable_id', '=', 'd.id')
             ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->whereIn('s.framework_id', $frameworkIdsForYear)
             ->where('pt.year', '=', $year)
             ->whereIn('pt.quarter', [1, 2, 3, 4])
             ->whereNotNull('d.end_date');
@@ -90,11 +131,16 @@ class DashboardController extends Controller
             ->orderBy('s.sector_name')
             ->get();
 
-        // Initialize sectors to ensure display even with no data
+        // Sectors/MDAs only from the framework(s) with the selected year
         if ($hasAccessToAllSectors) {
-            $allSectors = DB::table('sectors')->select('id', 'sector_name')->orderBy('sector_name')->get();
+            $allSectors = DB::table('sectors')
+                ->whereIn('framework_id', $frameworkIdsForYear)
+                ->select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get();
         } else {
             $allSectors = DB::table('sectors')
+                ->whereIn('framework_id', $frameworkIdsForYear)
                 ->whereIn('id', $accessibleSectorIds)
                 ->select('id', 'sector_name')
                 ->orderBy('sector_name')
@@ -118,11 +164,13 @@ class DashboardController extends Controller
             }
         }
         
-        // Calculate statistics filtered by accessible sectors
-        $commitmentsQuery = DB::table('commitments');
+        // Calculate statistics for the selected year's framework(s) only
+        $commitmentsQuery = DB::table('commitments')
+            ->whereIn('framework_id', $frameworkIdsForYear);
         $kpisQuery = DB::table('kpis as k')
             ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
-            ->join('commitments as c', 'd.commitment_id', '=', 'c.id');
+            ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
+            ->whereIn('k.framework_id', $frameworkIdsForYear);
         
         if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
             $commitmentsQuery->whereIn('sector_id', $accessibleSectorIds);
@@ -132,15 +180,24 @@ class DashboardController extends Controller
         $commitments = $commitmentsQuery->count();
         $kpis = $kpisQuery->count('k.id');
         
-        // Calculate budget separately
-        $budgetQuery = DB::table('commitments');
+        // Budget for the selected year's framework(s)
+        $budgetQuery = DB::table('commitments')
+            ->whereIn('framework_id', $frameworkIdsForYear);
         if (!$hasAccessToAllSectors && !empty($accessibleSectorIds)) {
             $budgetQuery->whereIn('sector_id', $accessibleSectorIds);
         }
         $stateBudget = $budgetQuery->sum('budget') ?? 0;
 
+        // Encrypted URLs per year so the dropdown never exposes plain year in the URL
+        $yearEncryptedUrls = [];
+        foreach ($years as $y) {
+            $yearEncryptedUrls[$y] = route('dashboard', ['e' => rawurlencode(Crypt::encrypt(json_encode(['year' => $y])))]);
+        }
+
         return view('pages.dashboard.index', [
             'year' => $year,
+            'years' => $years,
+            'yearEncryptedUrls' => $yearEncryptedUrls,
             'sectorQuarterPerf' => $sectorQuarterPerf,
             'commitments' => $commitments,
             'kpis' => $kpis,
@@ -159,20 +216,28 @@ class DashboardController extends Controller
             return redirect()->route('dashboard')->with('failure', 'You do not have permission to access this page.');
         }
 
-        // Get filter parameters
+        // Get all sectors from active framework
+        $activeFramework = Framework::where('status', 'Active')->first();
+        
+        // Get filter parameters - default year to active framework's year if available
         $selectedSectorId = $request->input('sector_id');
-        $year = $request->input('year', date('Y'));
+        $defaultYear = $activeFramework ? $activeFramework->year : date('Y');
+        $year = $request->input('year', $defaultYear);
         $quarter = $request->input('quarter', 'all');
 
-        // Get all sectors from database
-        $sectors = Sector::select('id', 'sector_name')
-            ->orderBy('sector_name')
-            ->get();
+        if ($activeFramework) {
+            $sectors = Sector::where('framework_id', $activeFramework->id)
+                ->select('id', 'sector_name')
+                ->orderBy('sector_name')
+                ->get();
+        } else {
+            $sectors = collect([]);
+        }
 
         // Calculate statistics based on filters
         $stats = $this->calculateStatistics($selectedSectorId, $year, $quarter, $request);
 
-        return view('pages.dashboard.statistics', compact('sectors', 'stats', 'year', 'quarter', 'selectedSectorId'));
+        return view('pages.dashboard.statistics', compact('sectors', 'stats', 'year', 'quarter', 'selectedSectorId', 'activeFramework'));
     }
 
     private function calculateStatistics($sectorId = null, $year = null, $quarter = null, $request = null)
@@ -181,7 +246,10 @@ class DashboardController extends Controller
         $quarter = $quarter ?? 'all';
         $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
 
-        // Calculate average performance
+        // Get active framework for filtering
+        $activeFramework = Framework::where('status', 'Active')->first();
+
+        // Calculate average performance (capped at 101% for values above 100%)
         $avgPerformanceQuery = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
@@ -194,6 +262,15 @@ class DashboardController extends Controller
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
         
+        // Filter by active framework
+        if ($activeFramework) {
+            $avgPerformanceQuery->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id)
+                ->where('pt.framework_id', $activeFramework->id);
+        }
+        
         if (!$isAllQuarters) {
             $avgPerformanceQuery->where('pt.quarter', '=', $quarter);
         } else {
@@ -205,10 +282,10 @@ class DashboardController extends Controller
         }
         
         $avgPerformance = $avgPerformanceQuery
-            ->select(DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'))
+            ->select(DB::raw('AVG(CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END) as avg_performance'))
             ->value('avg_performance') ?? 0;
 
-        // Get top performing sector
+        // Get top performing sector (capped at 101% for values above 100%)
         $topSectorQuery = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
@@ -220,6 +297,15 @@ class DashboardController extends Controller
             ->where('pt.milestone', '>', 0)
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
+        
+        // Filter by active framework
+        if ($activeFramework) {
+            $topSectorQuery->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id)
+                ->where('pt.framework_id', $activeFramework->id);
+        }
         
         if (!$isAllQuarters) {
             $topSectorQuery->where('pt.quarter', '=', $quarter);
@@ -235,14 +321,14 @@ class DashboardController extends Controller
             ->select(
                 's.id',
                 's.sector_name',
-                DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'),
+                DB::raw('AVG(CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END) as avg_performance'),
                 DB::raw('COUNT(DISTINCT k.id) as kpi_count')
             )
             ->groupBy('s.id', 's.sector_name')
             ->orderBy('avg_performance', 'DESC')
             ->first();
 
-        // Count pending verifications
+        // Count pending verifications (filter by active framework)
         $pendingVerificationsQuery = DB::table('performance_trackings as pt')
             ->join('kpis as k', 'pt.kpi_id', '=', 'k.id')
             ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
@@ -250,6 +336,15 @@ class DashboardController extends Controller
             ->join('sectors as s', 'c.sector_id', '=', 's.id')
             ->where('pt.year', '=', $year)
             ->where('pt.confirmation_status', '!=', 'Confirmed');
+        
+        // Filter by active framework
+        if ($activeFramework) {
+            $pendingVerificationsQuery->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id)
+                ->where('pt.framework_id', $activeFramework->id);
+        }
         
         if (!$isAllQuarters) {
             $pendingVerificationsQuery->where('pt.quarter', '=', $quarter);
@@ -263,7 +358,7 @@ class DashboardController extends Controller
         
         $pendingVerifications = $pendingVerificationsQuery->distinct('s.id')->count('s.id');
 
-        // Get sector comparison data
+        // Get sector comparison data (ranked from best to worst, capped at 101%)
         $sectorComparisonQuery = DB::table('sectors as s')
             ->join('commitments as c', 'c.sector_id', '=', 's.id')
             ->join('deliverables as d', 'd.commitment_id', '=', 'c.id')
@@ -275,6 +370,15 @@ class DashboardController extends Controller
             ->where('pt.milestone', '>', 0)
             ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
             ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
+        
+        // Filter by active framework
+        if ($activeFramework) {
+            $sectorComparisonQuery->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id)
+                ->where('pt.framework_id', $activeFramework->id);
+        }
         
         if (!$isAllQuarters) {
             $sectorComparisonQuery->where('pt.quarter', '=', $quarter);
@@ -290,18 +394,18 @@ class DashboardController extends Controller
             ->select(
                 's.id',
                 's.sector_name',
-                DB::raw('AVG((pt.actual_value / pt.milestone) * 100) as avg_performance'),
+                DB::raw('AVG(CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END) as avg_performance'),
                 DB::raw('COUNT(DISTINCT k.id) as kpi_count')
             )
             ->groupBy('s.id', 's.sector_name')
-            ->orderBy('s.sector_name')
+            ->orderBy('avg_performance', 'DESC')
             ->get();
 
         // Get KPI status breakdown
-        $kpiStatusBreakdown = $this->getKpiStatusBreakdown($sectorId, $year, $quarter);
+        $kpiStatusBreakdown = $this->getKpiStatusBreakdown($sectorId, $year, $quarter, $activeFramework);
 
         // Get detailed breakdown table data
-        $detailedBreakdown = $this->getDetailedBreakdown($sectorId, $year, $quarter);
+        $detailedBreakdown = $this->getDetailedBreakdown($sectorId, $year, $quarter, $request, $activeFramework);
 
         return [
             'avg_performance' => round($avgPerformance, 1),
@@ -313,45 +417,79 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getKpiStatusBreakdown($sectorId = null, $year = null, $quarter = null)
+    private function getKpiStatusBreakdown($sectorId = null, $year = null, $quarter = null, $activeFramework = null)
     {
-        $query = DB::table('kpis as k')
+        $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
+        
+        // Base query for KPIs with performance tracking data
+        $baseQuery = DB::table('kpis as k')
             ->join('deliverables as d', 'k.deliverable_id', '=', 'd.id')
             ->join('commitments as c', 'd.commitment_id', '=', 'c.id')
             ->join('sectors as s', 'c.sector_id', '=', 's.id')
-            ->leftJoin('performance_trackings as pt', function($join) use ($year, $quarter) {
-                $join->on('pt.kpi_id', '=', 'k.id')
-                     ->where('pt.year', '=', $year)
-                     ->where('pt.quarter', '=', $quarter);
-            })
-            ->when($sectorId, function($q) use ($sectorId) {
-                return $q->where('s.id', '=', $sectorId);
-            });
-
-        $totalKpis = $query->clone()->distinct('k.id')->count('k.id');
+            ->join('performance_trackings as pt', 'pt.kpi_id', '=', 'k.id')
+            ->where('pt.year', '=', $year)
+            ->whereNotNull('pt.actual_value')
+            ->whereNotNull('pt.milestone')
+            ->where('pt.milestone', '>', 0)
+            ->whereRaw('pt.milestone REGEXP "^[0-9]+\\.?[0-9]*$"')
+            ->whereRaw('pt.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"');
         
-        $onTrack = $query->clone()
-            ->whereNotNull('pt.actual_value')
-            ->whereNotNull('pt.milestone')
-            ->where('pt.milestone', '>', 0)
-            ->whereRaw('(pt.actual_value / pt.milestone) * 100 >= 70')
+        // Filter by quarter
+        if (!$isAllQuarters) {
+            $baseQuery->where('pt.quarter', '=', $quarter);
+        } else {
+            $baseQuery->whereIn('pt.quarter', [1, 2, 3, 4]);
+        }
+        
+        // Filter by sector if specified
+        if ($sectorId) {
+            $baseQuery->where('s.id', '=', $sectorId);
+        }
+        
+        // Filter by active framework
+        if ($activeFramework) {
+            $baseQuery->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id)
+                ->where('pt.framework_id', $activeFramework->id);
+        }
+        
+        // When quarter is 'all', we need to get the latest quarter's data for each KPI
+        // Use a subquery to get only the latest quarter's tracking for each KPI
+        if ($isAllQuarters) {
+            $frameworkFilter = $activeFramework ? 'AND pt2.framework_id = ' . (int)$activeFramework->id : '';
+            $baseQuery->whereRaw('pt.quarter = (
+                SELECT MAX(pt2.quarter)
+                FROM performance_trackings pt2
+                WHERE pt2.kpi_id = pt.kpi_id
+                AND pt2.year = pt.year
+                AND pt2.actual_value IS NOT NULL
+                AND pt2.milestone IS NOT NULL
+                AND pt2.milestone > 0
+                AND pt2.milestone REGEXP "^[0-9]+\\.?[0-9]*$"
+                AND pt2.actual_value REGEXP "^[0-9]+\\.?[0-9]*$"
+                ' . $frameworkFilter . '
+            )');
+        }
+        
+        // Get total KPIs with tracking data
+        $totalKpis = $baseQuery->clone()->distinct('k.id')->count('k.id');
+        
+        // Calculate status counts using capped performance
+        $onTrack = $baseQuery->clone()
+            ->whereRaw('CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END >= 70')
             ->distinct('k.id')
             ->count('k.id');
 
-        $atRisk = $query->clone()
-            ->whereNotNull('pt.actual_value')
-            ->whereNotNull('pt.milestone')
-            ->where('pt.milestone', '>', 0)
-            ->whereRaw('(pt.actual_value / pt.milestone) * 100 >= 40')
-            ->whereRaw('(pt.actual_value / pt.milestone) * 100 < 70')
+        $atRisk = $baseQuery->clone()
+            ->whereRaw('CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END >= 40')
+            ->whereRaw('CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END < 70')
             ->distinct('k.id')
             ->count('k.id');
 
-        $delayed = $query->clone()
-            ->whereNotNull('pt.actual_value')
-            ->whereNotNull('pt.milestone')
-            ->where('pt.milestone', '>', 0)
-            ->whereRaw('(pt.actual_value / pt.milestone) * 100 < 40')
+        $delayed = $baseQuery->clone()
+            ->whereRaw('CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END < 40')
             ->distinct('k.id')
             ->count('k.id');
 
@@ -366,7 +504,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getDetailedBreakdown($sectorId = null, $year = null, $quarter = null, $request = null)
+    private function getDetailedBreakdown($sectorId = null, $year = null, $quarter = null, $request = null, $activeFramework = null)
     {
         $isAllQuarters = ($quarter === 'all' || $quarter === null || $quarter === '');
         
@@ -390,8 +528,17 @@ class DashboardController extends Controller
             ->whereNotNull('kt.target')
             ->when($sectorId, function($q) use ($sectorId) {
                 return $q->where('s.id', '=', $sectorId);
-            })
-            ->select(
+            });
+        
+        // Filter by active framework
+        if ($activeFramework) {
+            $query->where('s.framework_id', $activeFramework->id)
+                ->where('c.framework_id', $activeFramework->id)
+                ->where('d.framework_id', $activeFramework->id)
+                ->where('k.framework_id', $activeFramework->id);
+        }
+        
+        $query->select(
                 's.id as sector_id',
                 's.sector_name',
                 'c.name as commitment_name',
@@ -400,20 +547,27 @@ class DashboardController extends Controller
                 'k.target_value as baseline',
                 'kt.target as target_value',
                 'pt.actual_value',
+                'pt.milestone',
                 'k.unit_of_measurement',
                 DB::raw('CASE 
                     WHEN pt.actual_value IS NULL OR pt.milestone IS NULL OR pt.milestone = 0 THEN "Pending"
-                    WHEN (pt.actual_value / pt.milestone) * 100 >= 100 THEN "Exceptional"
-                    WHEN (pt.actual_value / pt.milestone) * 100 >= 70 THEN "Target Met"
-                    WHEN (pt.actual_value / pt.milestone) * 100 >= 40 THEN "At Risk"
+                    WHEN CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END >= 100 THEN "Exceptional"
+                    WHEN CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END >= 70 THEN "Target Met"
+                    WHEN CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END >= 40 THEN "At Risk"
                     ELSE "Delayed"
                 END as status'),
                 DB::raw('CASE 
                     WHEN pt.actual_value IS NOT NULL AND pt.milestone IS NOT NULL AND pt.milestone > 0 
                     THEN ROUND(((pt.actual_value - pt.milestone) / pt.milestone) * 100, 1)
                     ELSE NULL
-                END as variance')
+                END as variance'),
+                DB::raw('CASE 
+                    WHEN pt.actual_value IS NOT NULL AND pt.milestone IS NOT NULL AND pt.milestone > 0 
+                    THEN CASE WHEN (pt.actual_value / pt.milestone) * 100 > 100 THEN 101 ELSE (pt.actual_value / pt.milestone) * 100 END
+                    ELSE 0
+                END as performance_score')
             )
+            ->orderBy('performance_score', 'DESC')
             ->orderBy('s.sector_name')
             ->orderBy('c.name');
 

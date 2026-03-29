@@ -520,10 +520,17 @@
         });
 
 
+        @php
+            $commitmentDeliverablesUrls = [];
+            foreach ($commitments as $c) {
+                $commitmentDeliverablesUrls[$c->id] = commitment_deliverables_url($c->id);
+            }
+        @endphp
+        var commitmentDeliverablesUrls = @json($commitmentDeliverablesUrls);
         function loadCommitments(id) {
             $.ajax({
-                type: 'Post',
-                url: "{{route("commitments.deliverables",[''])}}/" + id,
+                type: 'POST',
+                url: commitmentDeliverablesUrls[id] || "{{ route('commitments.deliverables.encrypted') }}",
                 data: {_token: '{{ csrf_token() }}'},
                 success: function (data) {
                     $("#loadArea").html(data);
