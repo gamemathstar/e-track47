@@ -32,7 +32,9 @@ class PerformanceTracking extends Model
         'facilitator_decision',
         'facilitator_rejection_reason',
         'coordinator_confirmed_at',
-        'coordinator_confirmed_by'
+        'coordinator_confirmed_by',
+        'coordinator_decision',
+        'coordinator_rejection_reason',
     ];
 
     protected $casts = [
@@ -145,5 +147,16 @@ class PerformanceTracking extends Model
     public function isPendingCoordinator()
     {
         return $this->confirmation_status === 'Pending Coordinator';
+    }
+
+    /**
+     * Facilitator accepted; coordinator has not yet approved or rejected.
+     */
+    public function isAwaitingCoordinatorFinalApproval(): bool
+    {
+        return (bool) $this->sector_head_approved_by
+            && $this->facilitator_decision === 'Accept'
+            && (bool) $this->facilitator_confirmed_by
+            && !$this->coordinator_confirmed_by;
     }
 }

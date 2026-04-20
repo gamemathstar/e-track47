@@ -53,6 +53,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('delivery/tracking/awaiting/comm/{id}/view', [UserController::class, 'awaitingVerificationCommView'])->name("delivery.awaiting.verification.comm.view");
     Route::get('delivery/tracking/awaiting/del/{id}/view', [UserController::class, 'awaitingVerificationDelView'])->name("delivery.awaiting.verification.del.view");
     Route::get('delivery/tracking/awaiting/{id}/view', [UserController::class, 'awaitingVerificationView'])->name("delivery.awaiting.verification.view");
+    Route::get('delivery/coordinator/final-review', [UserController::class, 'coordinatorFinalReview'])->name('delivery.coordinator.final-review');
+    Route::get('delivery/coordinator/final-review/sector/{id}', [UserController::class, 'coordinatorFinalReviewSector'])->name('delivery.coordinator.final-review.sector');
+    Route::get('delivery/coordinator/final-review/commitment/{id}', [UserController::class, 'coordinatorFinalReviewCommitment'])->name('delivery.coordinator.final-review.commitment');
+    Route::get('delivery/coordinator/final-review/deliverable/{id}', [UserController::class, 'coordinatorFinalReviewDeliverable'])->name('delivery.coordinator.final-review.deliverable');
     Route::post('performance/update', [UserController::class, 'updatePerformance'])->name("update.performance");
     Route::post('users/store', [UserController::class, 'store'])->name("users.add");
     Route::post('users/user/change-password', [UserController::class, 'changePassword'])->name('users.user.change.password');
@@ -107,6 +111,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('deliverable/kpi/store/del/dept', [KpiController::class, 'storeTracking'])->name('deliverable.store.tracking.del.dept');
     Route::post('deliverable/kpi/target/save', [KpiController::class, 'saveTarget'])->name('kpis.target.save');
     Route::get('deliverable/kpi/{kpi}/delete', [KpiController::class, 'delete'])->name('kpis.delete');
+    Route::get('performance-tracking/sector-head-review', [KpiController::class, 'sectorHeadReview'])->name('performance.tracking.sector-head-review');
     Route::post('performance-tracking/approve', [KpiController::class, 'approveData'])->name('performance.tracking.approve');
     Route::post('performance-tracking/facilitator-confirm', [KpiController::class, 'facilitatorConfirm'])->name('performance.tracking.facilitator.confirm');
     Route::post('performance-tracking/coordinator-confirm', [KpiController::class, 'coordinatorConfirm'])->name('performance.tracking.coordinator.confirm');

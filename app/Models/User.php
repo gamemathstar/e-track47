@@ -379,6 +379,10 @@ class User extends Authenticatable
                 if ($role->role === \App\Models\UserRole::ROLE_FACILITATOR) {
                     $facilitatorSectors = $role->facilitatorSectors()->pluck('sector_id')->toArray();
                     $sectorIds = array_merge($sectorIds, $facilitatorSectors);
+                    // Legacy / alternate setup: sector stored on user_roles.entity_id when pivot rows are missing
+                    if (empty($facilitatorSectors) && (int) $role->entity_id > 0) {
+                        $sectorIds[] = (int) $role->entity_id;
+                    }
                 } elseif ($role->entity_id > 0) {
                     // For other single-sector roles, use entity_id
                     $sectorIds[] = $role->entity_id;

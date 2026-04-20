@@ -72,6 +72,7 @@
                                     ->whereNotNull('actual_value')
                                     ->where('actual_value', '!=', 0)
                                     ->where('year', $currentYear);
+//                                    ->where('confirmation_status', 'Pending Sector Head Approval');
 
                                 if ($currentQuarter) {
                                     $query->where('quarter', $currentQuarter);
@@ -97,14 +98,13 @@
                             </select>
                         </div>
                         <button
+                            type="button"
                             id="approve-all-data-btn"
                             class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-500/20"
-                            data-sector-id="{{ $sector->id }}"
-                            data-year="{{ $currentYear }}"
-                            data-quarter="{{ $currentQuarter ?? '' }}"
+                            data-review-url="{{ route('performance.tracking.sector-head-review') }}"
                             @if($pendingCount == 0) disabled @endif>
-                            <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                            Approve Data
+                            <span class="material-symbols-outlined text-[18px]">fact_check</span>
+                            Review &amp; approve
                             @if($pendingCount > 0)
                                 <span
                                     class="bg-white text-emerald-500 rounded-full px-2 py-0.5 text-xs font-bold">{{ $pendingCount }}</span>
@@ -520,100 +520,21 @@
             window.location.href = url.toString();
         });
 
-        // Handle Approve Data button click - approve all pending records
+        // Sector Head: open review page to select KPIs before approving
         $('#approve-all-data-btn').on('click', function (e) {
             e.preventDefault();
-
-            // Check if button is disabled
             if ($(this).prop('disabled')) {
                 return false;
             }
-
-            var button = $(this);
             var year = $('#approve-year-select').val();
             var quarter = $('#approve-quarter-select').val();
-            var sectorId = button.data('sector-id');
-            var originalText = button.html();
-
-            // Build confirmation message
-            var periodText = year + (quarter ? ' Q' + quarter : ' (All Quarters)');
-            var confirmMessage = 'Are you sure you want to approve all pending performance tracking records for ' + periodText + '?<br><br><strong>This action cannot be undone.</strong>';
-
-            // Show SweetAlert confirmation modal
-            Swal.fire({
-                icon: 'question',
-                title: 'Approve Performance Tracking?',
-                html: confirmMessage,
-                showCancelButton: true,
-                confirmButtonColor: '#10b981', // emerald-500
-                cancelButtonColor: '#6b7280', // slate-500
-                confirmButtonText: '<span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 4px;">check_circle</span> Yes, Approve',
-                cancelButtonText: '<span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 4px;">cancel</span> Cancel',
-                reverseButtons: true,
-                focusCancel: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // User confirmed - proceed with approval
-                    button.prop('disabled', true).html('<span class="material-symbols-outlined text-[18px]">hourglass_empty</span> Approving...');
-
-                    $.ajax({
-                        url: '{{ route("performance.tracking.approve") }}',
-                        method: 'POST',
-                        data: {
-                            _token: '{{ csrf_token() }}',
-                            year: year,
-                            quarter: quarter || null,
-                            sector_id: sectorId
-                        },
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                // Show success message using SweetAlert
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Approved!',
-                                    html: '<div style="text-align: center;"><span class="material-symbols-outlined" style="font-size: 48px; color: #10b981; margin-bottom: 16px;">check_circle</span><br>' +
-                                          (response.message || 'Performance tracking records approved successfully.') + '</div>',
-                                    confirmButtonText: 'OK',
-                                    confirmButtonColor: '#10b981',
-                                    timer: 3000,
-                                    timerProgressBar: true
-                                }).then(function() {
-                                    location.reload();
-                                });
-                            } else {
-                                // Show error message using SweetAlert
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Error',
-                                    html: '<div style="text-align: center;"><span class="material-symbols-outlined" style="font-size: 48px; color: #ef4444; margin-bottom: 16px;">error</span><br>' +
-                                          (response.message || 'An error occurred while approving records.') + '</div>',
-                                    confirmButtonText: 'OK',
-                                    confirmButtonColor: '#ef4444'
-                                });
-                                button.prop('disabled', false).html(originalText);
-                            }
-                        },
-                        error: function (xhr) {
-                            var errorMsg = xhr.responseJSON?.message || 'An error occurred. Please try again.';
-                            // Show error message using SweetAlert
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                html: '<div style="text-align: center;"><span class="material-symbols-outlined" style="font-size: 48px; color: #ef4444; margin-bottom: 16px;">error</span><br>' +
-                                      errorMsg + '</div>',
-                                confirmButtonText: 'OK',
-                                confirmButtonColor: '#ef4444'
-                            });
-                            button.prop('disabled', false).html(originalText);
-                        }
-                    });
-                }
-                // If user cancelled, do nothing (button remains enabled)
-            });
+            var base = $(this).data('review-url');
+            var url = new URL(base, window.location.origin);
+            url.searchParams.set('year', year);
+            if (quarter) {
+                url.searchParams.set('quarter', quarter);
+            }
+            window.location.href = url.toString();
         });
     </script>
 @endsection

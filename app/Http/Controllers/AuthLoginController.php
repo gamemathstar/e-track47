@@ -98,6 +98,11 @@ class AuthLoginController extends Controller
             return route("dashboard.statistics");
         }
 
+        // Facilitators: land on Sector Head → Facilitator review queue
+        if ($user && $user->isFacilitator()) {
+            return route("delivery.awaiting.verification");
+        }
+
         return route("dashboard");
     }
 

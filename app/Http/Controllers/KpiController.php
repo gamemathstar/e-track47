@@ -6,6 +6,7 @@ use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\Notification;
 use App\Models\PerformanceTracking;
+use App\Models\Sector;
 use App\Models\User;
 use App\Models\UserRole;
 use App\Traits\ChecksDataEntryAccess;
@@ -108,7 +109,8 @@ class KpiController extends Controller
                 return redirect()->back()->with('failure', 'This data has been confirmed by PDCU and cannot be modified.');
             }
 
-            // Determine if this is a milestone-only update (PDCU can update) or actual value update (Data Admin only)
+            // Records without actual values yet: PDCU may set milestone; Data Admin may submit actuals (milestone unchanged).
+            // Records with actual values: only Data Admin may update those fields.
             $isMilestoneOnlyUpdate = $existingTracking->actual_value === null || $existingTracking->actual_value == 0;
 
             // For updates with actual values, only Data Admin can update
@@ -134,17 +136,6 @@ class KpiController extends Controller
                     }
                     return redirect()->back()->with('failure', 'This record has been approved by Sector Head and cannot be modified. It can only be edited if rejected by Facilitator.');
                 }
-            }
-
-            // For milestone-only updates, only PDCU can update
-            if ($isMilestoneOnlyUpdate && !$isPDCU) {
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Only PDCU users can update milestone values.',
-                    ], 403);
-                }
-                return redirect()->back()->with('failure', 'Only PDCU users can update milestone values.');
             }
         }
 
@@ -235,6 +226,23 @@ class KpiController extends Controller
                     $tracking->facilitator_rejection_reason = null;
                     $tracking->facilitator_confirmed_at = null;
                     $tracking->facilitator_confirmed_by = null;
+                }
+
+                // Coordinator rejected after facilitator acceptance — rewind to facilitator queue
+                if ($tracking->coordinator_decision === 'Reject') {
+                    $tracking->coordinator_decision = null;
+                    $tracking->coordinator_rejection_reason = null;
+                    $tracking->coordinator_confirmed_at = null;
+                    $tracking->coordinator_confirmed_by = null;
+                    $tracking->facilitator_decision = null;
+                    $tracking->facilitator_rejection_reason = null;
+                    $tracking->facilitator_confirmed_at = null;
+                    $tracking->facilitator_confirmed_by = null;
+                    $tracking->delivery_department_value = null;
+                    $tracking->delivery_department_remark = null;
+                    if ($tracking->sector_head_approved_by) {
+                        $tracking->confirmation_status = 'Pending Facilitator';
+                    }
                 }
 
                 // Set status to pending Sector Head approval
@@ -462,6 +470,74 @@ class KpiController extends Controller
         return back()->with('success', 'KPI targets updated successfully.');
     }
 
+    /**
+     * Sector Head: review pending KPI submissions before approving (per-row selection).
+     */
+    public function sectorHeadReview(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->isSectorHead()) {
+            return redirect()->route('dashboard')->with('failure', 'Only Sector Head users can access this page.');
+        }
+
+        $sector = $user->isSectorHead();
+        if (!$sector) {
+            return redirect()->route('dashboard')->with('failure', 'Sector not found for this user.');
+        }
+
+        $request->validate([
+            'year' => 'required|integer|min:2000|max:2100',
+            'quarter' => 'nullable|integer|in:1,2,3,4',
+        ]);
+
+        $year = (int)$request->input('year');
+        $quarter = $request->filled('quarter') ? (int)$request->input('quarter') : null;
+
+        $pendingTrackings = $this->pendingSectorHeadApprovalQuery($sector, $year, $quarter)
+            ->with(['kpi.deliverable.commitment'])
+            ->orderBy('quarter')
+            ->orderBy('id')
+            ->get();
+
+        $kpiIds = $pendingTrackings->pluck('kpi_id')->unique()->filter()->values();
+        $targetsByKpiId = $kpiIds->isEmpty()
+            ? collect()
+            : KpiTarget::whereIn('kpi_id', $kpiIds)->where('year', $year)->get()->keyBy('kpi_id');
+
+        return view('pages.sector.sector-head-review', compact(
+            'sector',
+            'year',
+            'quarter',
+            'pendingTrackings',
+            'targetsByKpiId'
+        ));
+    }
+
+    /**
+     * Base query: performance tracking rows awaiting Sector Head approval for a sector/year/(optional) quarter.
+     */
+    private function pendingSectorHeadApprovalQuery(Sector $sector, int $year, ?int $quarter)
+    {
+        $query = PerformanceTracking::whereHas('kpi', function ($kpiQuery) use ($sector) {
+            $kpiQuery->whereHas('deliverable', function ($deliverableQuery) use ($sector) {
+                $deliverableQuery->whereHas('commitment', function ($commitmentQuery) use ($sector) {
+                    $commitmentQuery->where('sector_id', $sector->id);
+                });
+            });
+        })
+            ->whereNull('sector_head_approved_by')
+            ->whereNotNull('actual_value')
+            ->where('actual_value', '!=', 0)
+            ->where('year', $year);
+//            ->where('confirmation_status', 'Pending Sector Head Approval');
+
+        if ($quarter) {
+            $query->where('quarter', $quarter);
+        }
+
+        return $query;
+    }
+
     public function approveData(Request $request)
     {
         $user = Auth::user();
@@ -492,31 +568,32 @@ class KpiController extends Controller
         $request->validate([
             'year' => 'required|integer|min:2000|max:2100',
             'quarter' => 'nullable|integer|in:1,2,3,4',
+            'approval_mode' => 'nullable|string|in:selective',
+            'tracking_ids' => 'nullable|array',
+            'tracking_ids.*' => 'integer|exists:performance_trackings,id',
         ]);
 
-        $year = $request->input('year');
-        $quarter = $request->input('quarter');
+        $year = (int)$request->input('year');
+        $quarter = $request->filled('quarter') ? (int)$request->input('quarter') : null;
 
-        // Get all pending performance tracking records for this sector, year, and quarter
-        // Only include records where Data Admin has supplied actual_value
-        // Must have status 'Pending Sector Head Approval' to ensure it's a Data Admin submission
-        $query = PerformanceTracking::whereHas('kpi', function ($kpiQuery) use ($sector) {
-            $kpiQuery->whereHas('deliverable', function ($deliverableQuery) use ($sector) {
-                $deliverableQuery->whereHas('commitment', function ($commitmentQuery) use ($sector) {
-                    $commitmentQuery->where('sector_id', $sector->id);
-                });
-            });
-        })
-            ->whereNull('sector_head_approved_by')
-            ->whereNotNull('actual_value')
-            ->where('actual_value', '!=', 0)
-            ->where('year', $year);
+        $allowedIds = $this->pendingSectorHeadApprovalQuery($sector, $year, $quarter)->pluck('id');
 
-        if ($quarter) {
-            $query->where('quarter', $quarter);
+        if ($request->input('approval_mode') === 'selective') {
+            $requested = is_array($request->input('tracking_ids')) ? array_map('intval', $request->input('tracking_ids')) : [];
+            $idsToApprove = $allowedIds->intersect($requested)->values()->all();
+            if (count($idsToApprove) === 0) {
+                $msg = 'Select at least one KPI submission that is pending approval for the selected period.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+
+                return redirect()->back()->withInput()->with('failure', $msg);
+            }
+            $pendingTrackings = PerformanceTracking::whereIn('id', $idsToApprove)->get();
+        } else {
+            // Legacy: approve all pending (e.g. older API clients without approval_mode)
+            $pendingTrackings = PerformanceTracking::whereIn('id', $allowedIds)->get();
         }
-
-        $pendingTrackings = $query->get();
 
         if ($pendingTrackings->isEmpty()) {
             if ($request->ajax() || $request->wantsJson()) {
@@ -556,7 +633,9 @@ class KpiController extends Controller
             ]);
         }
 
-        return redirect()->back()->with('success', $message);
+        $reviewParams = array_filter(['year' => $year, 'quarter' => $quarter], fn($v) => $v !== null && $v !== '');
+
+        return redirect()->route('performance.tracking.sector-head-review', $reviewParams)->with('success', $message);
     }
 
     /**
@@ -609,6 +688,21 @@ class KpiController extends Controller
             return redirect()->back()->with('failure', 'This performance tracking must be approved by Sector Head before Facilitator can confirm.');
         }
 
+        if (
+            $tracking->facilitator_decision === 'Accept'
+            && $tracking->facilitator_confirmed_by
+            && !$tracking->coordinator_confirmed_by
+        ) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This submission is already with the Coordinator for final approval.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('failure', 'This submission is already with the Coordinator for final approval.');
+        }
+
         // Update tracking record based on decision
         // NOTE: Facilitator is only allowed to update the following columns:
         // - facilitator_confirmed_at
@@ -624,17 +718,18 @@ class KpiController extends Controller
         $tracking->facilitator_confirmed_at = now();
         $tracking->facilitator_confirmed_by = $user->id;
         $tracking->facilitator_decision = $validated['facilitator_decision'];
-        
+
         if ($validated['facilitator_decision'] === 'Accept') {
             $tracking->delivery_department_value = $validated['delivery_department_value'];
             $tracking->delivery_department_remark = $validated['delivery_department_remark'];
             // Clear any previous rejection reason
             $tracking->facilitator_rejection_reason = null;
+            $tracking->confirmation_status = 'Pending Coordinator';
         } else {
             // Reject - set rejection reason only
             $tracking->facilitator_rejection_reason = $validated['facilitator_rejection_reason'];
         }
-        
+
         $tracking->save();
 
         // Notify based on decision
@@ -665,4 +760,87 @@ class KpiController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
+    /**
+     * Coordinator / Deputy Coordinator: final approve or reject after Facilitator accepted.
+     */
+    public function coordinatorConfirm(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user->isCoordinator() && !$user->isDeputyCoordinator()) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only Coordinators or Deputy Coordinators can perform final approval.',
+                ], 403);
+            }
+
+            return redirect()->back()->with('failure', 'Only Coordinators or Deputy Coordinators can perform final approval.');
+        }
+
+        $validated = $request->validate([
+            'track_id' => 'required|exists:performance_trackings,id',
+            'coordinator_decision' => 'required|in:Accept,Reject',
+            'coordinator_rejection_reason' => 'required_if:coordinator_decision,Reject|nullable|string|max:5000',
+        ]);
+
+        $tracking = PerformanceTracking::with(['kpi.deliverable.commitment.sector'])->findOrFail($validated['track_id']);
+
+        if ($tracking->coordinator_confirmed_by) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This performance tracking has already been reviewed by a Coordinator.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('failure', 'This performance tracking has already been reviewed by a Coordinator.');
+        }
+
+        if (!$tracking->isAwaitingCoordinatorFinalApproval()) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only facilitator-approved submissions awaiting final review can be actioned here.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('failure', 'Only facilitator-approved submissions awaiting final review can be actioned here.');
+        }
+
+        $tracking->coordinator_confirmed_at = now();
+        $tracking->coordinator_confirmed_by = $user->id;
+        $tracking->coordinator_decision = $validated['coordinator_decision'];
+
+        if ($validated['coordinator_decision'] === 'Accept') {
+            $tracking->confirmation_status = 'Confirmed';
+            $tracking->coordinator_rejection_reason = null;
+            $message = 'Performance tracking has been finally approved.';
+        } else {
+            $tracking->confirmation_status = 'Rejected';
+            $tracking->coordinator_rejection_reason = $validated['coordinator_rejection_reason'] ?? null;
+            $message = 'Performance tracking has been rejected. Data Admin has been notified.';
+        }
+
+        $tracking->save();
+
+        try {
+            if ($validated['coordinator_decision'] === 'Reject') {
+                Notification::notifyDataAdminAfterCoordinatorRejection($tracking);
+            }
+        } catch (\Exception $e) {
+            Log::error('Notification error in coordinatorConfirm: ' . $e->getMessage());
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
 }
+

@@ -44,31 +44,31 @@ class UserController extends Controller
         // Sector filter
         if ($request->filled('sector_id')) {
             $sectorId = $request->input('sector_id');
-            $query->where(function($q) use ($sectorId) {
+            $query->where(function ($q) use ($sectorId) {
                 // For single-sector roles (Sector Head, Data Admin)
                 $q->whereHas('roles', function ($roleQuery) use ($sectorId) {
                     $roleQuery->where('entity_id', $sectorId)
                         ->where('role_status', UserRole::STATUS_ACTIVE)
                         ->whereIn('role', [UserRole::ROLE_SECTOR_HEAD, UserRole::ROLE_DATA_ADMIN]);
                 })
-                // For Facilitators with multiple sectors
-                ->orWhereHas('roles', function ($roleQuery) use ($sectorId) {
-                    $roleQuery->where('role', UserRole::ROLE_FACILITATOR)
-                        ->where('role_status', UserRole::STATUS_ACTIVE)
-                        ->whereHas('facilitatorSectors', function ($fsQuery) use ($sectorId) {
-                            $fsQuery->where('sector_id', $sectorId);
-                        });
-                });
+                    // For Facilitators with multiple sectors
+                    ->orWhereHas('roles', function ($roleQuery) use ($sectorId) {
+                        $roleQuery->where('role', UserRole::ROLE_FACILITATOR)
+                            ->where('role_status', UserRole::STATUS_ACTIVE)
+                            ->whereHas('facilitatorSectors', function ($fsQuery) use ($sectorId) {
+                                $fsQuery->where('sector_id', $sectorId);
+                            });
+                    });
             });
         }
 
         // Paginate results - Order by role priority (Governor first), then by name
         $users = $query->orderByRaw("
-            CASE 
+            CASE
                 WHEN EXISTS (
-                    SELECT 1 FROM user_roles 
-                    WHERE user_roles.user_id = users.id 
-                    AND user_roles.role = 'Governor' 
+                    SELECT 1 FROM user_roles
+                    WHERE user_roles.user_id = users.id
+                    AND user_roles.role = 'Governor'
                     AND user_roles.role_status = 'Active'
                 ) THEN 0
                 ELSE 1
@@ -89,151 +89,477 @@ class UserController extends Controller
     public function awaitingVerification(Request $request)
     {
         $user = Auth::user();
-        
-        $query = Sector::select('sectors.*', DB::raw("COUNT(sectors.id) as count"))
+
+        if ($user->isFacilitator()) {
+            $performanceTrackings = $this->facilitatorAwaitingSectorsWithCounts($user);
+
+            return view('pages.users.awaiting', compact('performanceTrackings'));
+        }
+
+        $query = Sector::select('sectors.*', DB::raw('COUNT(sectors.id) as count'))
             ->join('commitments', 'sectors.id', '=', 'commitments.sector_id')
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
-            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id');
-        
-        // If user is a Facilitator, show records awaiting their action OR already rejected by them
-        if ($user->isFacilitator()) {
-            $query->where(function($q) use ($user) {
-                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
-                $q->whereNotNull('performance_trackings.sector_head_approved_by')
-                  ->whereNull('performance_trackings.facilitator_confirmed_by')
-                  ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already rejected by this facilitator
-                  ->orWhere(function($subQ) use ($user) {
-                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
-                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->where('performance_trackings.facilitator_decision', 'Reject')
-                           ->whereNull('performance_trackings.coordinator_confirmed_by');
-                  });
-            });
-            
-            // Filter to only show sectors assigned to them
-            if (!$user->canAccessAllSectors()) {
-                $assignedSectorIds = $user->getAssignedSectorIds();
-                if (!empty($assignedSectorIds)) {
-                    $query->whereIn('sectors.id', $assignedSectorIds);
-                } else {
-                    // If no sectors assigned, return empty result
-                    $query->whereRaw('1 = 0');
-                }
-            }
-        } else {
-            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
-            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
-        }
-        
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed');
+
         $performanceTrackings = $query->groupBy('sectors.id')->get();
 
         return view('pages.users.awaiting', compact('performanceTrackings'));
+    }
+
+    /**
+     * Sectors that have at least one performance tracking row awaiting facilitator action
+     * (Sector Head approved, facilitator not yet confirmed), with per-sector row counts.
+     */
+    private function facilitatorAwaitingSectorsWithCounts(User $user): \Illuminate\Support\Collection
+    {
+        $assignedSectorIds = null;
+        if (!$user->canAccessAllSectors()) {
+            $assignedSectorIds = $user->getAssignedSectorIds();
+            if (empty($assignedSectorIds)) {
+                return collect();
+            }
+        }
+
+        $countQuery = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('commitments', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->when($assignedSectorIds !== null, function ($q) use ($assignedSectorIds) {
+                $q->whereIn('commitments.sector_id', $assignedSectorIds);
+            })
+            ->where(function ($q) use ($user) {
+                $q->where(function ($w) {
+                    $w->whereNotNull('performance_trackings.sector_head_approved_by')
+                        ->whereNull('performance_trackings.facilitator_confirmed_by')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                })->orWhere(function ($w) use ($user) {
+                    $w->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                        ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                        ->where('performance_trackings.facilitator_decision', 'Reject')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                });
+            })
+            ->groupBy('commitments.sector_id')
+            ->select('commitments.sector_id as sector_id', DB::raw('COUNT(*) as count'));
+
+        $rows = $countQuery->get();
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $sectors = Sector::whereIn('id', $rows->pluck('sector_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($sectors) {
+            $sector = $sectors->get($row->sector_id);
+            if (!$sector) {
+                return null;
+            }
+            $sector->count = (int)$row->count;
+
+            return $sector;
+        })->filter()->values();
     }
 
     public function awaitingVerificationView(Request $request, $id)
     {
         $user = Auth::user();
         $sector = Sector::find($id);
-        
-        $query = Commitment::select('commitments.*', DB::raw("COUNT(commitments.id) as count"))
+
+        if ($user->isFacilitator()) {
+            if (!$user->canAccessAllSectors()) {
+                $assigned = $user->getAssignedSectorIds();
+                if (empty($assigned) || !in_array((int)$id, $assigned, true)) {
+                    $performanceTrackings = collect();
+
+                    return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
+                }
+            }
+            $performanceTrackings = $this->facilitatorAwaitingCommitmentsWithCounts($user, (int)$id);
+
+            return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
+        }
+
+        $query = Commitment::select('commitments.*', DB::raw('COUNT(commitments.id) as count'))
             ->join('deliverables', 'commitments.id', '=', 'deliverables.commitment_id')
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('commitments.sector_id', $id);
-        
-        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
-        if ($user->isFacilitator()) {
-            $query->where(function($q) use ($user) {
-                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
-                $q->whereNotNull('performance_trackings.sector_head_approved_by')
-                  ->whereNull('performance_trackings.facilitator_confirmed_by')
-                  ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already processed by this facilitator (accepted or rejected)
-                  ->orWhere(function($subQ) use ($user) {
-                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
-                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->whereNull('performance_trackings.coordinator_confirmed_by');
-                  });
-            });
-        } else {
-            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
-            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
-        }
-        
+            ->where('commitments.sector_id', $id)
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed');
+
         $performanceTrackings = $query->groupBy('commitments.id')->get();
 
         return view('pages.users.awaiting_commitment', compact('performanceTrackings', 'sector'));
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Commitment>
+     */
+    private function facilitatorAwaitingCommitmentsWithCounts(User $user, int $sectorId): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('commitments', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->where('commitments.sector_id', $sectorId)
+            ->where(function ($q) use ($user) {
+                $q->where(function ($w) {
+                    $w->whereNotNull('performance_trackings.sector_head_approved_by')
+                        ->whereNull('performance_trackings.facilitator_confirmed_by')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                })->orWhere(function ($w) use ($user) {
+                    $w->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                        ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                        ->where('performance_trackings.facilitator_decision', 'Reject')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                });
+            })
+            ->groupBy('commitments.id')
+            ->select('commitments.id as commitment_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $commitments = Commitment::whereIn('id', $rows->pluck('commitment_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($commitments) {
+            $commitment = $commitments->get($row->commitment_id);
+            if (!$commitment) {
+                return null;
+            }
+            $commitment->count = (int)$row->count;
+
+            return $commitment;
+        })->filter()->values();
     }
 
     public function awaitingVerificationCommView(Request $request, $id)
     {
         $user = Auth::user();
         $commitment = Commitment::find($id);
-        
-        $query = Deliverable::select('deliverables.*', DB::raw("COUNT(deliverables.id) as count"))
+
+        if ($user->isFacilitator()) {
+            if ($commitment && !$user->canAccessAllSectors()) {
+                $assigned = $user->getAssignedSectorIds();
+                if (empty($assigned) || !in_array((int)$commitment->sector_id, $assigned, true)) {
+                    $performanceTrackings = collect();
+
+                    return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
+                }
+            }
+            $performanceTrackings = $this->facilitatorAwaitingDeliverablesWithCounts($user, (int)$id);
+
+            return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
+        }
+
+        $query = Deliverable::select('deliverables.*', DB::raw('COUNT(deliverables.id) as count'))
             ->join('kpis', 'deliverables.id', '=', 'kpis.deliverable_id')
             ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('deliverables.commitment_id', $id);
-        
-        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
-        if ($user->isFacilitator()) {
-            $query->where(function($q) use ($user) {
-                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
-                $q->whereNotNull('performance_trackings.sector_head_approved_by')
-                  ->whereNull('performance_trackings.facilitator_confirmed_by')
-                  ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already processed by this facilitator (accepted or rejected)
-                  ->orWhere(function($subQ) use ($user) {
-                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
-                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->whereNull('performance_trackings.coordinator_confirmed_by');
-                  });
-            });
-        } else {
-            // For Coordinators and Deputy Coordinators, show records with 'Not Confirmed' status
-            $query->where('performance_trackings.confirmation_status', 'Not Confirmed');
-        }
-        
+            ->where('deliverables.commitment_id', $id)
+            ->where('performance_trackings.confirmation_status', 'Not Confirmed');
+
         $performanceTrackings = $query->groupBy('deliverables.id')->get();
 
         return view('pages.users.awaiting_deliverables', compact('performanceTrackings', 'commitment'));
     }
 
+    /**
+     * @return \Illuminate\Support\Collection<int, Deliverable>
+     */
+    private function facilitatorAwaitingDeliverablesWithCounts(User $user, int $commitmentId): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->where('deliverables.commitment_id', $commitmentId)
+            ->where(function ($q) use ($user) {
+                $q->where(function ($w) {
+                    $w->whereNotNull('performance_trackings.sector_head_approved_by')
+                        ->whereNull('performance_trackings.facilitator_confirmed_by')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                })->orWhere(function ($w) use ($user) {
+                    $w->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                        ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                        ->where('performance_trackings.facilitator_decision', 'Reject')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                });
+            })
+            ->groupBy('deliverables.id')
+            ->select('deliverables.id as deliverable_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $deliverables = Deliverable::whereIn('id', $rows->pluck('deliverable_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($deliverables) {
+            $deliverable = $deliverables->get($row->deliverable_id);
+            if (!$deliverable) {
+                return null;
+            }
+            $deliverable->count = (int)$row->count;
+
+            return $deliverable;
+        })->filter()->values();
+    }
+
     public function awaitingVerificationDelView(Request $request, $id)
     {
         $user = Auth::user();
-        $deliverable = Deliverable::find($id);
-        
-        $query = Kpi::select('kpis.*', DB::raw("COUNT(kpis.id) as count"))
-            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
-            ->where('kpis.deliverable_id', $id);
-        
-        // If user is a Facilitator, show records awaiting their action OR already processed by them (accepted/rejected)
+        $deliverable = Deliverable::with('commitment')->find($id);
+
         if ($user->isFacilitator()) {
-            $query->where(function($q) use ($user) {
-                // Records awaiting facilitator action (approved by Sector Head, not yet confirmed by Facilitator)
-                $q->whereNotNull('performance_trackings.sector_head_approved_by')
-                  ->whereNull('performance_trackings.facilitator_confirmed_by')
-                  ->whereNull('performance_trackings.coordinator_confirmed_by')
-                  // OR records already processed by this facilitator (accepted or rejected)
-                  ->orWhere(function($subQ) use ($user) {
-                      $subQ->whereNotNull('performance_trackings.facilitator_confirmed_by')
-                           ->where('performance_trackings.facilitator_confirmed_by', $user->id)
-                           ->whereNull('performance_trackings.coordinator_confirmed_by');
-                  });
-            });
-        } else {
-            // For Coordinators and Deputy Coordinators, show records awaiting facilitator action
-            $query->whereNotNull('performance_trackings.sector_head_approved_by')
-                  ->whereNull('performance_trackings.facilitator_confirmed_by')
-                  ->whereNull('performance_trackings.coordinator_confirmed_by');
+            if ($deliverable && $deliverable->commitment && !$user->canAccessAllSectors()) {
+                $assigned = $user->getAssignedSectorIds();
+                $sectorId = (int)$deliverable->commitment->sector_id;
+                if (empty($assigned) || !in_array($sectorId, $assigned, true)) {
+                    $kpis = collect();
+
+                    return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
+                }
+            }
+            $kpis = $this->facilitatorAwaitingKpisWithCounts($user, (int)$id);
+
+            return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
         }
-        
+
+        $query = Kpi::select('kpis.*', DB::raw('COUNT(kpis.id) as count'))
+            ->join('performance_trackings', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('kpis.deliverable_id', $id)
+            ->whereNotNull('performance_trackings.sector_head_approved_by')
+            ->whereNull('performance_trackings.facilitator_confirmed_by')
+            ->whereNull('performance_trackings.coordinator_confirmed_by');
+
         $kpis = $query->groupBy('kpis.id')->get();
 
         return view('pages.users.awaiting_kpis', compact('kpis', 'deliverable', 'user'));
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Kpi>
+     */
+    private function facilitatorAwaitingKpisWithCounts(User $user, int $deliverableId): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->where('kpis.deliverable_id', $deliverableId)
+            ->where(function ($q) use ($user) {
+                $q->where(function ($w) {
+                    $w->whereNotNull('performance_trackings.sector_head_approved_by')
+                        ->whereNull('performance_trackings.facilitator_confirmed_by')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                })->orWhere(function ($w) use ($user) {
+                    $w->whereNotNull('performance_trackings.facilitator_confirmed_by')
+                        ->where('performance_trackings.facilitator_confirmed_by', $user->id)
+                        ->where('performance_trackings.facilitator_decision', 'Reject')
+                        ->whereNull('performance_trackings.coordinator_confirmed_by');
+                });
+            })
+            ->groupBy('kpis.id')
+            ->select('kpis.id as kpi_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $kpis = Kpi::whereIn('id', $rows->pluck('kpi_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($kpis) {
+            $kpi = $kpis->get($row->kpi_id);
+            if (!$kpi) {
+                return null;
+            }
+            $kpi->count = (int)$row->count;
+
+            return $kpi;
+        })->filter()->values();
+    }
+
+    public function coordinatorFinalReview(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->isCoordinator() && !$user->isDeputyCoordinator()) {
+            abort(403);
+        }
+        $performanceTrackings = $this->coordinatorPendingSectorsWithCounts();
+
+        return view('pages.users.coordinator_final_review', compact('performanceTrackings'));
+    }
+
+    public function coordinatorFinalReviewSector(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user->isCoordinator() && !$user->isDeputyCoordinator()) {
+            abort(403);
+        }
+        $sector = Sector::findOrFail($id);
+        $performanceTrackings = $this->coordinatorPendingCommitmentsWithCounts((int) $id);
+
+        return view('pages.users.coordinator_final_commitments', compact('sector', 'performanceTrackings'));
+    }
+
+    public function coordinatorFinalReviewCommitment(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user->isCoordinator() && !$user->isDeputyCoordinator()) {
+            abort(403);
+        }
+        $commitment = Commitment::findOrFail($id);
+        $performanceTrackings = $this->coordinatorPendingDeliverablesWithCounts((int) $id);
+
+        return view('pages.users.coordinator_final_deliverables', compact('commitment', 'performanceTrackings'));
+    }
+
+    public function coordinatorFinalReviewDeliverable(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user->isCoordinator() && !$user->isDeputyCoordinator()) {
+            abort(403);
+        }
+        $deliverable = Deliverable::with('commitment.sector')->findOrFail($id);
+        $kpis = Kpi::where('deliverable_id', $id)
+            ->with([
+                'performanceTracking.sectorHeadApprovedBy:id,full_name',
+                'performanceTracking.facilitatorConfirmedBy:id,full_name',
+            ])
+            ->get();
+
+        $coordinatorTrackDetails = [];
+        foreach ($kpis as $kpi) {
+            foreach ($kpi->performanceTracking as $track) {
+                if ($track->isAwaitingCoordinatorFinalApproval()) {
+                    $coordinatorTrackDetails[$track->id] = [
+                        'kpi_name' => $kpi->kpi,
+                        'target_value' => $kpi->target_value,
+                        'unit_of_measurement' => $kpi->unit_of_measurement,
+                        'quarter' => $track->quarter,
+                        'year' => $track->year,
+                        'milestone' => $track->milestone,
+                        'tracking_date' => $track->tracking_date ? $track->tracking_date->format('Y-m-d') : null,
+                        'actual_value' => $track->actual_value,
+                        'remarks' => $track->remarks,
+                        'sector_head_name' => $track->sectorHeadApprovedBy?->full_name,
+                        'sector_head_at' => $track->sector_head_approved_at ? $track->sector_head_approved_at->format('Y-m-d H:i') : null,
+                        'facilitator_name' => $track->facilitatorConfirmedBy?->full_name,
+                        'facilitator_at' => $track->facilitator_confirmed_at ? $track->facilitator_confirmed_at->format('Y-m-d H:i') : null,
+                        'facilitator_decision' => $track->facilitator_decision,
+                        'delivery_department_value' => $track->delivery_department_value,
+                        'delivery_department_remark' => $track->delivery_department_remark,
+                    ];
+                }
+            }
+        }
+
+        return view('pages.users.coordinator_final_kpis', compact('deliverable', 'kpis', 'coordinatorTrackDetails'));
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Sector>
+     */
+    private function coordinatorPendingSectorsWithCounts(): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('commitments', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->whereNotNull('performance_trackings.sector_head_approved_by')
+            ->where('performance_trackings.facilitator_decision', 'Accept')
+            ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+            ->whereNull('performance_trackings.coordinator_confirmed_by')
+            ->groupBy('commitments.sector_id')
+            ->select('commitments.sector_id as sector_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $sectors = Sector::whereIn('id', $rows->pluck('sector_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($sectors) {
+            $sector = $sectors->get($row->sector_id);
+            if (!$sector) {
+                return null;
+            }
+            $sector->count = (int) $row->count;
+
+            return $sector;
+        })->filter()->values();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Commitment>
+     */
+    private function coordinatorPendingCommitmentsWithCounts(int $sectorId): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->join('commitments', 'commitments.id', '=', 'deliverables.commitment_id')
+            ->where('commitments.sector_id', $sectorId)
+            ->whereNotNull('performance_trackings.sector_head_approved_by')
+            ->where('performance_trackings.facilitator_decision', 'Accept')
+            ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+            ->whereNull('performance_trackings.coordinator_confirmed_by')
+            ->groupBy('commitments.id')
+            ->select('commitments.id as commitment_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $commitments = Commitment::whereIn('id', $rows->pluck('commitment_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($commitments) {
+            $commitment = $commitments->get($row->commitment_id);
+            if (!$commitment) {
+                return null;
+            }
+            $commitment->count = (int) $row->count;
+
+            return $commitment;
+        })->filter()->values();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Deliverable>
+     */
+    private function coordinatorPendingDeliverablesWithCounts(int $commitmentId): \Illuminate\Support\Collection
+    {
+        $rows = DB::table('performance_trackings')
+            ->join('kpis', 'kpis.id', '=', 'performance_trackings.kpi_id')
+            ->join('deliverables', 'deliverables.id', '=', 'kpis.deliverable_id')
+            ->where('deliverables.commitment_id', $commitmentId)
+            ->whereNotNull('performance_trackings.sector_head_approved_by')
+            ->where('performance_trackings.facilitator_decision', 'Accept')
+            ->whereNotNull('performance_trackings.facilitator_confirmed_by')
+            ->whereNull('performance_trackings.coordinator_confirmed_by')
+            ->groupBy('deliverables.id')
+            ->select('deliverables.id as deliverable_id', DB::raw('COUNT(*) as count'))
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $deliverables = Deliverable::whereIn('id', $rows->pluck('deliverable_id'))->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($deliverables) {
+            $deliverable = $deliverables->get($row->deliverable_id);
+            if (!$deliverable) {
+                return null;
+            }
+            $deliverable->count = (int) $row->count;
+
+            return $deliverable;
+        })->filter()->values();
     }
 
     public function create()
