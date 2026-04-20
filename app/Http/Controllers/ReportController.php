@@ -3253,17 +3253,24 @@ class ReportController extends Controller
             $request->sector_facilitator_date
         );
 
-        // Save document
-        $filename = "Performance_Report_{$sector->sector_name}_{$year}.docx";
-        $filename = preg_replace('/[^A-Za-z0-9_\-]/', '_', $filename);
+        // Build a safe filename while preserving the .docx extension.
+        $safeSectorName = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string) $sector->sector_name);
+        $safeSectorName = trim(preg_replace('/_+/', '_', $safeSectorName), '_');
+        if ($safeSectorName === '') {
+            $safeSectorName = 'Sector';
+        }
+        $filename = "Performance_Report_{$safeSectorName}_{$year}.docx";
 
-        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        header('Content-Disposition: attachment;filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
-
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save('php://output');
-        exit;
+        return response()->streamDownload(function () use ($phpWord) {
+            $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
+            'Pragma' => 'public',
+            'Expires' => '0',
+        ]);
     }
 
     private function getSectorPerformanceDataForWord($sector, $year)
