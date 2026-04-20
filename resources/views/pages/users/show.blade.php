@@ -40,14 +40,21 @@
                          src="{{ asset($user->image_url? 'uploads/users/' . $user->image_url: 'dist/images/profile-5.jpg') }}">
                 </div>
                 <div class="ml-5">
-                    @php 
+                    @php
                         $sector = $user->sector();
                         $userRole = $user->getCurrentRole();
+                        $displaySectors = collect();
+                        if ($userRole && $userRole->role === \App\Models\UserRole::ROLE_FACILITATOR) {
+                            $displaySectors = $userRole->facilitatorSectors()->with('sector')->get()->pluck('sector')->filter();
+                        }
+                        $displaySectorText = $displaySectors->isNotEmpty()
+                            ? $displaySectors->pluck('sector_name')->join(', ')
+                            : ($sector ? $sector->sector_name : '');
                     @endphp
                     <div
                         class="w-24 sm:w-40 truncate sm:whitespace-normal font-medium text-lg">{{ $user->full_name }}</div>
                     <div
-                        class="text-slate-500">{{ $userRole ? $userRole->role : 'No Role' }}{{ $sector ? ' | ' . $sector->sector_name : '' }}</div>
+                        class="text-slate-500">{{ $userRole ? $userRole->role : 'No Role' }}{{ $displaySectorText ? ' | ' . $displaySectorText : '' }}</div>
                 </div>
             </div>
             <div
@@ -62,10 +69,10 @@
                         <i data-lucide="phone" class="w-4 h-4 mr-2"></i>
                         {{ $user->phone_number }}
                     </div>
-                    @if(!is_null($user->sector()))
+                    @if($displaySectorText)
                         <div class="truncate sm:whitespace-normal flex items-center mt-3">
                             <i data-lucide="home" class="w-4 h-4 mr-2"></i>
-                            {{ $sector?$sector->sector_name:"" }}
+                            {{ $displaySectorText }}
                         </div>
                     @endif
                 </div>
@@ -109,7 +116,8 @@
                 </li>
                 <li id="settings-tab" class="nav-item" role="presentation">
                     <a href="javascript:;" class="nav-link py-4 flex items-center" data-tw-target="#settings"
-                       aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="settings"></i> Settings </a>
+                       aria-selected="false" role="tab"> <i class="w-4 h-4 mr-2" data-lucide="settings"></i> Settings
+                    </a>
                 </li>
             @endif
         </ul>
@@ -190,205 +198,235 @@
         </div>
 
         @if(!$isViewingOwnProfile)
-        <div id="edit-profile" class="tab-pane" role="tabpanel" aria-labelledby="edit-profile-tab">
-            <div class="grid grid-cols-12 gap-6">
-                <!-- BEGIN: Latest Uploads -->
-                <div class="intro-y box col-span-12 lg:col-span-12">
-                    <div class="p-8">
-                        <form action="{{route('users.add')}}" method="post">
-                            @csrf
-                            <input type="hidden" name="id" value="{{ $user->id }}">
-                            <div class="grid grid-cols-12 mt-4">
-                                <div class="col-span-12 lg:col-span-4">
-                                    <label for="full_name" class="form-label">Full Name</label>
-                                    <input type="text" id="full_name" class="form-control" name="full_name"
-                                           placeholder="Full Name" value="{{ $user->full_name }}" required>
-                                </div>
-                                <div class="col-span-12 lg:col-span-4 mr-2  ml-2">
-                                    <label for="email" class="form-label">Email</label>
-                                    <input type="email" id="email" class="form-control" name="email" placeholder="Email"
-                                           value="{{ $user->email }}" required>
-                                </div>
-
-                                <div class="col-span-12 lg:col-span-4">
-                                    <label for="phone_number" class="form-label">Phone No</label>
-                                    <input type="tel" id="phone_number" class="form-control" name="phone_number"
-                                           value="{{ $user->phone_number }}" placeholder="Phone No" required>
-                                </div>
-                            </div>
-
-                            @php
-                                $sector = $user->sector();
-                                $userRole = $user->getCurrentRole();
-                            @endphp
-                            <div class="grid grid-cols-12 mt-4">
-                                <div class="col-span-12 lg:col-span-4 mr-">
-                                    <label for="regular-form-2" class="form-label">Role</label>
-                                    <select name="role" id="" class="form-control">
-                                        <option value="">Select</option>
-                                        <option
-                                            {{ $userRole && $userRole->role == 'Governor'? 'selected' : '' }}
-                                            value="Governor"> Governor
-                                        </option>
-                                        <option
-                                            {{ $userRole && $userRole->role == 'System Admin'? 'selected' : '' }}
-                                            value="System Admin"> System Admin
-                                        </option>
-                                        <option
-                                            {{ $userRole && $userRole->role == 'Sector Head'? 'selected' : '' }}
-                                            value="Sector Head"> Sector Head
-                                        </option>
-                                        <option {{ $userRole && ($userRole->role == 'Data Admin' || $userRole->role == 'Sector Admin')? 'selected' : '' }}
-                                                value="Data Admin">Data Admin
-                                        </option>
-                                        <option {{ $userRole && $userRole->role == 'Coordinator'? 'selected' : '' }}
-                                                value="Coordinator">Coordinator
-                                        </option>
-                                        <option {{ $userRole && $userRole->role == 'Deputy Coordinator'? 'selected' : '' }}
-                                                value="Deputy Coordinator">Deputy Coordinator
-                                        </option>
-                                        <option {{ $userRole && $userRole->role == 'Facilitator'? 'selected' : '' }}
-                                                value="Facilitator">Facilitator
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <div class="col-span-12 lg:col-span-4 ml-1">
-                                    <label for="regular-form-2" class="form-label">Sector</label>
-                                    <select name="sector_id" id="" class="form-control">
-                                        <option value="">Select</option>
-                                        @foreach($sectors as $sektor)
-                                            <option {{ $sector && $sector->id===$sektor->id? 'selected':'' }}
-                                                    value="{{$sektor->id}}">{{$sektor->sector_name}}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <br>
-                            <br>
-                            <div class="mt-3 text-center">
-                                <button class="btn btn-primary" id="addEditDeliverableBtn">Save</button>
-                                <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">
-                                    Close
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                <!-- END: Latest Uploads -->
-            </div>
-        </div>
-        @endif
-
-        @if(!$isViewingOwnProfile)
-        <div id="settings" class="tab-pane" role="tabpanel" aria-labelledby="settings-tab">
-            <div class="grid grid-cols-12 gap-6">
-                <!-- Role Management Section -->
-                <div class="intro-y box col-span-12">
-                    <div class="p-8">
-                        <h3 class="text-lg font-bold mb-4">Role Management</h3>
-                        
-                        <!-- Current Active Role -->
-                        @php
-                            // Sort roles: Active first, then Revoked, then by created_at DESC
-                            $allRoles = $user->roles()
-                                ->orderByRaw("CASE WHEN role_status = 'Active' THEN 0 ELSE 1 END")
-                                ->orderBy('created_at', 'DESC')
-                                ->get();
-                        @endphp
-                        
-                        @if($currentRole)
-                            <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h4 class="font-semibold text-emerald-900">Current Active Role</h4>
-                                        <p class="text-sm text-emerald-700 mt-1">
-                                            <strong>Role:</strong> {{ $currentRole->role }}<br>
-                                            <strong>Entity:</strong> {{ $currentRole->target_entity }}
-                                            @if($currentRole->role === 'Facilitator')
-                                                <br><strong>Sectors:</strong>
-                                                @php
-                                                    $facilitatorSectors = $currentRole->facilitatorSectors()->with('sector')->get();
-                                                @endphp
-                                                @if($facilitatorSectors->count() > 0)
-                                                    {{ $facilitatorSectors->pluck('sector.sector_name')->join(', ') }}
-                                                @else
-                                                    None assigned
-                                                @endif
-                                            @elseif($currentRole->target_entity === 'Sector' && $currentRole->sector)
-                                                - {{ $currentRole->sector->sector_name }}
-                                            @endif
-                                        </p>
-                                    </div>
-                                    <span class="px-3 py-1 bg-emerald-600 text-white rounded-full text-xs font-bold">
-                                        Active
-                                    </span>
-                                </div>
-                            </div>
-                        @else
-                            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                                <p class="text-amber-800">No active role assigned to this user.</p>
-                            </div>
-                        @endif
-
-                        <!-- Update Role Form -->
-                        <div class="mb-6">
-                            <h4 class="font-semibold mb-3">Update Role</h4>
-                            <form action="{{ route('users.role.update', $user) }}" method="post">
+            <div id="edit-profile" class="tab-pane" role="tabpanel" aria-labelledby="edit-profile-tab">
+                <div class="grid grid-cols-12 gap-6">
+                    <!-- BEGIN: Latest Uploads -->
+                    <div class="intro-y box col-span-12 lg:col-span-12">
+                        <div class="p-8">
+                            <form action="{{route('users.add')}}" method="post">
                                 @csrf
-                                <div class="grid grid-cols-12 gap-4">
+                                <input type="hidden" name="id" value="{{ $user->id }}">
+                                <div class="grid grid-cols-12 mt-4">
                                     <div class="col-span-12 lg:col-span-4">
-                                        <label for="update_role" class="form-label">New Role</label>
-                                        <select name="role" id="update_role" class="form-control" required>
-                                            <option value="">Select Role</option>
-                                            <option value="Governor">Governor</option>
-                                            <option value="System Admin">System Admin</option>
-                                            <option value="Sector Head">Sector Head</option>
-                                            <option value="Data Admin">Data Admin</option>
-                                            <option value="Coordinator">Coordinator</option>
-                                            <option value="Deputy Coordinator">Deputy Coordinator</option>
-                                            <option value="Facilitator">Facilitator</option>
+                                        <label for="full_name" class="form-label">Full Name</label>
+                                        <input type="text" id="full_name" class="form-control" name="full_name"
+                                               placeholder="Full Name" value="{{ $user->full_name }}" required>
+                                    </div>
+                                    <div class="col-span-12 lg:col-span-4 mr-2  ml-2">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input type="email" id="email" class="form-control" name="email"
+                                               placeholder="Email"
+                                               value="{{ $user->email }}" required>
+                                    </div>
+
+                                    <div class="col-span-12 lg:col-span-4">
+                                        <label for="phone_number" class="form-label">Phone No</label>
+                                        <input type="tel" id="phone_number" class="form-control" name="phone_number"
+                                               value="{{ $user->phone_number }}" placeholder="Phone No" required>
+                                    </div>
+                                </div>
+
+                                @php
+                                    $sector = $user->sector();
+                                    $userRole = $user->getCurrentRole();
+                                @endphp
+                                <div class="grid grid-cols-12 mt-4">
+                                    <div class="col-span-12 lg:col-span-4 mr-">
+                                        <label for="regular-form-2" class="form-label">Role</label>
+                                        <select name="role" id="edit_profile_role" class="form-control">
+                                            <option value="">Select</option>
+                                            <option
+                                                {{ $userRole && $userRole->role == 'Governor'? 'selected' : '' }}
+                                                value="Governor"> Governor
+                                            </option>
+                                            <option
+                                                {{ $userRole && $userRole->role == 'System Admin'? 'selected' : '' }}
+                                                value="System Admin"> System Admin
+                                            </option>
+                                            <option
+                                                {{ $userRole && $userRole->role == 'Sector Head'? 'selected' : '' }}
+                                                value="Sector Head"> Sector Head
+                                            </option>
+                                            <option
+                                                {{ $userRole && ($userRole->role == 'Data Admin' || $userRole->role == 'Sector Admin')? 'selected' : '' }}
+                                                value="Data Admin">Data Admin
+                                            </option>
+                                            <option {{ $userRole && $userRole->role == 'Coordinator'? 'selected' : '' }}
+                                                    value="Coordinator">Coordinator
+                                            </option>
+                                            <option
+                                                {{ $userRole && $userRole->role == 'Deputy Coordinator'? 'selected' : '' }}
+                                                value="Deputy Coordinator">Deputy Coordinator
+                                            </option>
+                                            <option {{ $userRole && $userRole->role == 'Facilitator'? 'selected' : '' }}
+                                                    value="Facilitator">Facilitator
+                                            </option>
                                         </select>
                                     </div>
-                                    <!-- Single Sector Selection (for Sector Head, Data Admin) -->
-                                    <div class="col-span-12 lg:col-span-4" id="update_sector_area" style="display: none;">
-                                        <label for="update_sector_id" class="form-label">Sector</label>
-                                        <select name="sector_id" id="update_sector_id" class="form-control">
-                                            <option value="">Select Sector</option>
+
+                                    <div class="col-span-12 lg:col-span-4 ml-1" id="edit_profile_sector_area">
+                                        <label for="regular-form-2" class="form-label">Sector</label>
+                                        <select name="sector_id" id="edit_profile_sector_id" class="form-control">
+                                            <option value="">Select</option>
                                             @foreach($sectors as $sektor)
-                                                <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
+                                                <option {{ $sector && $sector->id===$sektor->id? 'selected':'' }}
+                                                        value="{{$sektor->id}}">{{$sektor->sector_name}}
+                                                </option>
                                             @endforeach
                                         </select>
                                     </div>
-                                    <!-- Multiple Sector Selection (for Facilitator) -->
-                                    <div class="col-span-12 lg:col-span-4" id="update_facilitator_sectors_area" style="display: none;">
-                                        <label for="update_sector_ids" class="form-label">Sectors <span class="text-danger small">(select one or more)</span></label>
-                                        <select name="sector_ids[]" id="update_sector_ids" multiple class="form-control" style="min-height: 120px;">
-                                            @php
-                                                $currentFacilitatorRole = $currentRole && $currentRole->role === 'Facilitator' ? $currentRole : null;
-                                                $currentSectorIds = $currentFacilitatorRole ? $currentFacilitatorRole->facilitatorSectors()->pluck('sector_id')->toArray() : [];
-                                            @endphp
+                                    <div class="col-span-12 lg:col-span-4 ml-1"
+                                         id="edit_profile_facilitator_sectors_area" style="display: none;">
+                                        <label for="edit_profile_sector_ids" class="form-label">Sectors <span
+                                                class="text-danger small">(select one or more)</span></label>
+                                        @php
+                                            $editFacilitatorRole = $userRole && $userRole->role === 'Facilitator' ? $userRole : null;
+                                            $editFacilitatorSectorIds = $editFacilitatorRole ? $editFacilitatorRole->facilitatorSectors()->pluck('sector_id')->toArray() : [];
+                                        @endphp
+                                        <select name="sector_ids[]" id="edit_profile_sector_ids" multiple
+                                                class="form-control" style="min-height: 120px;">
                                             @foreach($sectors as $sektor)
-                                                <option value="{{$sektor->id}}" {{ in_array($sektor->id, old('sector_ids', $currentSectorIds)) ? 'selected' : '' }}>{{$sektor->sector_name}}</option>
+                                                <option
+                                                    value="{{ $sektor->id }}" {{ in_array($sektor->id, old('sector_ids', $editFacilitatorSectorIds)) ? 'selected' : '' }}>
+                                                    {{ $sektor->sector_name }}
+                                                </option>
                                             @endforeach
                                         </select>
-                                        <p class="text-xs text-muted mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple sectors</p>
+                                        <p class="text-xs text-muted mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select
+                                            multiple sectors</p>
                                     </div>
-                                    <div class="col-span-12 lg:col-span-4 flex items-end">
-                                        <button type="submit" class="btn btn-primary w-full">Update Role</button>
-                                    </div>
+                                </div>
+                                <br>
+                                <br>
+                                <div class="mt-3 text-center">
+                                    <button class="btn btn-primary" id="addEditDeliverableBtn">Save</button>
+                                    <button type="button" data-tw-dismiss="modal" class="btn btn-secondary" id="">
+                                        Close
+                                    </button>
                                 </div>
                             </form>
                         </div>
+                    </div>
+                    <!-- END: Latest Uploads -->
+                </div>
+            </div>
+        @endif
 
-                        <!-- Role History -->
-                        @if($allRoles && $allRoles->count() > 0)
-                            <div>
-                                <h4 class="font-semibold mb-3">Role History</h4>
-                                <div class="overflow-x-auto">
-                                    <table class="table table-bordered">
-                                        <thead>
+        @if(!$isViewingOwnProfile)
+            <div id="settings" class="tab-pane" role="tabpanel" aria-labelledby="settings-tab">
+                <div class="grid grid-cols-12 gap-6">
+                    <!-- Role Management Section -->
+                    <div class="intro-y box col-span-12">
+                        <div class="p-8">
+                            <h3 class="text-lg font-bold mb-4">Role Management</h3>
+
+                            <!-- Current Active Role -->
+                            @php
+                                // Sort roles: Active first, then Revoked, then by created_at DESC
+                                $allRoles = $user->roles()
+                                    ->orderByRaw("CASE WHEN role_status = 'Active' THEN 0 ELSE 1 END")
+                                    ->orderBy('created_at', 'DESC')
+                                    ->get();
+                            @endphp
+
+                            @if($currentRole)
+                                <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-semibold text-emerald-900">Current Active Role</h4>
+                                            <p class="text-sm text-emerald-700 mt-1">
+                                                <strong>Role:</strong> {{ $currentRole->role }}<br>
+                                                <strong>Entity:</strong> {{ $currentRole->target_entity }}
+                                                @if($currentRole->role === 'Facilitator')
+                                                    <br><strong>Sectors:</strong>
+                                                    @php
+                                                        $facilitatorSectors = $currentRole->facilitatorSectors()->with('sector')->get();
+                                                    @endphp
+                                                    @if($facilitatorSectors->count() > 0)
+                                                        {{ $facilitatorSectors->pluck('sector.sector_name')->join(', ') }}
+                                                    @else
+                                                        None assigned
+                                                    @endif
+                                                @elseif($currentRole->target_entity === 'Sector' && $currentRole->sector)
+                                                    - {{ $currentRole->sector->sector_name }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="px-3 py-1 bg-emerald-600 text-white rounded-full text-xs font-bold">
+                                        Active
+                                    </span>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <p class="text-amber-800">No active role assigned to this user.</p>
+                                </div>
+                            @endif
+
+                            <!-- Update Role Form -->
+                            <div class="mb-6">
+                                <h4 class="font-semibold mb-3">Update Role</h4>
+                                <form action="{{ route('users.role.update', $user) }}" method="post">
+                                    @csrf
+                                    <div class="grid grid-cols-12 gap-4">
+                                        <div class="col-span-12 lg:col-span-4">
+                                            <label for="update_role" class="form-label">New Role</label>
+                                            <select name="role" id="update_role" class="form-control" required>
+                                                <option value="">Select Role</option>
+                                                <option value="Governor">Governor</option>
+                                                <option value="System Admin">System Admin</option>
+                                                <option value="Sector Head">Sector Head</option>
+                                                <option value="Data Admin">Data Admin</option>
+                                                <option value="Coordinator">Coordinator</option>
+                                                <option value="Deputy Coordinator">Deputy Coordinator</option>
+                                                <option value="Facilitator">Facilitator</option>
+                                            </select>
+                                        </div>
+                                        <!-- Single Sector Selection (for Sector Head, Data Admin) -->
+                                        <div class="col-span-12 lg:col-span-4" id="update_sector_area"
+                                             style="display: none;">
+                                            <label for="update_sector_id" class="form-label">Sector</label>
+                                            <select name="sector_id" id="update_sector_id" class="form-control">
+                                                <option value="">Select Sector</option>
+                                                @foreach($sectors as $sektor)
+                                                    <option value="{{$sektor->id}}">{{$sektor->sector_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <!-- Multiple Sector Selection (for Facilitator) -->
+                                        <div class="col-span-12 lg:col-span-4" id="update_facilitator_sectors_area"
+                                             style="display: none;">
+                                            <label for="update_sector_ids" class="form-label">Sectors <span
+                                                    class="text-danger small">(select one or more)</span></label>
+                                            <select name="sector_ids[]" id="update_sector_ids" multiple
+                                                    class="form-control" style="min-height: 120px;">
+                                                @php
+                                                    $currentFacilitatorRole = $currentRole && $currentRole->role === 'Facilitator' ? $currentRole : null;
+                                                    $currentSectorIds = $currentFacilitatorRole ? $currentFacilitatorRole->facilitatorSectors()->pluck('sector_id')->toArray() : [];
+                                                @endphp
+                                                @foreach($sectors as $sektor)
+                                                    <option
+                                                        value="{{$sektor->id}}" {{ in_array($sektor->id, old('sector_ids', $currentSectorIds)) ? 'selected' : '' }}>{{$sektor->sector_name}}</option>
+                                                @endforeach
+                                            </select>
+                                            <p class="text-xs text-muted mt-1">Hold Ctrl (Windows) or Cmd (Mac) to
+                                                select multiple sectors</p>
+                                        </div>
+                                        <div class="col-span-12 lg:col-span-4 flex items-end">
+                                            <button type="submit" class="btn btn-primary w-full">Update Role</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Role History -->
+                            @if($allRoles && $allRoles->count() > 0)
+                                <div>
+                                    <h4 class="font-semibold mb-3">Role History</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="table table-bordered">
+                                            <thead>
                                             <tr>
                                                 <th>Role</th>
                                                 <th>Target Entity</th>
@@ -397,8 +435,8 @@
                                                 <th>Assigned Date</th>
                                                 <th>Actions</th>
                                             </tr>
-                                        </thead>
-                                        <tbody>
+                                            </thead>
+                                            <tbody>
                                             @foreach($allRoles as $role)
                                                 <tr>
                                                     <td>{{ $role->role }}</td>
@@ -429,30 +467,39 @@
                                                     <td>{{ $role->created_at ? $role->created_at->format('Y-m-d H:i') : 'N/A' }}</td>
                                                     <td>
                                                         @if($role->isRevoked())
-                                                            <form action="{{ route('users.role.reactivate', $user) }}" method="post" class="d-inline">
+                                                            <form action="{{ route('users.role.reactivate', $user) }}"
+                                                                  method="post" class="d-inline">
                                                                 @csrf
-                                                                <input type="hidden" name="role_id" value="{{ $role->id }}">
-                                                                <button type="submit" class="btn btn-sm btn-success">Reactivate</button>
+                                                                <input type="hidden" name="role_id"
+                                                                       value="{{ $role->id }}">
+                                                                <button type="submit" class="btn btn-sm btn-success">
+                                                                    Reactivate
+                                                                </button>
                                                             </form>
                                                         @elseif($role->isActive() && $allRoles->where('role_status', 'Active')->count() > 1)
-                                                            <form action="{{ route('users.role.revoke', $user) }}" method="post" class="d-inline">
+                                                            <form action="{{ route('users.role.revoke', $user) }}"
+                                                                  method="post" class="d-inline">
                                                                 @csrf
-                                                                <input type="hidden" name="role_id" value="{{ $role->id }}">
-                                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to revoke this role?')">Revoke</button>
+                                                                <input type="hidden" name="role_id"
+                                                                       value="{{ $role->id }}">
+                                                                <button type="submit" class="btn btn-sm btn-danger"
+                                                                        onclick="return confirm('Are you sure you want to revoke this role?')">
+                                                                    Revoke
+                                                                </button>
                                                             </form>
                                                         @endif
                                                     </td>
                                                 </tr>
                                             @endforeach
-                                        </tbody>
-                                    </table>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
         @endif
     </div>
 @endsection
@@ -461,13 +508,27 @@
     <script src="{{asset('dist/js/jquery.min.js')}}"></script>
     <script>
         $(function () {
-            // Role change handler for edit profile
-            $("select[name='role']").on('change', function () {
+            // Role change handler for edit profile form (profile tab)
+            $("#edit_profile_role").on('change', function () {
                 var selectedRole = $(this).val();
-                if (selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin' || selectedRole === 'Facilitator') {
-                    $("#sectorArea").show();
+                var isFacilitator = selectedRole === 'Facilitator';
+                var needsSingleSector = selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin';
+
+                if (needsSingleSector) {
+                    $("#edit_profile_sector_area").show();
+                    $("#edit_profile_sector_id").prop('required', true);
                 } else {
-                    $("#sectorArea").hide();
+                    $("#edit_profile_sector_area").hide();
+                    $("#edit_profile_sector_id").prop('required', false).val('');
+                }
+
+                if (isFacilitator) {
+                    $("#edit_profile_facilitator_sectors_area").show();
+                    $("#edit_profile_sector_ids").prop('required', true);
+                } else {
+                    $("#edit_profile_facilitator_sectors_area").hide();
+                    $("#edit_profile_sector_ids").prop('required', false);
+                    $("#edit_profile_sector_ids option:selected").prop('selected', false);
                 }
             });
 
@@ -476,7 +537,7 @@
                 var selectedRole = $(this).val();
                 var isFacilitator = selectedRole === 'Facilitator';
                 var needsSingleSector = selectedRole === 'Sector Head' || selectedRole === 'Data Admin' || selectedRole === 'Sector Admin';
-                
+
                 // Show/hide single sector field
                 if (needsSingleSector) {
                     $("#update_sector_area").show();
@@ -485,7 +546,7 @@
                     $("#update_sector_area").hide();
                     $("#update_sector_id").prop('required', false).val('');
                 }
-                
+
                 // Show/hide multiple sectors field (for Facilitator)
                 if (isFacilitator) {
                     $("#update_facilitator_sectors_area").show();
@@ -497,11 +558,13 @@
                     $("#update_sector_ids option:selected").prop('selected', false);
                 }
             });
-            
-            // Initialize on page load if role is pre-selected
-            @if($currentRole && $currentRole->role === 'Facilitator')
-                $("#update_role").val('Facilitator').trigger('change');
-            @endif
+
+            // Initialize on page load (supports current role and old input after validation errors)
+            var initialRole = @json(old('role', $currentRole->role ?? ''));
+            if (initialRole) {
+                $("#update_role").val(initialRole).trigger('change');
+                $("#edit_profile_role").val(initialRole).trigger('change');
+            }
         });
     </script>
 @endsection

@@ -399,7 +399,7 @@ class UserController extends Controller
             abort(403);
         }
         $sector = Sector::findOrFail($id);
-        $performanceTrackings = $this->coordinatorPendingCommitmentsWithCounts((int) $id);
+        $performanceTrackings = $this->coordinatorPendingCommitmentsWithCounts((int)$id);
 
         return view('pages.users.coordinator_final_commitments', compact('sector', 'performanceTrackings'));
     }
@@ -411,7 +411,7 @@ class UserController extends Controller
             abort(403);
         }
         $commitment = Commitment::findOrFail($id);
-        $performanceTrackings = $this->coordinatorPendingDeliverablesWithCounts((int) $id);
+        $performanceTrackings = $this->coordinatorPendingDeliverablesWithCounts((int)$id);
 
         return view('pages.users.coordinator_final_deliverables', compact('commitment', 'performanceTrackings'));
     }
@@ -487,7 +487,7 @@ class UserController extends Controller
             if (!$sector) {
                 return null;
             }
-            $sector->count = (int) $row->count;
+            $sector->count = (int)$row->count;
 
             return $sector;
         })->filter()->values();
@@ -522,7 +522,7 @@ class UserController extends Controller
             if (!$commitment) {
                 return null;
             }
-            $commitment->count = (int) $row->count;
+            $commitment->count = (int)$row->count;
 
             return $commitment;
         })->filter()->values();
@@ -556,7 +556,7 @@ class UserController extends Controller
             if (!$deliverable) {
                 return null;
             }
-            $deliverable->count = (int) $row->count;
+            $deliverable->count = (int)$row->count;
 
             return $deliverable;
         })->filter()->values();
@@ -594,6 +594,17 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        // Normalize facilitator sector payload before validation.
+        if (
+            $request->input('role') === UserRole::ROLE_FACILITATOR
+            && !$request->filled('sector_ids')
+            && $request->filled('sector_id')
+        ) {
+            $request->merge([
+                'sector_ids' => [(int)$request->input('sector_id')],
+            ]);
+        }
+
         // Validate the request
         $validated = $request->validate([
             'full_name' => 'required|string|max:255',
@@ -611,10 +622,19 @@ class UserController extends Controller
                     UserRole::ROLE_FACILITATOR,
                 ]),
             'sector_id' => 'nullable|required_if:role,' . UserRole::ROLE_SECTOR_HEAD . ',' . UserRole::ROLE_SECTOR_ADMIN . ',' . UserRole::ROLE_DATA_ADMIN . '|exists:sectors,id',
+            'sector_ids' => 'nullable|required_if:role,' . UserRole::ROLE_FACILITATOR . '|array',
+            'sector_ids.*' => 'exists:sectors,id',
         ], [
             'sector_id.required_if' => 'Please select a sector for this role.',
             'sector_id.exists' => 'The selected sector does not exist.',
+            'sector_ids.required_if' => 'Please select at least one sector for Facilitator role.',
+            'sector_ids.array' => 'Sectors must be provided as an array.',
+            'sector_ids.*.exists' => 'One or more selected sectors do not exist.',
         ]);
+
+        if (($validated['role'] ?? null) === UserRole::ROLE_FACILITATOR) {
+            $validated['sector_ids'] = array_values(array_unique(array_map('intval', $validated['sector_ids'] ?? [])));
+        }
 
         try {
             // Create or update user
@@ -762,6 +782,17 @@ class UserController extends Controller
      */
     public function updateRole(Request $request, User $user)
     {
+        // Normalize facilitator sector payload before validation.
+        if (
+            $request->input('role') === UserRole::ROLE_FACILITATOR
+            && !$request->filled('sector_ids')
+            && $request->filled('sector_id')
+        ) {
+            $request->merge([
+                'sector_ids' => [(int)$request->input('sector_id')],
+            ]);
+        }
+
         $validated = $request->validate([
             'role' => 'required|in:' . implode(',', [
                     UserRole::ROLE_GOVERNOR,
@@ -784,6 +815,10 @@ class UserController extends Controller
             'sector_ids.array' => 'Sectors must be provided as an array.',
             'sector_ids.*.exists' => 'One or more selected sectors do not exist.',
         ]);
+
+        if (($validated['role'] ?? null) === UserRole::ROLE_FACILITATOR) {
+            $validated['sector_ids'] = array_values(array_unique(array_map('intval', $validated['sector_ids'] ?? [])));
+        }
 
         try {
             // Get role to entity mapping
