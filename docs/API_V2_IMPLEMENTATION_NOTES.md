@@ -294,6 +294,75 @@ reject existing rows (new FKs are nullable).
 
 ---
 
+## 9a. Web-app impact verification (pre-build gate)
+
+Goal: prove **none** of A1–A8 or the §7 schema changes alter how the **web app**
+(session-based Blade UI) functions. The web app and v2 share only **models + tables**,
+so that is where any risk would live. Verified against the code:
+
+**Method & evidence**
+- Web auth is **session-only** (`AuthLoginController@login` → `Auth::attempt()` +
+  `session()->regenerate()`; logout → `Auth::logout()` + `session()->invalidate()`).
+  No tokens. → all auth assumptions (A1/A6) are in a separate lane.
+- **No shared-model landmines:** a grep across `app/Models` for `addGlobalScope`,
+  `protected $appends`, `protected $guarded`, custom `booted()` → **no matches**.
+  Models use explicit `$fillable` + minimal `$casts`. Adding nullable columns cannot
+  change their serialization or query behavior.
+- **New columns are referenced nowhere in the web app:** grep of `app/` and
+  `resources/views/` for `is_default`, `avatar_key`, `must_change_password`,
+  `gradient_keys`, `icon_key`, `is_public`, `deep_link` → **no matches**. The web app
+  is blind to every column we add.
+- Web framework/gallery logic keys off **existing** columns only (`status='Active'`,
+  `status='active'`), independent of any new `is_default`/`is_public`.
+
+**Per-assumption verdict**
+
+| Assumption | Web-app effect | Why |
+| --- | --- | --- |
+| A1 refresh tokens | **None** | Web uses `web` session guard; A1 only touches Passport `api` guard + new table. |
+| A2 string ids | **None** | Lives in v2 Resources only; no model/DB change. |
+| A3 presenters | **None** | v2-only classes; shared models not modified. |
+| A4 accent/icon vocab | **None** | v2 serialization only. |
+| A5 report downloadUrl | **None** | New route under `/api/v2` + `storage/app/public/reports`; no web route touched. |
+| A6 public system endpoints | **None** | New `/api/v2` routes; optional-auth variant is v2-scoped. |
+| A7 no pagination | **None** | v2 response shape only. |
+| A8 v1 untouched | **None** | By definition; also no web edits. |
+
+**Per-schema-change verdict** (all additive, nullable/defaulted, guarded with
+`Schema::hasTable/hasColumn`)
+
+| Change | Web-app effect | Note |
+| --- | --- | --- |
+| `users +must_change_password,+avatar_key` | None | nullable/default 0; web never reads them; not added to web flows. |
+| `frameworks +subtitle,+is_default,+inherited_from_framework_id` | None* | web reads `status` only. *Guardrail GR2. |
+| `galleries +category,+is_public,+icon_key,+gradient_keys` | None | web filters on `status` only. |
+| `notifications +kind,+deep_link_*` | None | nullable; web creation sets its own columns. |
+| New tables (`api_refresh_tokens`, `user_settings`, `notification_preferences`, `security_events`, `discussion_*`, `system_settings`) | None | web references none of them. |
+
+**Guardrails I will hold to in Phases 2–3 (this is where risk would be introduced, not in the current state):**
+- **GR1 — Do not mutate shared models in breaking ways.** No `$appends`, no global
+  scopes, no `$casts` changes to existing columns, no relationship renames on
+  `User/Sector/Commitment/Deliverable/Kpi/PerformanceTracking/Framework/Gallery/Notification`.
+  New columns may be added to `$fillable` and new (nullable) `$casts`/relationship
+  methods added — both are additive and inert to the web app. v2 presentation lives in
+  Resources/Presenters, never on the model.
+- **GR2 — `is_default` mirrors, never overrides, web semantics.** v2 "set-default"
+  reuses the web's `activate()` behavior (`status='Active'` + archive others); `is_default`
+  is a derived mirror so the web's `status='Active'` source of truth never diverges.
+- **GR3 — v2 error JSON is route-scoped.** The structured `{code,message,fieldErrors}`
+  renderer fires **only** for `api/v2/*` (in `Handler::register()` via a guarded
+  `renderable`), leaving web HTML error pages and v1 responses untouched.
+- **GR4 — No edits to `web` middleware group, `config/auth.php` defaults, or the web
+  route group.** v2 adds a new route group + (optional) new guard/alias only.
+- **GR5 — Migrations are additive & reversible**, guarded against the SQL-dump schema,
+  with no NOT-NULL-without-default on populated tables and no FKs that reject existing rows.
+
+**Conclusion:** with GR1–GR5 observed, none of the assumptions or schema changes alter
+web-app behavior. The current codebase has no global scopes/appends/guarded models and
+no web references to any new column, so the additive plan is verifiably inert to the web
+UI. The only behavior-coupling point is framework default/active (GR2), handled by
+reusing the existing activate path.
+
 ## 10. Proposed Phase 3 build order (feature-by-feature)
 
 1. **Auth + Profile** (foundation-critical; unblocks everything).
