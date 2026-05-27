@@ -11,7 +11,8 @@ client). This file is updated at the end of every phase.
   - **F1 Auth + Profile:** ✅ complete (see §19).
   - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20).
   - **F3 KPI tracking:** ✅ complete (see §21).
-  - **F4 Approvals workflow:** ✅ complete (see §22). Awaiting review.
+  - **F4 Approvals workflow:** ✅ complete (see §22).
+  - **F5 Dashboards:** ✅ complete (see §23). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -810,3 +811,44 @@ clean; v1 routes intact.
 
 **Backward-compatibility:** no v1/web file changed (the web `KpiController`/
 `UserController` approval paths are untouched; v2 reuses the models + new service).
+
+## 23. F5 — Dashboards
+
+Implements API_REFERENCE.md §11.11 — six role-specific snapshot endpoints, each
+resolved from the authenticated user and **gated to its role** (403 otherwise).
+
+**Endpoints (all bearer)**
+
+| Method & path | Role | Handler |
+| --- | --- | --- |
+| `GET /dashboard/governor` | Governor | `DashboardController@governor` |
+| `GET /dashboard/coordinator` | Coordinator / Deputy | `@coordinator` |
+| `GET /dashboard/facilitator` | Facilitator | `@facilitator` |
+| `GET /dashboard/sector-head` | Sector Head | `@sectorHead` |
+| `GET /dashboard/data-admin` | Data Admin | `@dataAdmin` |
+| `GET /dashboard/system-admin` | System Admin | `@systemAdmin` |
+
+**Added**
+- `app/Services/V2/DashboardService.php` — the six snapshots (raw arrays, as §11.6),
+  reusing `HierarchyMetrics` (sector/commitment progress + counts) and direct
+  aggregates (KPI status buckets, submission rate, pending counts, recent activity,
+  user/gallery/framework counts, logins-24h + security rows from `oauth_access_tokens`).
+- `app/Http/Controllers/Api/V2/DashboardController.php` (6 role-gated methods).
+
+**Derivation & placeholders (B3):** `overallPercent`/`actualPercent` from the
+performance fraction (101% cap); `planPercent` = expected progress by current quarter;
+KPI buckets on‑track ≥70 / at‑risk 40–69 / delayed <40 (no‑data KPIs count as delayed);
+greetings are time‑of‑day based. A few **ops/vanity metrics with no DB source** use
+clearly‑commented deterministic placeholders: `overallDeltaLabel` (`+0.0%`),
+facilitator `avgResponseDays`/`reviewAccuracyPercent`, system‑admin
+`serverHealthPercent`/`apiResponseLabel`/`storageLabel`.
+
+**Role gating note:** `isGovernor()`/`isSystemAdmin()` key off `target_entity`
+(`State`/`System`), while coordinator/facilitator/sector-head/data-admin use the role
+helpers — the service calls the matching helper per endpoint.
+
+**Verification:** DashboardTest 8/8 (all six snapshot shapes, raw — no `data` wrapper —,
+403 role gating, 401 auth). Full suite **59/59**. `php -l` clean; v1 routes intact.
+
+**Backward-compatibility:** no v1/web file changed (web `DashboardController` untouched;
+v2 reuses models + `HierarchyMetrics` + the new service).

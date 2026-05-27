@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V2\ApprovalController;
 use App\Http\Controllers\Api\V2\AuthController;
 use App\Http\Controllers\Api\V2\CommitmentController;
+use App\Http\Controllers\Api\V2\DashboardController;
 use App\Http\Controllers\Api\V2\DeliverableController;
 use App\Http\Controllers\Api\V2\KpiController;
 use App\Http\Controllers\Api\V2\ProfileController;
@@ -89,7 +90,18 @@ Route::middleware('auth:api')->prefix('approvals')->group(function () {
     Route::post('/submissions/{submissionId}/review', [ApprovalController::class, 'review']);
 });
 
+// --- 11.11 Dashboards (role snapshots) ---------------------------------------
+Route::middleware('auth:api')->prefix('dashboard')->group(function () {
+    Route::get('/governor', [DashboardController::class, 'governor']);
+    Route::get('/coordinator', [DashboardController::class, 'coordinator']);
+    Route::get('/facilitator', [DashboardController::class, 'facilitator']);
+    Route::get('/sector-head', [DashboardController::class, 'sectorHead']);
+    Route::get('/data-admin', [DashboardController::class, 'dataAdmin']);
+    Route::get('/system-admin', [DashboardController::class, 'systemAdmin']);
+});
+
 // ---------------------------------------------------------------------------
-// Remaining feature groups (approvals, dashboards, reports, …) are added
-// per-feature in subsequent Phase 3 steps. System signals use `auth.optional`.
+// Remaining feature groups (reports, users, gallery, notifications, settings,
+// discussions, system) are added per-feature in subsequent Phase 3 steps.
+// System signals use the `auth.optional` alias.
 // ---------------------------------------------------------------------------
