@@ -6,6 +6,7 @@ use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\Framework;
 use App\Models\Kpi;
+use App\Models\KpiTarget;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\User;
@@ -136,5 +137,17 @@ trait InteractsWithPdcuAuth
             'actual_value' => '80',
             'confirmation_status' => 'Pending Sector Head Approval',
         ], $attrs));
+    }
+
+    protected function makeKpiTarget(Kpi $kpi, int|float|string $target = 85, int $year = 2024): KpiTarget
+    {
+        $t = new KpiTarget();
+        $t->kpi_id = $kpi->id;
+        $t->year = $year;
+        $t->target = $target;
+        $t->status = 'active';
+        $t->save();
+
+        return $t;
     }
 }

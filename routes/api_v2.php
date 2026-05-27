@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V2\AuthController;
 use App\Http\Controllers\Api\V2\CommitmentController;
 use App\Http\Controllers\Api\V2\DeliverableController;
+use App\Http\Controllers\Api\V2\KpiController;
 use App\Http\Controllers\Api\V2\ProfileController;
 use App\Http\Controllers\Api\V2\SectorController;
 use Illuminate\Support\Facades\Route;
@@ -64,7 +65,17 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/deliverables/{id}', [DeliverableController::class, 'show']);
 });
 
+// --- 11.4 KPI tracking -------------------------------------------------------
+Route::middleware('auth:api')->group(function () {
+    Route::get('/deliverables/{id}/kpis', [KpiController::class, 'index']);
+    Route::get('/kpis/{id}', [KpiController::class, 'show']);
+
+    Route::post('/kpis/{id}/submissions', [KpiController::class, 'submit']);
+    Route::post('/kpis/{id}/milestones', [KpiController::class, 'setMilestone']);
+    Route::post('/kpis/{id}/tracking-entries', [KpiController::class, 'addTracking']);
+});
+
 // ---------------------------------------------------------------------------
-// Remaining feature groups (kpis, approvals, …) are added per-feature in
-// subsequent Phase 3 steps. System signals use the `auth.optional` alias.
+// Remaining feature groups (approvals, dashboards, reports, …) are added
+// per-feature in subsequent Phase 3 steps. System signals use `auth.optional`.
 // ---------------------------------------------------------------------------

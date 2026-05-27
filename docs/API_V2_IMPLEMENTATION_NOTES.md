@@ -9,7 +9,8 @@ client). This file is updated at the end of every phase.
 - **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15).
 - **Phase 3 — Feature implementation:** 🔄 in progress.
   - **F1 Auth + Profile:** ✅ complete (see §19).
-  - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20). Awaiting review.
+  - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20).
+  - **F3 KPI tracking:** ✅ complete (see §21). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -693,3 +694,56 @@ role scoping, 404s, auth). Full suite **27/27**. `php -l` clean. v1 `api/login` 
 
 **Backward-compatibility:** no v1/web file changed. The unwrap middleware and the
 new connection/migrations remain v2/test-scoped.
+
+## 21. F3 — KPI tracking
+
+Implements API_REFERENCE.md §11.4 — two reads + three queued command endpoints.
+
+**Endpoints (all bearer)**
+
+| Method & path | Handler | Notes |
+| --- | --- | --- |
+| `GET /api/v2/deliverables/{id}/kpis` | `KpiController@index` | KPI summary list |
+| `GET /api/v2/kpis/{id}` | `KpiController@show` | detail + submissions[] + supportingDocuments[] + hero |
+| `POST /api/v2/kpis/{id}/submissions` | `KpiController@submit` | Data Admin submits actual → Pending Sector Head; 202 |
+| `POST /api/v2/kpis/{id}/milestones` | `KpiController@setMilestone` | PDCU sets milestone; 202 |
+| `POST /api/v2/kpis/{id}/tracking-entries` | `KpiController@addTracking` | interim data point; 202 |
+
+**Added**
+- `app/Services/V2/SectorAccessService.php` — extracted shared role-based sector
+  access (reused by F2 + F3); `HierarchyService` refactored to delegate to it
+  (F2 tests re-run green, behavior unchanged).
+- `app/Services/V2/KpiTrackingService.php` — reads (summary/detail derivation:
+  status active/stable/lagging/pending, quartersOverview, submissions, supporting
+  docs from polymorphic files, hero copy, target from `kpi_targets`) + the three
+  mutations over `PerformanceTracking` using the §4 state machine.
+- `app/Http/Resources/V2/KpiResource.php` (summary + detail via attached `v_*` attrs).
+- `app/Http/Requests/V2/Kpi/{SubmitPerformanceRequest,SetMilestoneRequest,AddTrackingEntryRequest}.php`.
+- `app/Http/Controllers/Api/V2/KpiController.php`.
+- `tests/Concerns/InteractsWithPdcuAuth.php` — `makeKpiTarget` helper.
+- `tests/Feature/Api/V2/KpiTrackingTest.php` (10 tests).
+
+**Workflow & rules**
+- `submit` (re)submits a quarter to the Sector Head, clearing any downstream
+  review state (so a resubmission after rejection restarts cleanly); a `Confirmed`
+  quarter is **locked** → `409`. `setMilestone`/`addTrackingEntry` upsert the
+  quarter's tracking without advancing the workflow.
+- Year: `submit` derives it (KPI year → active framework year → current year);
+  `milestone`/`tracking-entry` take it from the request. Quarter `qN` ↔ int.
+- Evidence: `evidenceDocumentIds` re-point existing `File` rows' polymorphic
+  `fileable` to the tracking (lenient; unknown ids skipped). No upload endpoint
+  exists in §11.4, matching the contract.
+
+**Authorization**
+- Reads: caller must have sector access (else 404, no existence leak).
+- `submit`/`tracking-entry`: Data Admin of that sector or an all-access role; others 403.
+- `setMilestone`: PDCU (delivery unit / all-access); others 403.
+
+**Verification:** KpiTrackingTest 10/10 (list shape + targetLabel, detail with
+submissions/docs, submit→pending, 403 for non-data-admin, 422 fieldErrors,
+409 locked, milestone, tracking entry, auth 401, cross-sector 404). Full suite
+**37/37**. `php -l` clean; v1 routes intact.
+
+**Backward-compatibility:** no v1/web file changed; `KpiController` (web) untouched
+— v2 reuses the models + the new service. The `HierarchyService` refactor is v2-only
+and covered by the green F2 suite.

@@ -8,7 +8,6 @@ use App\Models\Deliverable;
 use App\Models\Framework;
 use App\Models\Sector;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,8 +20,10 @@ use Illuminate\Support\Collection;
  */
 class HierarchyService
 {
-    public function __construct(private readonly HierarchyMetrics $metrics)
-    {
+    public function __construct(
+        private readonly HierarchyMetrics $metrics,
+        private readonly SectorAccessService $access,
+    ) {
     }
 
     public function activeFrameworkId(): ?int
@@ -31,27 +32,12 @@ class HierarchyService
     }
 
     /** Sectors the user may see, optionally constrained to the active framework. */
-    private function accessibleSectorQuery(User $user, bool $scopeToActiveFramework = true): Builder
+    private function accessibleSectorQuery(User $user, bool $scopeToActiveFramework = true)
     {
-        $query = Sector::query();
-
-        if ($scopeToActiveFramework && ($fw = $this->activeFrameworkId())) {
-            $query->where('framework_id', $fw);
-        }
-
-        if ($user->canAccessAllSectors()) {
-            return $query;
-        }
-
-        if ($user->isFacilitator()) {
-            return $query->whereIn('id', $user->getAssignedSectorIds() ?: [-1]);
-        }
-
-        if ($own = ($user->isSectorHead() ?: $user->isDataAdmin())) {
-            return $query->where('id', $own->id);
-        }
-
-        return $query->whereRaw('1 = 0'); // no sector access
+        return $this->access->accessibleSectorQuery(
+            $user,
+            $scopeToActiveFramework ? $this->activeFrameworkId() : null,
+        );
     }
 
     /** @return Collection<int,Sector> */
