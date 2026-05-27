@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V2\ApprovalController;
 use App\Http\Controllers\Api\V2\AuthController;
 use App\Http\Controllers\Api\V2\CommitmentController;
 use App\Http\Controllers\Api\V2\DeliverableController;
@@ -73,6 +74,19 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/kpis/{id}/submissions', [KpiController::class, 'submit']);
     Route::post('/kpis/{id}/milestones', [KpiController::class, 'setMilestone']);
     Route::post('/kpis/{id}/tracking-entries', [KpiController::class, 'addTracking']);
+});
+
+// --- 11.6 Approvals workflow -------------------------------------------------
+Route::middleware('auth:api')->prefix('approvals')->group(function () {
+    Route::get('/coordinator/queue', [ApprovalController::class, 'coordinatorQueue']);
+    Route::get('/sector-head/queue', [ApprovalController::class, 'sectorHeadQueue']);
+    Route::get('/sector-head/bulk', [ApprovalController::class, 'sectorHeadBulk']);
+    Route::get('/facilitator/queue', [ApprovalController::class, 'facilitatorQueue']);
+    Route::get('/data-admin/my-kpis', [ApprovalController::class, 'myKpis']);
+
+    Route::post('/submissions/bulk-approve', [ApprovalController::class, 'bulkApprove']);
+    Route::get('/submissions/{kpiId}', [ApprovalController::class, 'submissionDetail']);
+    Route::post('/submissions/{submissionId}/review', [ApprovalController::class, 'review']);
 });
 
 // ---------------------------------------------------------------------------

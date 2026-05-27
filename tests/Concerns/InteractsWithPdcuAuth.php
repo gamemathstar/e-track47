@@ -4,6 +4,7 @@ namespace Tests\Concerns;
 
 use App\Models\Commitment;
 use App\Models\Deliverable;
+use App\Models\FacilitatorSector;
 use App\Models\Framework;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
@@ -68,6 +69,27 @@ trait InteractsWithPdcuAuth
             array_merge($attrs, ['target_entity' => 'Sector', 'entity_id' => $sector->id]),
             'Sector Head'
         );
+    }
+
+    /** A user who is Data Admin of a specific sector. */
+    protected function makeDataAdmin(Sector $sector, array $attrs = []): User
+    {
+        return $this->makeUser(
+            array_merge($attrs, ['target_entity' => 'Sector', 'entity_id' => $sector->id]),
+            'Data Admin'
+        );
+    }
+
+    /** A facilitator assigned (via facilitator_sectors) to a specific sector. */
+    protected function makeFacilitator(Sector $sector, array $attrs = []): User
+    {
+        $user = $this->makeUser($attrs, 'Facilitator');
+        FacilitatorSector::create([
+            'user_role_id' => $user->getCurrentRole()->id,
+            'sector_id' => $sector->id,
+        ]);
+
+        return $user;
     }
 
     // --- hierarchy seeding (real column shapes) ------------------------------

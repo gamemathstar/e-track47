@@ -49,4 +49,28 @@ class SectorAccessService
 
         return $this->accessibleSectorQuery($user)->whereKey($sectorId)->exists();
     }
+
+    /**
+     * Sector ids the user may see, for filtering rows joined to sectors.
+     * `null` = all sectors (no constraint); `[]` = none.
+     *
+     * @return int[]|null
+     */
+    public function accessibleSectorIds(User $user): ?array
+    {
+        if ($user->canAccessAllSectors()) {
+            return null;
+        }
+
+        if ($user->isFacilitator()) {
+            return array_map('intval', $user->getAssignedSectorIds() ?: []);
+        }
+
+        if ($own = ($user->isSectorHead() ?: $user->isDataAdmin())) {
+            return [(int) $own->id];
+        }
+
+        return [];
+    }
 }
+

@@ -10,7 +10,8 @@ client). This file is updated at the end of every phase.
 - **Phase 3 — Feature implementation:** 🔄 in progress.
   - **F1 Auth + Profile:** ✅ complete (see §19).
   - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20).
-  - **F3 KPI tracking:** ✅ complete (see §21). Awaiting review.
+  - **F3 KPI tracking:** ✅ complete (see §21).
+  - **F4 Approvals workflow:** ✅ complete (see §22). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -747,3 +748,65 @@ submissions/docs, submit→pending, 403 for non-data-admin, 422 fieldErrors,
 **Backward-compatibility:** no v1/web file changed; `KpiController` (web) untouched
 — v2 reuses the models + the new service. The `HierarchyService` refactor is v2-only
 and covered by the green F2 suite.
+
+## 22. F4 — Approvals workflow
+
+Implements API_REFERENCE.md §11.6 — the four-role review lifecycle. Highest reuse:
+runs directly on the §4 `PerformanceTracking` state machine.
+
+**Endpoints (all bearer)**
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /approvals/coordinator/queue` | `ApprovalController@coordinatorQueue` |
+| `GET /approvals/sector-head/queue` (`?quarter`) | `@sectorHeadQueue` |
+| `GET /approvals/sector-head/bulk` (`?grouping=by_commitment\|by_deliverable`) | `@sectorHeadBulk` |
+| `GET /approvals/facilitator/queue` (`?grouping=by_sector\|by_kpi`) | `@facilitatorQueue` |
+| `GET /approvals/data-admin/my-kpis` (`?filter,?quarter,?year`) | `@myKpis` |
+| `GET /approvals/submissions/{kpiId}` | `@submissionDetail` |
+| `POST /approvals/submissions/{submissionId}/review` | `@review` (202) |
+| `POST /approvals/submissions/bulk-approve` | `@bulkApprove` (202) |
+
+**Added**
+- `app/Services/V2/ApprovalService.php` — queues (filtered by accessible sectors +
+  lifecycle state, grouped where required), submission detail, `review`, `bulkApprove`.
+- `SectorAccessService::accessibleSectorIds()` (null = all, [] = none) for row filtering.
+- `app/Http/Requests/V2/Approvals/{ReviewSubmissionRequest,BulkApproveRequest}.php`.
+- `app/Http/Controllers/Api/V2/ApprovalController.php` (query‑param validation inline).
+- `tests/Concerns/InteractsWithPdcuAuth.php` — `makeDataAdmin`, `makeFacilitator`.
+- `tests/Feature/Api/V2/ApprovalsTest.php` (14 tests).
+
+**Mapping & transitions**
+- A "submission" is a `PerformanceTracking` row: queue `id` = tracking id (used for
+  review/bulk); `kpiId` = KPI id (used for submission detail). `state` =
+  `confirmation_status` → wire lifecycle.
+- `review` (role + decision) advances/returns the lifecycle per §4: sector_head accept
+  → Pending Facilitator (stamps approver); facilitator accept → Pending Coordinator
+  (sets `delivery_department_value`/remark from `validatedValue`/`acceptRemarks`);
+  coordinator accept → Confirmed. Any reject → Rejected (facilitator/coordinator store
+  their reason column; sector-head reason recorded on `remarks`, no dedicated column).
+- `bulk-approve` = sector-head accept applied transactionally to many; strict — any
+  non‑approvable id ⇒ `409`.
+
+**Authorization & errors**
+- Every read/mutation requires sector access (else `404`, no leak). `review`
+  cross-checks the **claimed role against the token** (sector head of that sector /
+  facilitator assigned to it / coordinator|deputy), else `403`. Reviewing a submission
+  not in the role's precursor state ⇒ `409`. Validation ⇒ `422 fieldErrors`.
+
+**Design note — response shape.** Queue/detail responses are computed aggregates
+(grouping, nested stats/items), so the service returns **raw associative arrays** the
+controller returns directly (still raw JSON, no envelope). This is a deliberate, minor
+divergence from the Resource-per-model pattern used by F1–F3.
+
+**Deferred (flagged, non-blocking):** workflow **notifications** (FCM/in-app) are NOT
+dispatched by these endpoints yet — they belong to the Notifications feature; the web
+app still sends them for web-initiated actions. State transitions are complete.
+
+**Verification:** ApprovalsTest 14/14 (all five queues incl. groupings, submission
+detail, the three accept transitions, coordinator reject, 409 state-mismatch, 403
+wrong-role, 422 validation, bulk-approve, auth 401). Full suite **51/51**. `php -l`
+clean; v1 routes intact.
+
+**Backward-compatibility:** no v1/web file changed (the web `KpiController`/
+`UserController` approval paths are untouched; v2 reuses the models + new service).
