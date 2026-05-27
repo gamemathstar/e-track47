@@ -1,0 +1,48 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| API v2 routes (mobile)
+|--------------------------------------------------------------------------
+|
+| Loaded by RouteServiceProvider at the URL prefix `api/v2` with the `api`
+| middleware group. This file is the home for the new mobile API described in
+| docs/API_REFERENCE.md. It is completely separate from routes/api.php (v1),
+| which is left untouched (A8).
+|
+| Conventions:
+|  - Responses are raw (no envelope); errors use the route-scoped handler.
+|  - Protected routes use `auth:api` (Passport). Public-capable system signals
+|    use the `auth.optional` alias.
+|  - Feature route groups are added per-feature during Phase 3.
+|
+*/
+
+// Health check — unauthenticated, DB-free. Confirms the v2 lane is wired and
+// that responses are emitted raw (no `data` wrapper).
+Route::get('/ping', function () {
+    return [
+        'status' => 'ok',
+        'apiVersion' => 'v2',
+        'time' => now()->toIso8601String(),
+    ];
+})->name('api.v2.ping');
+
+// ---------------------------------------------------------------------------
+// Feature route groups land here in Phase 3, e.g.:
+//
+// Route::prefix('auth')->group(function () {
+//     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:v2-login');
+//     Route::post('/refresh', [AuthController::class, 'refresh']);
+//     Route::middleware('auth:api')->group(function () {
+//         Route::get('/me', [AuthController::class, 'me']);
+//         Route::post('/logout', [AuthController::class, 'logout']);
+//         Route::post('/password/force-change', [AuthController::class, 'forcePasswordChange']);
+//     });
+// });
+//
+// Route::middleware('auth:api')->group(function () { /* sectors, kpis, … */ });
+// Route::middleware('auth.optional')->prefix('system')->group(function () { /* status, update, onboarding */ });
+// ---------------------------------------------------------------------------

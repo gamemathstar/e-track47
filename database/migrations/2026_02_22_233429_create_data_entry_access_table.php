@@ -11,7 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('data_entry_access', function (Blueprint $table) {
+        // Table name corrected to the plural `data_entry_accesses` to match both
+        // the live DB and the DataEntryAccess model's default table name (the
+        // original singular name never matched the model). Guarded so it is a
+        // no-op on the live DB, which already has `data_entry_accesses` (GR5).
+        if (Schema::hasTable('data_entry_accesses')) {
+            return;
+        }
+
+        Schema::create('data_entry_accesses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sector_id')->constrained('sectors')->onDelete('cascade');
             $table->integer('year')->notNull();
@@ -38,6 +46,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('data_entry_access');
+        Schema::dropIfExists('data_entry_accesses');
     }
 };

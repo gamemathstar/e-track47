@@ -4,8 +4,9 @@ Living document for the `/api/v2` mobile API build. Source contract:
 [`docs/API_REFERENCE.md`](./API_REFERENCE.md) (reverse-engineered from the Flutter
 client). This file is updated at the end of every phase.
 
-- **Phase 1 — Analysis:** ✅ complete (this document). Awaiting review.
-- **Phase 2 — Foundation:** ⏳ not started.
+- **Phase 1 — Analysis:** ✅ complete & approved.
+- **Phase 2 — Foundation:** ✅ complete (see §11).
+- **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15). Awaiting review.
 - **Phase 3 — Feature implementation:** ⏳ not started.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
@@ -381,3 +382,182 @@ reusing the existing activate path.
 
 Each feature ships: routes → FormRequests → Service → Resource/Presenter →
 feature tests, with a backward-compat note.
+
+---
+
+# Phase 2 — Foundation
+
+Goal: stand up the v2 lane and its shared plumbing so Phase 3 features only add
+routes/requests/services/resources. No feature endpoints yet (only a health
+`ping`). All work honors GR1–GR5; v1 and web are untouched.
+
+## 11. What was built
+
+**Versioning & wiring**
+- `routes/api_v2.php` — new v2 route file (currently: `GET /api/v2/ping` health
+  check + documented placeholders for Phase 3 groups).
+- `app/Providers/RouteServiceProvider.php` — **edited** (additive): registers the
+  v2 group at prefix `api/v2` using the existing `api` middleware group, *before*
+  the unchanged v1 `api` group; adds a `v2-login` rate limiter (5/min by IP). The
+  v1 `api` group and the `web` group are byte-for-byte unchanged (GR4).
+
+**Response / error system**
+- `app/Support/V2/ApiResponse.php` — raw success helpers (`noContent` 204,
+  `accepted` 202) + `exception()` mapper producing the §6 contract
+  `{ code, message, fieldErrors? }` with correct status codes. Framework
+  HttpExceptions emit stable per-status messages (no route-path leakage); domain
+  errors carry their own message via `ApiException`.
+- `app/Exceptions/Handler.php` — **edited** (additive): a `renderable` that fires
+  **only** for `api/v2/*` (returns null otherwise), so web HTML error pages and v1
+  responses are untouched (GR3). Existing `$dontFlash` and `reportable` unchanged.
+- `app/Exceptions/V2/ApiException.php` — domain exception (status + machine code +
+  optional fieldErrors) with named constructors (`notFound`/`conflict`/`forbidden`/
+  `unprocessable`/`badRequest`).
+
+**Base classes**
+- `app/Http/Controllers/Api/V2/BaseController.php` — thin-controller base with
+  `noContent()`/`accepted()` command helpers.
+- `app/Http/Resources/V2/BaseResource.php` — sets `public static $wrap = null` so
+  v2 resources serialize **raw** (no `data` envelope), scoped to v2 subclasses
+  only (does **not** call the global `withoutWrapping()`; v1/web unaffected).
+- `app/Http/Requests/V2/BaseFormRequest.php` — always throws `ValidationException`
+  (→ 422 + fieldErrors via the handler) and `ApiException::forbidden()` on failed
+  authorization; centralizes validation so controllers stay thin.
+
+**Support layer**
+- `app/Support/V2/WireEnums.php` — two-way maps: DB role ↔ wire (`Sector Head` ↔
+  `sector_head`, …), confirmation_status ↔ lifecycle state, quarter int ↔ `qN`.
+- `app/Support/V2/Presenters/Presenter.php` — base presenter: `id()` (PK→string,
+  A2), `relativeTime()`, `initials()`, `money()` (₦, optional abbrev),
+  `fraction()`, `cappedPercent()` (101% cap), and the shared `ACCENTS` vocab (A4).
+
+**Auth infrastructure (A1)**
+- `app/Models/ApiRefreshToken.php` — opaque rotating refresh token (stores SHA-256
+  hash only; `isActive()`/`revoke()`/`hashToken()`).
+- `database/migrations/2026_05_27_100000_add_api_v2_columns_to_users_table.php` —
+  additive, guarded: `must_change_password` (bool default false), `avatar_key`
+  (nullable).
+- `database/migrations/2026_05_27_100100_create_api_refresh_tokens_table.php` —
+  new table; guarded; no DB-level FK (model-enforced) per GR5.
+- `app/Http/Middleware/OptionalApiAuth.php` + alias `auth.optional` in
+  `app/Http/Kernel.php` (**edited**, additive — new alias only) for the
+  public-capable system endpoints (A6).
+
+> The auth **endpoints** (`/auth/login|refresh|me|logout|password/force-change`)
+> are Phase 3 (feature 1). Phase 2 only lays their infrastructure. Migrations are
+> **created but not yet run** (pending the B1 test-DB decision); they are
+> idempotent and safe to run via `php artisan migrate`.
+
+## 12. Verification (this phase)
+
+- `tests/Feature/Api/V2/FoundationTest.php` — **4 tests, all passing** (DB-free):
+  1. `GET /api/v2/ping` → 200, raw JSON, **no `data` wrapper**.
+  2. unknown `/api/v2/*` → 404 `{ code:"not_found", message }` (error contract).
+  3. unknown **web** route → default 404, **not** the v2 JSON body (GR3 scoping).
+  4. `GET /login` (web) → 200 (web entry point unaffected).
+- Full **Feature** suite green (5/5 — includes the default `GET /` test, extra
+  evidence the web app boots/serves).
+- `route:list` confirms `api/v2/ping` registered **and** v1 `api/login` +
+  `api/projects` intact.
+- `php -l` clean on every new/edited PHP file.
+
+## 13. Files touched in Phase 2
+
+*New:* `routes/api_v2.php`; `app/Support/V2/{ApiResponse,WireEnums}.php`;
+`app/Support/V2/Presenters/Presenter.php`; `app/Exceptions/V2/ApiException.php`;
+`app/Http/Controllers/Api/V2/BaseController.php`;
+`app/Http/Resources/V2/BaseResource.php`;
+`app/Http/Requests/V2/BaseFormRequest.php`;
+`app/Http/Middleware/OptionalApiAuth.php`; `app/Models/ApiRefreshToken.php`;
+two migrations; `tests/Feature/Api/V2/FoundationTest.php`.
+
+*Edited (all additive):* `app/Providers/RouteServiceProvider.php`,
+`app/Http/Kernel.php` (alias), `app/Exceptions/Handler.php` (scoped renderable).
+
+*Untouched:* `routes/api.php`, `routes/web.php`, `Api/AuthController`,
+`Api/ProjectController`, all web controllers/models/views, `config/auth.php`.
+
+## 14. Backward-compatibility note
+
+No v1 route, controller, model, or response shape changed. The handler change is
+inert outside `api/v2/*`. The `BaseResource` unwrapping is per-class (v1 uses no
+Resources). New migrations are additive/guarded and not yet executed. Web verified
+serving (`GET /` and `GET /login` both 200 in the suite).
+
+---
+
+# Phase 2.5 — Test-DB baseline (resolves B1)
+
+Goal: make `migrate:fresh` reproduce a **correct** PDCU schema on a clean database
+so Phase 3 features get real DB-backed tests — without touching the live DB or the
+web app.
+
+## 15. What we found and did
+
+**Why B1 existed (verified against the live DB):**
+- `trackerx` is a **shared/polluted dev DB**: 63 tables, ~30 from an unrelated
+  academic system. Its `migrations` table records only **18** of the repo's 35
+  files. So `migrate:fresh` never reproduced it.
+- The repo had **no create-migration** for `users`, `password_reset_tokens` (both
+  misplaced under `database/factories/`), `user_roles`, `files`, `notifications`,
+  or the budget tables — they only ever came from SQL import.
+- Two existing migrations had **latent fresh-run bugs**: `2026_02_15…` dropped a
+  never-created `duration_in_days`; `2026_02_22…` created `data_entry_access`
+  (singular) while the model + live DB use `data_entry_accesses` (plural).
+- The live DB is also **stale** (e.g. `performance_trackings.confirmation_status`
+  still the old 3-value enum) — so we corrected to the *intended* schema, not the
+  live copy (per your decision).
+
+**Built (all from live `SHOW CREATE TABLE` DDL, corrected to intended schema):**
+- 8 guarded create-migrations (early timestamps so the existing defensive ALTERs
+  apply cleanly): `users`, `password_reset_tokens`, `user_roles`, `files`,
+  `notifications`, `sector_budgets`, `commitment_budgets`, `fund_releases`. Each
+  guarded with `Schema::hasTable()` → **no-op on the live DB**.
+- Fixed 2 existing migrations (you approved "update existing"): `2026_02_15…`
+  drops only columns that exist; `2026_02_22…` now creates `data_entry_accesses`
+  (plural) + `hasTable` guard. Both already-run on the live DB, so editing affects
+  **only** fresh/test builds.
+
+**Isolated test DB (no `.env` change):**
+- Added a **`mysql_test`** connection in `config/database.php` (mirrors `mysql`,
+  DB defaults to `trackerx_test`). Additive — the web app/v1 always use the default
+  `mysql` connection.
+- `phpunit.xml` now sets `DB_CONNECTION=mysql_test` (+ `DB_TEST_DATABASE`). Test
+  runs target `trackerx_test`; the web app never reads phpunit.xml.
+
+## 16. Verification
+
+- `php artisan migrate:fresh --database=mysql_test` runs the **entire** 43-migration
+  chain green.
+- Test DB `trackerx_test`: 28 tables; `performance_trackings.confirmation_status`
+  has the **correct 6-value** enum; `users` has `must_change_password` + `avatar_key`.
+- **Live `trackerx` provably untouched**: still 63 tables, 12 users, stale 3-value
+  enum unchanged, `data_entry_accesses` unchanged, no stray singular table.
+- Full **Feature suite 9/9** (4 foundation + 4 `DatabaseBaselineTest` using
+  `RefreshDatabase` + 1 default). `php -l` clean on all new/edited files.
+
+## 17. Local/CI setup (one-time)
+
+```bash
+# create the throwaway test DB, then build its schema
+php artisan tinker --execute="DB::statement('CREATE DATABASE IF NOT EXISTS trackerx_test')"
+php artisan migrate:fresh --database=mysql_test
+# run tests (uses mysql_test via phpunit.xml)
+php vendor/bin/phpunit
+```
+
+`RefreshDatabase` tests re-migrate `trackerx_test` automatically. **Never** run
+`migrate` against the default connection for tests — the live `trackerx` is for the
+web app only.
+
+## 18. Backward-compatibility note (Phase 2.5)
+
+Every new migration is `hasTable`-guarded → inert on the live DB. The two edited
+migrations are already recorded as run on the live DB, so they will not re-execute
+there; the edits only affect fresh databases. No model/route/controller/view/`.env`
+changed. `config/database.php` gained one additive connection used only by tests.
+Live DB confirmed unchanged after the full exercise.
+
+> Separately flagged for the team (not addressed here, non-blocking): the live
+> `trackerx` is missing the approval-workflow enum expansion and carries a foreign
+> app's `notifications` shape — worth reconciling in production independently.

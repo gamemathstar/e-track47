@@ -63,6 +63,26 @@ return [
             ]) : [],
         ],
 
+        // Isolated connection used ONLY by the automated test suite (phpunit sets
+        // DB_CONNECTION=mysql_test). Mirrors `mysql` but targets a throwaway
+        // database (default `trackerx_test`). The web app and v1 always use the
+        // default `mysql` connection, so this entry is inert to them (GR4).
+        'mysql_test' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_TEST_DATABASE', 'trackerx_test'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),
