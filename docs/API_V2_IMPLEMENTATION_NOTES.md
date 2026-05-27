@@ -6,8 +6,9 @@ client). This file is updated at the end of every phase.
 
 - **Phase 1 — Analysis:** ✅ complete & approved.
 - **Phase 2 — Foundation:** ✅ complete (see §11).
-- **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15). Awaiting review.
-- **Phase 3 — Feature implementation:** ⏳ not started.
+- **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15).
+- **Phase 3 — Feature implementation:** 🔄 in progress.
+  - **F1 Auth + Profile:** ✅ complete (see §19). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -561,3 +562,78 @@ Live DB confirmed unchanged after the full exercise.
 > Separately flagged for the team (not addressed here, non-blocking): the live
 > `trackerx` is missing the approval-workflow enum expansion and carries a foreign
 > app's `notifications` shape — worth reconciling in production independently.
+
+---
+
+# Phase 3 — Feature implementation
+
+## 19. F1 — Auth + Profile
+
+Implements API_REFERENCE.md §11.1 (Authentication) and §11.2 (Profile). First
+feature, so it also proves the full Phase 2 stack end-to-end against the test DB.
+
+**Endpoints**
+
+| Method & path | Auth | Handler | Notes |
+| --- | --- | --- | --- |
+| `POST /api/v2/auth/login` | public | `AuthController@login` | `throttle:v2-login` (5/min/IP); returns `{access_token, refresh_token, user}` raw |
+| `POST /api/v2/auth/refresh` | public | `AuthController@refresh` | rotates refresh token; returns `{access_token, refresh_token}` |
+| `GET /api/v2/auth/me` | bearer | `AuthController@me` | compact User object |
+| `POST /api/v2/auth/logout` | bearer | `AuthController@logout` | revokes access + all refresh tokens; 204 |
+| `POST /api/v2/auth/password/force-change` | bearer | `AuthController@forcePasswordChange` | clears `must_change_password`; 204 |
+| `GET /api/v2/profile/me` | bearer | `ProfileController@me` | full profile object |
+
+> `POST /auth/register` is **reserved/not exposed** (the client doesn't call it;
+> open registration would be a security hole). Add behind admin control later.
+
+**Added (new files)**
+- `app/Services/V2/AuthService.php` — login/refresh/logout/forceChangePassword;
+  Passport access token + rotating opaque refresh token (A1).
+- `app/Http/Requests/V2/Auth/{LoginRequest,RefreshRequest,ForcePasswordChangeRequest}.php`.
+- `app/Http/Resources/V2/{UserResource,AuthSessionResource,ProfileResource}.php`.
+- `app/Http/Controllers/Api/V2/{AuthController,ProfileController}.php`.
+- `tests/Concerns/InteractsWithPdcuAuth.php` (user + personal-access-client helpers).
+- `tests/Feature/Api/V2/{AuthTest,ProfileTest}.php`.
+
+**Edited**
+- `routes/api_v2.php` — auth + profile groups (replacing the Phase 2 placeholders).
+- `app/Support/V2/ApiResponse.php` + `BaseController.php` — `noContent()` now emits a
+  truly empty 204 body (clean `assertNoContent`); `accepted()` empty-body safe.
+
+**Field mapping (DB → wire)**
+- User object: `id`→string PK, `name`→`full_name`, `role`→wire role (snake_case or
+  **null** when unassigned → client shows role picker), `mustChangePassword`→bool.
+- Profile: `fullName`/`phone`/`email` direct; `joinDate`←`created_at` (`Y-m-d`);
+  `department`←assigned sector name; `avatarUrl`←`image_url`; `organization` a
+  deterministic constant; unknown optional fields pruned (omitted) rather than null.
+
+**Token strategy**
+- Access token: Passport `createToken('pdcu-mobile-v2')` (keys generated via
+  `php artisan passport:keys`; required for the API to sign tokens — see §17a).
+- Refresh: opaque 80-char random, **SHA-256 hashed at rest** in `api_refresh_tokens`,
+  30-day TTL, **single-use** (revoked + reissued on every `/auth/refresh`).
+- Logout revokes the current Passport token (when real) + all the user's refresh tokens.
+
+**Verification**
+- `AuthTest` (9) + `ProfileTest` (2) — all green: login raw shape & wire role,
+  null-role path, 401 bad creds, 422 fieldErrors contract, `me`, auth-required 401,
+  force-change clears flag (204), refresh rotation invalidates the old token, logout.
+- Full suite **21/21** (incl. foundation, DB baseline, default). `php -l` clean.
+- `route:list` confirms the 6 new v2 routes; v1 `api/login` + `api/projects` intact.
+
+**Backward-compatibility**
+- No v1/web file touched. `passport:keys` only adds local signing keys
+  (gitignored; web app uses session auth, unaffected — and it also repairs v1
+  token issuance, which was inoperable without keys).
+- All auth state is additive (`api_refresh_tokens`, additive `users` columns).
+
+## 17a. Setup addendum — Passport keys
+
+Token issuance requires Passport signing keys (absent on this checkout). One-time:
+
+```bash
+php artisan passport:keys        # generates storage/oauth-*.key (gitignored)
+```
+
+Tests seed a personal-access client per run (see `InteractsWithPdcuAuth`); for a
+real environment run `php artisan passport:install` once.

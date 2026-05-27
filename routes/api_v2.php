@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V2\AuthController;
+use App\Http\Controllers\Api\V2\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,19 +32,24 @@ Route::get('/ping', function () {
     ];
 })->name('api.v2.ping');
 
+// --- 11.1 Authentication -----------------------------------------------------
+Route::prefix('auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:v2-login');
+    Route::post('/refresh', [AuthController::class, 'refresh']);
+
+    Route::middleware('auth:api')->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/password/force-change', [AuthController::class, 'forcePasswordChange']);
+    });
+});
+
+// --- 11.2 Profile ------------------------------------------------------------
+Route::middleware('auth:api')->prefix('profile')->group(function () {
+    Route::get('/me', [ProfileController::class, 'me']);
+});
+
 // ---------------------------------------------------------------------------
-// Feature route groups land here in Phase 3, e.g.:
-//
-// Route::prefix('auth')->group(function () {
-//     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:v2-login');
-//     Route::post('/refresh', [AuthController::class, 'refresh']);
-//     Route::middleware('auth:api')->group(function () {
-//         Route::get('/me', [AuthController::class, 'me']);
-//         Route::post('/logout', [AuthController::class, 'logout']);
-//         Route::post('/password/force-change', [AuthController::class, 'forcePasswordChange']);
-//     });
-// });
-//
-// Route::middleware('auth:api')->group(function () { /* sectors, kpis, … */ });
-// Route::middleware('auth.optional')->prefix('system')->group(function () { /* status, update, onboarding */ });
+// Remaining feature groups (sectors, kpis, approvals, …) are added per-feature
+// in subsequent Phase 3 steps. System signals use the `auth.optional` alias.
 // ---------------------------------------------------------------------------

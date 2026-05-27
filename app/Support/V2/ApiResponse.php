@@ -7,6 +7,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -26,17 +27,18 @@ class ApiResponse
     /**
      * 204 No Content — the preferred success shape for void mutations (§7).
      */
-    public static function noContent(): JsonResponse
+    public static function noContent(): Response
     {
-        return new JsonResponse(null, 204);
+        return response()->noContent();
     }
 
     /**
      * 202 Accepted — for queued/command endpoints the client treats as success.
+     * Emits a truly empty body when no payload is supplied (the client ignores it).
      */
-    public static function accepted(array $body = []): JsonResponse
+    public static function accepted(array $body = []): JsonResponse|Response
     {
-        return new JsonResponse($body ?: null, 202);
+        return $body === [] ? response()->noContent(202) : new JsonResponse($body, 202);
     }
 
     /**
