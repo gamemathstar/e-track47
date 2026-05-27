@@ -34,9 +34,11 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         $this->routes(function () {
-            // v2 mobile API — separate route file, same `api` middleware group.
-            // Registered before v1; both use explicit paths so they never collide.
-            Route::middleware('api')
+            // v2 mobile API — separate route file, same `api` middleware group
+            // plus the raw-resource middleware (unwraps the `data` envelope for
+            // v2 only). Registered before v1; both use explicit paths so they
+            // never collide.
+            Route::middleware(['api', \App\Http\Middleware\ForceRawJsonResources::class])
                 ->prefix('api/v2')
                 ->group(base_path('routes/api_v2.php'));
 

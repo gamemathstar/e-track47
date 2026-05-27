@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\V2\AuthController;
+use App\Http\Controllers\Api\V2\CommitmentController;
+use App\Http\Controllers\Api\V2\DeliverableController;
 use App\Http\Controllers\Api\V2\ProfileController;
+use App\Http\Controllers\Api\V2\SectorController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,7 +52,19 @@ Route::middleware('auth:api')->prefix('profile')->group(function () {
     Route::get('/me', [ProfileController::class, 'me']);
 });
 
+// --- 11.3 Sectors, commitments & deliverables (read hierarchy) ---------------
+Route::middleware('auth:api')->group(function () {
+    Route::get('/sectors', [SectorController::class, 'index']);
+    Route::get('/sectors/{id}', [SectorController::class, 'show']);
+    Route::get('/sectors/{id}/commitments', [SectorController::class, 'commitments']);
+
+    Route::get('/commitments/{id}', [CommitmentController::class, 'show']);
+    Route::get('/commitments/{id}/deliverables', [CommitmentController::class, 'deliverables']);
+
+    Route::get('/deliverables/{id}', [DeliverableController::class, 'show']);
+});
+
 // ---------------------------------------------------------------------------
-// Remaining feature groups (sectors, kpis, approvals, …) are added per-feature
-// in subsequent Phase 3 steps. System signals use the `auth.optional` alias.
+// Remaining feature groups (kpis, approvals, …) are added per-feature in
+// subsequent Phase 3 steps. System signals use the `auth.optional` alias.
 // ---------------------------------------------------------------------------

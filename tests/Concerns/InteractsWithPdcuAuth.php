@@ -2,6 +2,12 @@
 
 namespace Tests\Concerns;
 
+use App\Models\Commitment;
+use App\Models\Deliverable;
+use App\Models\Framework;
+use App\Models\Kpi;
+use App\Models\PerformanceTracking;
+use App\Models\Sector;
 use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Support\Str;
@@ -52,5 +58,83 @@ trait InteractsWithPdcuAuth
         }
 
         return $user;
+    }
+
+    /** A user who is Sector Head of a specific sector. */
+    protected function makeSectorHead(Sector $sector, array $attrs = []): User
+    {
+        return $this->makeUser(
+            array_merge($attrs, ['target_entity' => 'Sector', 'entity_id' => $sector->id]),
+            'Sector Head'
+        );
+    }
+
+    // --- hierarchy seeding (real column shapes) ------------------------------
+
+    protected function makeFramework(array $attrs = []): Framework
+    {
+        // The baseline data migration seeds a 2024 framework, and `year` is unique.
+        // Normalize so the test controls exactly one Active framework.
+        Framework::query()->update(['status' => 'Archived']);
+
+        return Framework::updateOrCreate(
+            ['year' => $attrs['year'] ?? 2024],
+            array_merge(['title' => 'FY 2024', 'status' => 'Active'], $attrs),
+        );
+    }
+
+    protected function makeSector(Framework $framework, array $attrs = []): Sector
+    {
+        return Sector::create(array_merge([
+            'sector_name' => 'Health',
+            'ministry' => 'Ministry of Health',
+            'status' => 'active',
+            'framework_id' => $framework->id,
+        ], $attrs));
+    }
+
+    protected function makeCommitment(Sector $sector, array $attrs = []): Commitment
+    {
+        return Commitment::create(array_merge([
+            'name' => 'Maternal Health Expansion',
+            'status' => 'In Progress',
+            'sector_id' => $sector->id,
+            'framework_id' => $sector->framework_id,
+        ], $attrs));
+    }
+
+    protected function makeDeliverable(Commitment $commitment, array $attrs = []): Deliverable
+    {
+        return Deliverable::create(array_merge([
+            'deliverable' => 'Rural Clinic Digitization',
+            'status' => 'active',
+            'commitment_id' => $commitment->id,
+            'framework_id' => $commitment->framework_id,
+        ], $attrs));
+    }
+
+    protected function makeKpi(Deliverable $deliverable, array $attrs = []): Kpi
+    {
+        return Kpi::create(array_merge([
+            'kpi' => 'Clinics with EHR',
+            'unit_of_measurement' => '%',
+            'status' => 'active',
+            'year' => 2024,
+            'deliverable_id' => $deliverable->id,
+            'framework_id' => $deliverable->framework_id,
+        ], $attrs));
+    }
+
+    protected function makeTracking(Kpi $kpi, array $attrs = []): PerformanceTracking
+    {
+        return PerformanceTracking::create(array_merge([
+            'kpi_id' => $kpi->id,
+            'framework_id' => $kpi->framework_id,
+            'quarter' => 1,
+            'year' => 2024,
+            'milestone' => '100',
+            'actual_value' => '80',
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ], $attrs));
     }
 }

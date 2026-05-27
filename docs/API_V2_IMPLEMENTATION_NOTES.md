@@ -8,7 +8,8 @@ client). This file is updated at the end of every phase.
 - **Phase 2 — Foundation:** ✅ complete (see §11).
 - **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15).
 - **Phase 3 — Feature implementation:** 🔄 in progress.
-  - **F1 Auth + Profile:** ✅ complete (see §19). Awaiting review.
+  - **F1 Auth + Profile:** ✅ complete (see §19).
+  - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -637,3 +638,58 @@ php artisan passport:keys        # generates storage/oauth-*.key (gitignored)
 
 Tests seed a personal-access client per run (see `InteractsWithPdcuAuth`); for a
 real environment run `php artisan passport:install` once.
+
+## 20. F2 — Sectors → Commitments → Deliverables (read hierarchy)
+
+Implements API_REFERENCE.md §11.3 — six read-only endpoints.
+
+**Endpoints (all bearer)**
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /api/v2/sectors` | `SectorController@index` |
+| `GET /api/v2/sectors/{id}` | `SectorController@show` |
+| `GET /api/v2/sectors/{id}/commitments` | `SectorController@commitments` |
+| `GET /api/v2/commitments/{id}` | `CommitmentController@show` |
+| `GET /api/v2/commitments/{id}/deliverables` | `CommitmentController@deliverables` |
+| `GET /api/v2/deliverables/{id}` | `DeliverableController@show` |
+
+**Added**
+- `app/Services/V2/HierarchyService.php` — the 6 reads; role-based access (reuses
+  `canAccessAllSectors`/`getAssignedSectorIds`/`isSectorHead`/`isDataAdmin`) + active-framework scoping; attaches derived metrics as transient model attributes.
+- `app/Services/V2/HierarchyMetrics.php` — **grouped** aggregate queries (no N+1)
+  for commitment counts, KPI counts, deliverable counts, pending approvals, and a
+  0–1 progress fraction (`COALESCE(delivery_department_value, actual_value)/milestone`,
+  capped 1.0, averaged over the subtree).
+- `app/Support/V2/Presenters/SectorPresenter.php` — deterministic `icon` (+ accent) slot.
+- `WireEnums` — `commitmentStatusToWire` (→ on_track/delayed/critical) and
+  `deliverableStatusToWire` (→ active/delayed).
+- Resources `SectorResource`/`CommitmentResource`/`DeliverableResource`; controllers
+  `SectorController`/`CommitmentController`/`DeliverableController`.
+- `tests/Concerns/InteractsWithPdcuAuth.php` — hierarchy seeding helpers (+ `makeSectorHead`).
+- `tests/Feature/Api/V2/HierarchyTest.php` (6 tests).
+
+**Important fix — raw resource collections.** Per-class `$wrap = null` only unwraps
+*single* resources; `AnonymousResourceCollection` reads wrapping from the base
+`JsonResource`, so list endpoints were emitting `{ "data": [...] }`. Added
+`app/Http/Middleware/ForceRawJsonResources.php` (`JsonResource::withoutWrapping()`)
+and applied it to the **`api/v2` group only** (RouteServiceProvider). v1/web use no
+API Resources, so this is inert to them. Singles remain unwrapped.
+
+**Access scoping (security):** sector lists/details are role-scoped — all-access
+roles (coordinator/governor/etc.) see the active framework's sectors; facilitators
+see assigned sectors; sector head/data admin see only their own. Cross-sector access
+returns **404** (no existence leak). Commitment/deliverable reads authorize via the
+parent sector.
+
+**Derived-field decisions (B3):** `icon` from a keyword map; `progressPercent`/
+`avgProgress` from the performance fraction; commitment `completionStatus` = "N of M"
+deliverables; `dueDate`/`nextMilestone` from max deliverable `due_date`. Fields with
+no data source (`budgetAmount`, `year`, `staffId`-style) are pruned (omitted).
+
+**Verification:** HierarchyTest 6/6 (shapes, derived metrics incl. progress 0.8,
+role scoping, 404s, auth). Full suite **27/27**. `php -l` clean. v1 `api/login` +
+`api/projects` intact.
+
+**Backward-compatibility:** no v1/web file changed. The unwrap middleware and the
+new connection/migrations remain v2/test-scoped.

@@ -91,4 +91,27 @@ class WireEnums
 
         return null;
     }
+
+    /**
+     * DB commitment status → wire status (§11.3): on_track / delayed / critical.
+     * DB values are Title Case ('Completed', 'In Progress', 'At Risk',
+     * 'Not Started') or the legacy default 'active'.
+     */
+    public static function commitmentStatusToWire(?string $status): string
+    {
+        return match (strtolower(trim((string) $status))) {
+            'at risk', 'at_risk', 'critical' => 'critical',
+            'not started', 'not_started', 'delayed' => 'delayed',
+            default => 'on_track', // completed, in progress, active, …
+        };
+    }
+
+    /** DB deliverable status → wire status (§11.3): active / delayed. */
+    public static function deliverableStatusToWire(?string $status): string
+    {
+        return match (strtolower(trim((string) $status))) {
+            'at risk', 'at_risk', 'delayed', 'critical' => 'delayed',
+            default => 'active',
+        };
+    }
 }
