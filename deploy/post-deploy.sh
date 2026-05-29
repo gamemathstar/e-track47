@@ -50,12 +50,15 @@ php artisan route:clear
 php artisan cache:clear
 
 # --- 5. Post-deploy assertions ----------------------------------------------
+# Use `stat` (which only needs traverse permission on the parent dir) rather
+# than reading the file — Passport's private key is mode 600 owned by the web
+# user, so a deploy user (root / ubuntu / etc.) intentionally can't read it.
 log "Verifying Passport keys are present and well-formed"
 KEY_PATH="storage/oauth-private.key"
 if [ ! -f "$KEY_PATH" ]; then
   fail "Passport private key is missing at $KEY_PATH"
 fi
-KEY_BYTES=$(wc -c < "$KEY_PATH" | tr -d '[:space:]')
+KEY_BYTES=$(stat -c%s "$KEY_PATH" 2>/dev/null || stat -f%z "$KEY_PATH" 2>/dev/null || echo 0)
 if [ "${KEY_BYTES:-0}" -lt 500 ]; then
   fail "Passport private key looks broken (only $KEY_BYTES bytes at $KEY_PATH)"
 fi
