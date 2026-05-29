@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\V2\DashboardController;
 use App\Http\Controllers\Api\V2\DataEntryWindowController;
 use App\Http\Controllers\Api\V2\DeliverableController;
 use App\Http\Controllers\Api\V2\FrameworkController;
+use App\Http\Controllers\Api\V2\GalleryController;
 use App\Http\Controllers\Api\V2\KpiController;
+use App\Http\Controllers\Api\V2\UsersController;
 use App\Http\Controllers\Api\V2\ProfileController;
 use App\Http\Controllers\Api\V2\SectorController;
 use Illuminate\Support\Facades\Route;
@@ -122,6 +124,24 @@ Route::middleware('auth:api')->prefix('frameworks')->group(function () {
     Route::post('/', [FrameworkController::class, 'store']);
     Route::post('/{id}/archive', [FrameworkController::class, 'archive']);
     Route::post('/{id}/set-default', [FrameworkController::class, 'setDefault']);
+});
+
+// --- 11.9 Users & security ---------------------------------------------------
+Route::middleware('auth:api')->group(function () {
+    Route::get('/users', [UsersController::class, 'index']);
+    Route::get('/users/security-log', [UsersController::class, 'securityLog']);
+    Route::post('/users/me/password', [UsersController::class, 'changeMyPassword']);
+    Route::post('/users/me/photo', [UsersController::class, 'updateMyPhoto']);
+    Route::post('/users', [UsersController::class, 'store']);
+    Route::get('/users/{id}', [UsersController::class, 'show']);
+});
+
+// --- 11.13 Gallery -----------------------------------------------------------
+Route::middleware('auth:api')->prefix('gallery')->group(function () {
+    Route::get('/management', [GalleryController::class, 'management']);
+    Route::get('/public', [GalleryController::class, 'publicList']);
+    Route::get('/items/{id}', [GalleryController::class, 'show']);
+    Route::post('/items', [GalleryController::class, 'upload']);
 });
 
 // ---------------------------------------------------------------------------

@@ -14,7 +14,9 @@ client). This file is updated at the end of every phase.
   - **F4 Approvals workflow:** ✅ complete (see §22).
   - **F5 Dashboards:** ✅ complete (see §23).
   - **F6 Data-entry windows:** ✅ complete (see §24).
-  - **F7 Frameworks:** ✅ complete (see §25). Awaiting review.
+  - **F7 Frameworks:** ✅ complete (see §25).
+  - **F8 Users & security:** ✅ complete (see §26).
+  - **F9 Gallery:** 🟡 code complete + lint-clean; tests written but **last run blocked by MySQL outage on the host** (see §27). Awaiting MySQL restart to verify.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -902,3 +904,68 @@ framework (performance data intentionally not copied). **Duplicate year** ⇒ 40
 **Backward-compat:** no v1/web file changed. The frameworks migration is additive
 and guarded — the web app keys off `status='Active'` exclusively, so the new
 columns are inert.
+
+## 26. F8 — Users & security
+
+Implements API_REFERENCE.md §11.9. System-Admin-only directory + multipart create;
+authenticated-user `me` flows; security log derived from oauth_access_tokens.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /users` (`?search,?role,?sector`) | `UsersController@index` |
+| `GET /users/{id}` | `@show` |
+| `POST /users` (multipart: `fullName,email,phone,role,avatarKey?,photo?`) | `@store` (202) |
+| `POST /users/me/password` | `@changeMyPassword` (204) |
+| `POST /users/me/photo` (multipart: `photo`) | `@updateMyPhoto` (204) |
+| `GET /users/security-log` (`?filter,?q`) | `@securityLog` |
+
+**Added:** `UsersService`, three FormRequests (`AddUserRequest`/`ChangePasswordRequest`/
+`UpdatePhotoRequest`), `UsersController`. Photo storage: `storage/app/public/uploads/users`.
+New users get a random password + `must_change_password=true` (admin invitation flow).
+
+**Authorization:** list/detail/create/security-log are System Admin only (403 otherwise).
+`me` flows require any authenticated user.
+
+**Limitations (noted, non-blocking):**
+- `POST /users` doesn't accept a `sectorId`/role-target (the spec form doesn't expose
+  one) — sector-scoped roles are created with `entity_id=0` and must be re-targeted
+  via a future admin endpoint.
+- Security log returns real data for `filter=all|logins` (recent OAuth token
+  issuances). `changes`/`denied` return `[]` until a dedicated `security_events`
+  audit table is added.
+
+**Verification:** UsersTest **11/11** (list filtering, detail, create + multipart
+upload, duplicate email 409, validation 422, change-password incl. wrong-current
+422, update photo, admin gate 403, security log, auth 401).
+
+## 27. F9 — Gallery
+
+Implements API_REFERENCE.md §11.13. Additive guarded migration:
+`2026_05_28_100100_add_api_v2_columns_to_galleries_table` adds `category`,
+`is_public`, `icon_key`, `gradient_keys` (json) — web app reads `status` only, so
+inert.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /gallery/management` (`?tab=all\|recent\|archived`) | `GalleryController@management` (System Admin) |
+| `GET /gallery/public` (`?filter=all\|roads\|healthcare\|education`) | `@publicList` |
+| `GET /gallery/items/{id}` | `@show` |
+| `POST /gallery/items` (multipart: `title,description,category,displayOrder,isPublic,asset?`) | `@upload` (202; System Admin) |
+
+**Added:** `GalleryService`, `UploadGalleryRequest`, `GalleryController`. Gallery
+model is not mutated (GR1) — new attributes are set directly on the instance, which
+works because `$fillable` is not enforced for direct property assignment. Assets:
+`storage/app/public/uploads/galleries`.
+
+**Status: ⚠️ tests written but unverified end-to-end this run.** The MySQL service on
+the dev host became unreachable mid-run ("SQLSTATE[HY000] [2002] No connection could
+be made"), so the last `RefreshDatabase` cycle failed. Once MySQL is back, run:
+
+```bash
+php artisan migrate:fresh --database=mysql_test
+php vendor/bin/phpunit tests/Feature/Api/V2/GalleryTest.php
+php vendor/bin/phpunit                # full suite
+```
+
+I expect green — the code is lint-clean (`php -l` all files) and follows the same
+patterns as F8 which ran 11/11 right before the outage.
