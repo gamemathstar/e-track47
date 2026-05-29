@@ -73,6 +73,7 @@ class GalleryService
             'descriptionBlocks' => array_values(array_filter(explode("\n", (string) $g->caption))) ?: ['—'],
             'isVerified' => true,
             'verifiedPillLabel' => 'Verified Project',
+            'heroImageUrl' => $this->imageUrlFor($g),
             'heroIconKey' => $this->iconForCategory($g->category ?? 'infrastructure'),
             'heroGradientKeys' => $this->gradientFor($g),
             'stats' => $this->statsFor($g),
@@ -145,12 +146,29 @@ class GalleryService
             'title' => $g->title ?: 'Untitled',
             'category' => $cat,
             'categoryLabel' => self::CATEGORY_LABELS[$cat] ?? ucfirst($cat),
+            'imageUrl' => $this->imageUrlFor($g),
             'iconKey' => $g->icon_key ?? $this->iconForCategory($cat),
             'gradientKeys' => $gradient,
             'isActive' => $g->status === 'active',
             'isPublic' => Schema::hasColumn('galleries', 'is_public') ? (bool) ($g->is_public ?? true) : true,
             'displayOrder' => (int) $g->display_order,
         ];
+    }
+
+    /**
+     * Absolute URL for the uploaded gallery asset, or null when no file was
+     * attached. `Storage::disk('public')->url()` honours config('filesystems.disks.public.url')
+     * — i.e. when APP_URL is set correctly the returned URL is absolute and
+     * mobile clients can render it directly.
+     */
+    private function imageUrlFor(Gallery $g): ?string
+    {
+        $path = $g->image_path ?? null;
+        if (! $path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url(ltrim($path, '/'));
     }
 
     private function iconForCategory(string $category): string
