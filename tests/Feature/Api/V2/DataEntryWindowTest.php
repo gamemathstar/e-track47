@@ -1,0 +1,113 @@
+<?php
+
+namespace Tests\Feature\Api\V2;
+
+use App\Models\DataEntryAccess;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Passport\Passport;
+use Tests\Concerns\InteractsWithPdcuAuth;
+use Tests\TestCase;
+
+/**
+ * §11.7 data-entry windows: list / stats / lock-unlock / open-lock-override.
+ * Coordinator-only (403 otherwise).
+ */
+class DataEntryWindowTest extends TestCase
+{
+    use RefreshDatabase;
+    use InteractsWithPdcuAuth;
+
+    public function test_list_windows_seeds_rows_for_active_framework_sectors(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/data-entry/windows')
+            ->assertOk()->assertJsonCount(1)
+            ->assertJsonStructure([['sectorId', 'sectorName', 'accent', 'status', 'lastUpdatedLabel', 'quarterLabel', 'deadlineLabel']])
+            ->assertJsonPath('0.status', 'locked'); // default seeded status
+    }
+
+    public function test_stats_returns_counts(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw, ['sector_name' => 'Health']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/data-entry/stats')
+            ->assertOk()
+            ->assertJsonStructure(['totalSectors', 'openSectors', 'submissionRateLabel'])
+            ->assertJsonPath('totalSectors', 1);
+    }
+
+    public function test_unlock_and_lock_per_sector(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/open")->assertStatus(202);
+        $this->assertSame('open', DataEntryAccess::where('sector_id', $sector->id)->first()->status);
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/lock")->assertStatus(202);
+        $this->assertSame('closed', DataEntryAccess::where('sector_id', $sector->id)->first()->status);
+    }
+
+    public function test_grant_override(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/override", [
+            'reason' => 'Late submission approved',
+            'expiresAt' => '2024-12-31T23:59:59.000',
+        ])->assertStatus(202);
+
+        $row = DataEntryAccess::where('sector_id', $sector->id)->first();
+        $this->assertSame('override', $row->status);
+        $this->assertSame('Late submission approved', $row->override_reason);
+        $this->assertNotNull($row->override_deadline);
+    }
+
+    public function test_lock_all_and_unlock_all(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw, ['sector_name' => 'A']);
+        $this->makeSector($fw, ['sector_name' => 'B']);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/data-entry/windows/unlock-all')->assertStatus(202);
+        $this->assertSame(2, DataEntryAccess::where('status', 'open')->count());
+
+        $this->postJson('/api/v2/data-entry/windows/lock-all')->assertStatus(202);
+        $this->assertSame(2, DataEntryAccess::where('status', 'closed')->count());
+    }
+
+    public function test_grant_override_validation(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/override", [])
+            ->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['reason']]);
+    }
+
+    public function test_non_coordinator_forbidden(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->getJson('/api/v2/data-entry/windows')->assertStatus(403)->assertJsonPath('code', 'forbidden');
+    }
+
+    public function test_requires_auth(): void
+    {
+        $this->getJson('/api/v2/data-entry/windows')->assertStatus(401);
+    }
+}

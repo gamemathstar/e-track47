@@ -4,7 +4,9 @@ use App\Http\Controllers\Api\V2\ApprovalController;
 use App\Http\Controllers\Api\V2\AuthController;
 use App\Http\Controllers\Api\V2\CommitmentController;
 use App\Http\Controllers\Api\V2\DashboardController;
+use App\Http\Controllers\Api\V2\DataEntryWindowController;
 use App\Http\Controllers\Api\V2\DeliverableController;
+use App\Http\Controllers\Api\V2\FrameworkController;
 use App\Http\Controllers\Api\V2\KpiController;
 use App\Http\Controllers\Api\V2\ProfileController;
 use App\Http\Controllers\Api\V2\SectorController;
@@ -98,6 +100,28 @@ Route::middleware('auth:api')->prefix('dashboard')->group(function () {
     Route::get('/sector-head', [DashboardController::class, 'sectorHead']);
     Route::get('/data-admin', [DashboardController::class, 'dataAdmin']);
     Route::get('/system-admin', [DashboardController::class, 'systemAdmin']);
+});
+
+// --- 11.7 Data-entry windows (Coordinator) -----------------------------------
+Route::middleware('auth:api')->prefix('data-entry')->group(function () {
+    Route::get('/windows', [DataEntryWindowController::class, 'index']);
+    Route::get('/stats', [DataEntryWindowController::class, 'stats']);
+    Route::post('/windows/lock-all', [DataEntryWindowController::class, 'lockAll']);
+    Route::post('/windows/unlock-all', [DataEntryWindowController::class, 'unlockAll']);
+    Route::post('/windows/{sectorId}/open', [DataEntryWindowController::class, 'open']);
+    Route::post('/windows/{sectorId}/lock', [DataEntryWindowController::class, 'lock']);
+    Route::post('/windows/{sectorId}/override', [DataEntryWindowController::class, 'override']);
+});
+
+// --- 11.5 Frameworks ---------------------------------------------------------
+Route::middleware('auth:api')->prefix('frameworks')->group(function () {
+    Route::get('/', [FrameworkController::class, 'index']);
+    Route::get('/stats', [FrameworkController::class, 'stats']);
+    Route::get('/{id}', [FrameworkController::class, 'show']);
+    Route::get('/{id}/sectors', [FrameworkController::class, 'sectors']);
+    Route::post('/', [FrameworkController::class, 'store']);
+    Route::post('/{id}/archive', [FrameworkController::class, 'archive']);
+    Route::post('/{id}/set-default', [FrameworkController::class, 'setDefault']);
 });
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,9 @@ client). This file is updated at the end of every phase.
   - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20).
   - **F3 KPI tracking:** ✅ complete (see §21).
   - **F4 Approvals workflow:** ✅ complete (see §22).
-  - **F5 Dashboards:** ✅ complete (see §23). Awaiting review.
+  - **F5 Dashboards:** ✅ complete (see §23).
+  - **F6 Data-entry windows:** ✅ complete (see §24).
+  - **F7 Frameworks:** ✅ complete (see §25). Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -852,3 +854,51 @@ helpers — the service calls the matching helper per endpoint.
 
 **Backward-compatibility:** no v1/web file changed (web `DashboardController` untouched;
 v2 reuses models + `HierarchyMetrics` + the new service).
+
+## 24. F6 — Data-entry windows
+
+Implements API_REFERENCE.md §11.7 — coordinator-only management of the per-sector
+data-entry windows. 7 endpoints; reuses the `DataEntryAccess` model.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /data-entry/windows` (`?year,?quarter`) | `DataEntryWindowController@index` |
+| `GET /data-entry/stats` (`?year,?quarter`) | `@stats` |
+| `POST /data-entry/windows/lock-all` | `@lockAll` (202) |
+| `POST /data-entry/windows/unlock-all` | `@unlockAll` (202) |
+| `POST /data-entry/windows/{sectorId}/open` | `@open` (202) |
+| `POST /data-entry/windows/{sectorId}/lock` | `@lock` (202) |
+| `POST /data-entry/windows/{sectorId}/override` | `@override` (202) |
+
+`DataEntryWindowService` lazily **seeds rows** for every active-framework sector for
+the requested (year, quarter) if missing (mirroring the web's lazy initialization);
+status `closed` → wire `locked`, `override` → wire `open`; coordinator-only (403
+otherwise). `DataEntryWindowTest` **8/8**.
+
+## 25. F7 — Frameworks
+
+Implements API_REFERENCE.md §11.5 — 7 endpoints. Schema: additive guarded migration
+`2026_05_28_100000_add_api_v2_columns_to_frameworks_table` (`subtitle`, `is_default`,
+`inherited_from_framework_id`). `is_default` is a **mirror** of the web's
+`status='Active'` source of truth (GR2).
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /frameworks` | `FrameworkController@index` |
+| `GET /frameworks/stats` | `@stats` |
+| `GET /frameworks/{id}` | `@show` (counts + creator + inheritance) |
+| `GET /frameworks/{id}/sectors` | `@sectors` |
+| `POST /frameworks` | `@store` (201; reuses web "activate" semantics, copies hierarchy if `sectorMethod=inherit`) |
+| `POST /frameworks/{id}/archive` | `@archive` (202) |
+| `POST /frameworks/{id}/set-default` | `@setDefault` (202; archives others, sets active+is_default) |
+
+**Inheritance** copies sectors → commitments → deliverables → KPIs into the new
+framework (performance data intentionally not copied). **Duplicate year** ⇒ 409.
+**Already-archived archive** ⇒ 409. Coordinator-only for mutations (403 for others).
+`FrameworksTest` **9/9**.
+
+**This batch:** F6 + F7. Full suite **76/76**. `php -l` clean; v1 routes intact.
+
+**Backward-compat:** no v1/web file changed. The frameworks migration is additive
+and guarded — the web app keys off `status='Active'` exclusively, so the new
+columns are inert.
