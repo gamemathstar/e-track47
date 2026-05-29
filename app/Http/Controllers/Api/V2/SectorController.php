@@ -17,10 +17,22 @@ class SectorController extends BaseController
     {
     }
 
-    /** GET /sectors */
+    /**
+     * GET /sectors[?frameworkId=N]
+     *
+     * Defaults to the currently Active framework — sector composition differs
+     * between frameworks, so the list MUST be framework-scoped. Pass an explicit
+     * frameworkId to view a different cycle (e.g. for historical comparison).
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
-        return SectorResource::collection($this->hierarchy->listSectors($request->user()));
+        $validated = $request->validate([
+            'frameworkId' => ['nullable', 'integer'],
+        ]);
+
+        return SectorResource::collection(
+            $this->hierarchy->listSectors($request->user(), $validated['frameworkId'] ?? null),
+        );
     }
 
     /** GET /sectors/{id} */

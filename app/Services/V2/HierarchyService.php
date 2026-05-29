@@ -32,29 +32,26 @@ class HierarchyService
     }
 
     /**
-     * Sectors the user may see. By default no framework constraint is applied —
-     * every sector the role can see is returned, across all frameworks. Pass
-     * scopeToActiveFramework=true only when a caller specifically wants the
-     * "current cycle" view.
+     * Sectors the user may see, optionally constrained to a specific framework.
+     * Pass $frameworkId to scope the list; null means "every framework".
      */
-    private function accessibleSectorQuery(User $user, bool $scopeToActiveFramework = false)
+    private function accessibleSectorQuery(User $user, ?int $frameworkId = null)
     {
-        return $this->access->accessibleSectorQuery(
-            $user,
-            $scopeToActiveFramework ? $this->activeFrameworkId() : null,
-        );
+        return $this->access->accessibleSectorQuery($user, $frameworkId);
     }
 
-    /** @return Collection<int,Sector> */
-    public function listSectors(User $user): Collection
+    /**
+     * @param  int|null  $frameworkId  caller-specified framework; falls back to
+     *                                 the currently Active framework when null.
+     *                                 Frameworks differ in their sector composition,
+     *                                 so the list MUST be framework-scoped.
+     * @return Collection<int,Sector>
+     */
+    public function listSectors(User $user, ?int $frameworkId = null): Collection
     {
-        // GET /sectors returns every sector the user has role-based access to,
-        // across all frameworks. Earlier this list was scoped to the active
-        // framework, but that hid sectors whenever a deployment had sectors
-        // tagged to a non-Active framework (a common state on production), so
-        // the active-framework constraint is dropped. Detail/commitment drilldowns
-        // already use scopeToActiveFramework=false, so this is consistent.
-        $sectors = $this->accessibleSectorQuery($user)
+        $frameworkId ??= $this->activeFrameworkId();
+
+        $sectors = $this->accessibleSectorQuery($user, $frameworkId)
             ->orderBy('sector_name')->get();
 
         $metrics = $this->metrics->forSectors($sectors->pluck('id')->all());
@@ -65,6 +62,9 @@ class HierarchyService
 
     public function getSector(User $user, string $id): Sector
     {
+        // Detail/drilldown deliberately don't constrain by framework — a caller
+        // that already knows the sector id should be able to read it regardless
+        // of which framework is currently Active.
         $sector = $this->accessibleSectorQuery($user)->find($id);
 
         if (! $sector) {
