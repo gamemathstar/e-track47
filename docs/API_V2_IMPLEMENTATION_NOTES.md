@@ -11,7 +11,8 @@ client). This file is updated at the end of every phase.
   - **F1 Auth + Profile** (§19) · **F2 Sectors → Commitments → Deliverables** (§20) · **F3 KPI tracking** (§21) · **F4 Approvals workflow** (§22) · **F5 Dashboards** (§23)
   - **F6 Data-entry windows** (§24) · **F7 Frameworks** (§25) · **F8 Users & security** (§26) · **F9 Gallery** (§27)
   - **F10 Notifications** (§28) · **F11 Settings** (§29) · **F12 Reports** (§30) · **F13 System** (§31) · **F14 Discussions** (§32)
-- **Phase 4 — QA & optimization:** ✅ complete (see §33). Full suite **141/141**.
+- **Phase 4 — QA & optimization:** ✅ complete (see §33).
+- **Phase 4.5 — Deploy hardening (Passport-keys self-healing):** ✅ complete (see §36). Full suite **143/143**.
 
 ---
 
@@ -1285,3 +1286,66 @@ self-contained enough to land later without a contract change.
 
 The API is **ready for the mobile team to integrate against**. The follow-ups in
 §34 are real, but none are blockers for the documented client contract.
+
+---
+
+# Phase 4.5 — Deploy hardening
+
+## 36. Passport-keys self-healing
+
+Triggered by the testing-server incident where mobile login returned
+`{ "code": "server_error", "message": "Invalid key supplied" }` while the web
+app worked fine — the textbook fingerprint of missing Passport RSA keys.
+(Documented in §17a; missed by the deploy.) This phase makes that mistake
+mechanically impossible to repeat.
+
+**Added**
+- `app/Console/Commands/EnsurePassportKeysCommand.php` — `pdcu:ensure-passport-keys`.
+  Idempotent: checks `storage/oauth-private.key` size; runs `passport:keys` only
+  when missing or truncated; exits 0 either way. Safe to call from any
+  automation that runs unattended.
+- `app/Http/Controllers/Api/V2/HealthController.php` + `GET /api/v2/_health` —
+  **unauthenticated** deploy/CI probe. Returns:
+
+  ```json
+  { "api": "v2.0.0", "passport": "ok|missing_keys|missing_client", "db": "ok|fail" }
+  ```
+
+  HTTP 200 when healthy, 503 with the same diagnostic body when something's
+  wrong. Exposes only non-sensitive metadata — safe to leave reachable by the
+  mobile team and load balancers.
+- `deploy/post-deploy.sh` — single self-healing script. Order:
+  1. `php artisan pdcu:ensure-passport-keys`
+  2. `php artisan passport:client --personal --no-interaction` if
+     `oauth_personal_access_clients` is empty
+  3. `php artisan migrate --force`
+  4. `php artisan config:clear && route:clear && cache:clear`
+  5. Post-deploy assertion: `storage/oauth-private.key` exists and is ≥ 500
+     bytes; **exits non-zero loudly** if not, so broken deploys can't ship green.
+- `composer.json` — `post-install-cmd` hook runs `pdcu:ensure-passport-keys`,
+  so a fresh `composer install` brings keys up on its own. (Idempotent — no-op
+  on dev boxes where keys already exist.)
+- `tests/Feature/Api/V2/HealthTest.php` — proves the probe is public, returns
+  the documented shape, and that the artisan command is safe to call twice.
+
+**Deploy checklist (testing & prod)**
+
+```bash
+# the deploy script wraps all of this; run it as the post-deploy step
+bash deploy/post-deploy.sh
+
+# then verify from outside:
+curl -fsS https://<host>/api/v2/_health
+# expect 200 with { "api": "v2.0.0", "passport": "ok", "db": "ok" }
+```
+
+If the probe ever returns `passport: missing_keys`, run
+`php artisan pdcu:ensure-passport-keys` on the server. If it returns
+`passport: missing_client`, run `php artisan passport:install --no-interaction`.
+Both are idempotent.
+
+**No v1/web changes.** The new endpoint lives under `/api/v2/_health`; the
+composer hook is a no-op when keys are already there; the deploy script
+explicitly does not touch the web app.
+
+**Suite:** HealthTest 2/2. Full suite **143/143** (no regressions).

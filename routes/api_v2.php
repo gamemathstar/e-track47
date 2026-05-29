@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V2\DeliverableController;
 use App\Http\Controllers\Api\V2\DiscussionsController;
 use App\Http\Controllers\Api\V2\FrameworkController;
 use App\Http\Controllers\Api\V2\GalleryController;
+use App\Http\Controllers\Api\V2\HealthController;
 use App\Http\Controllers\Api\V2\KpiController;
 use App\Http\Controllers\Api\V2\NotificationsController;
 use App\Http\Controllers\Api\V2\ProfileController;
@@ -37,7 +38,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Health check — unauthenticated, DB-free. Confirms the v2 lane is wired and
+// Deploy / CI readiness probe — unauthenticated. Reports 200 when the v2 lane
+// can issue + verify tokens (Passport keys + oauth client present, DB reachable),
+// or 503 with diagnostics when it can't. Safe to expose to the mobile team and
+// load balancers — non-sensitive metadata only.
+Route::get('/_health', [HealthController::class, 'show'])->name('api.v2.health');
+
+// Liveness check — unauthenticated, DB-free. Confirms the v2 lane is wired and
 // that responses are emitted raw (no `data` wrapper).
 Route::get('/ping', function () {
     return [
