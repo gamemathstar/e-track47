@@ -3,6 +3,7 @@
 namespace App\Services\V2;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Derived performance/count metrics for the sector → commitment → deliverable
@@ -110,9 +111,17 @@ class HierarchyMetrics
             $out[$id] = ['kpi_count' => 0, 'deliverable_count' => 0, 'at_risk_count' => 0, 'completed_deliverables' => 0, 'progress' => 0.0, 'next_milestone' => null];
         }
 
+        // `due_date` was added by the deliverables migration but some
+        // production DBs were imported from SQL dumps that predate it. When
+        // it's absent, we degrade nextMilestone to null rather than 500.
+        $hasDueDate = Schema::hasColumn('deliverables', 'due_date');
+        $select = $hasDueDate
+            ? 'commitment_id, status, COUNT(*) AS c, MAX(due_date) AS next_due'
+            : 'commitment_id, status, COUNT(*) AS c, NULL AS next_due';
+
         $deliverables = DB::table('deliverables')
             ->whereIn('commitment_id', $commitmentIds)
-            ->selectRaw('commitment_id, status, COUNT(*) AS c, MAX(due_date) AS next_due')
+            ->selectRaw($select)
             ->groupBy('commitment_id', 'status')
             ->get();
 
