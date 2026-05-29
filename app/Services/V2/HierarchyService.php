@@ -31,8 +31,13 @@ class HierarchyService
         return optional(Framework::where('status', 'Active')->first())->id;
     }
 
-    /** Sectors the user may see, optionally constrained to the active framework. */
-    private function accessibleSectorQuery(User $user, bool $scopeToActiveFramework = true)
+    /**
+     * Sectors the user may see. By default no framework constraint is applied —
+     * every sector the role can see is returned, across all frameworks. Pass
+     * scopeToActiveFramework=true only when a caller specifically wants the
+     * "current cycle" view.
+     */
+    private function accessibleSectorQuery(User $user, bool $scopeToActiveFramework = false)
     {
         return $this->access->accessibleSectorQuery(
             $user,
@@ -43,7 +48,14 @@ class HierarchyService
     /** @return Collection<int,Sector> */
     public function listSectors(User $user): Collection
     {
-        $sectors = $this->accessibleSectorQuery($user)->orderBy('sector_name')->get();
+        // GET /sectors returns every sector the user has role-based access to,
+        // across all frameworks. Earlier this list was scoped to the active
+        // framework, but that hid sectors whenever a deployment had sectors
+        // tagged to a non-Active framework (a common state on production), so
+        // the active-framework constraint is dropped. Detail/commitment drilldowns
+        // already use scopeToActiveFramework=false, so this is consistent.
+        $sectors = $this->accessibleSectorQuery($user)
+            ->orderBy('sector_name')->get();
 
         $metrics = $this->metrics->forSectors($sectors->pluck('id')->all());
         $sectors->each(fn (Sector $s) => $this->attachSectorMetrics($s, $metrics[$s->id] ?? null, false));
@@ -53,7 +65,7 @@ class HierarchyService
 
     public function getSector(User $user, string $id): Sector
     {
-        $sector = $this->accessibleSectorQuery($user, scopeToActiveFramework: false)->find($id);
+        $sector = $this->accessibleSectorQuery($user)->find($id);
 
         if (! $sector) {
             throw ApiException::notFound('Sector not found.');
@@ -118,7 +130,7 @@ class HierarchyService
 
     private function authorizeSector(User $user, int|string|null $sectorId): void
     {
-        $allowed = $this->accessibleSectorQuery($user, scopeToActiveFramework: false)
+        $allowed = $this->accessibleSectorQuery($user)
             ->where('id', $sectorId)
             ->exists();
 
