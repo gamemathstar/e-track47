@@ -11,7 +11,7 @@ client). This file is updated at the end of every phase.
   - **F1 Auth + Profile** (§19) · **F2 Sectors → Commitments → Deliverables** (§20) · **F3 KPI tracking** (§21) · **F4 Approvals workflow** (§22) · **F5 Dashboards** (§23)
   - **F6 Data-entry windows** (§24) · **F7 Frameworks** (§25) · **F8 Users & security** (§26) · **F9 Gallery** (§27)
   - **F10 Notifications** (§28) · **F11 Settings** (§29) · **F12 Reports** (§30) · **F13 System** (§31) · **F14 Discussions** (§32)
-- **Phase 4 — QA & optimization:** ⏳ not started (optional polish).
+- **Phase 4 — QA & optimization:** ✅ complete (see §33). Full suite **141/141**.
 
 ---
 
@@ -1193,3 +1193,95 @@ flag, auth 401). **Full suite 134/134.** `php -l` clean; v1 intact.
 Phase 4 (QA & optimization) is optional polish: more thorough N+1 audit, response
 caching where appropriate, additional edge-case tests, OpenAPI schema generation,
 and consolidating the response-shape conventions into a single doc.
+
+---
+
+# Phase 4 — QA & optimization
+
+## 33. What was done
+
+Two pragmatic safety nets on top of the 14 feature suites: an N+1 audit on the
+heaviest endpoints, and a cross-feature end-to-end workflow test that proves the
+same PerformanceTracking row flows correctly through tracking → approvals →
+dashboards → reports.
+
+**N+1 audit** (`tests/Feature/Api/V2/QueryCountAuditTest.php`): seeds a fixed
+3×2×2×2 hierarchy (3 sectors × 2 commitments × 2 deliverables × 2 KPIs + a
+tracking each), hits the heaviest endpoints under `DB::enableQueryLog()`, and
+asserts a **bounded** query count — so the asserts catch any future N+1 even if
+the data grows.
+
+| Endpoint | Threshold | Actual | Headroom |
+|---|---:|---:|---|
+| `GET /sectors` | 15 | 5 | HierarchyMetrics grouped queries |
+| `GET /approvals/sector-head/queue` | 20 | 17 | eager-loaded |
+| `GET /dashboard/governor` | 30 | 12 | aggregate-driven |
+| `POST /reports/viewer` | 80 | 34 | per-sector kpiRows (~1.4 queries/KPI) |
+| `GET /users` | 40 | 12 | acceptable for 6 users; see follow-ups |
+
+No N+1 explosion found. Migration to grow data won't change the *shape* of the
+query plan in any of these endpoints; counts grow linearly only with sectors
+(not KPIs) for the viewer, and are constant for the others.
+
+**End-to-end workflow tests** (`tests/Feature/Api/V2/EndToEndWorkflowTest.php`):
+
+1. **Happy path (2 tests, 38 assertions):**
+   Coordinator sets Q1 milestone → Data Admin submits actual=85 → Sector Head
+   accepts (Pending Facilitator, stamps approver) → Facilitator accepts with
+   `validatedValue=85` (Pending Coordinator, sets `delivery_department_value`) →
+   Coordinator confirms (Confirmed, locks the row). Then asserts downstream:
+   KPI detail shows `quartersOverview[0]='completed'` and a non-pending status;
+   coordinator dashboard `reviewQueueCount=0`; reports/hub `pendingCount=0` and
+   `topSectorLabel='Health'`; reports/viewer renders the KPI in the Health
+   group. Locked: resubmission of Q1 returns **409**.
+2. **Reject + resubmit:** Data Admin submit → Sector Head accept → Facilitator
+   **reject** with reason. Tracking → Rejected with `facilitator_rejection_reason`
+   stored. Data Admin resubmits with new value → workflow restarts
+   (Pending Sector Head Approval, facilitator decision/reason **cleared**).
+
+**Suite size:** 16 test files, **141 tests / 855 assertions**, ~12 s clock time.
+
+## 34. Documented follow-ups (not done; flagged for future work)
+
+These were intentionally deferred — none block the mobile client, and each is
+self-contained enough to land later without a contract change.
+
+1. **Workflow notifications dispatch.** v2 reviews don't yet fan-out FCM/in-app
+   notifications to downstream roles. The web app still emits them for web
+   actions, so production isn't silent — only mobile-initiated reviews skip the
+   dispatch. Wire through `Notification::notifyXxx` static methods in
+   `ApprovalService::review` once the team is ready to test the FCM stack.
+2. **Real Excel/Word/PDF report writers.** F12 currently writes text summaries
+   with binary extensions. Drop `phpspreadsheet`/`phpword` writers into
+   `ReportsService::writeArtifact` (both packages are already in composer.json).
+3. **`security_events` audit table.** F8 `/users/security-log` returns
+   OAuth-token-derived rows for `filter=logins`; `changes`/`denied` return `[]`.
+   A dedicated audit table would back the other filters with real data.
+4. **`POST /users` sector targeting.** The spec form doesn't include a
+   `sectorId`, so sector-scoped roles created via the mobile admin currently
+   start with `entity_id=0`. Either (a) extend the contract to accept a sectorId,
+   or (b) add a follow-up admin endpoint to retarget the role.
+5. **Users list eager-loading.** `GET /users` (12 queries for 6 users) loops
+   `getCurrentRole()` + `Sector::find` per user. Eager-load roles + sectors when
+   pagination lands — at v1 scale it's fine.
+6. **OpenAPI/Swagger spec.** Adding `darkaonline/l5-swagger` (or generating from
+   the existing FormRequests/Resources) would give the mobile team a
+   machine-readable contract alongside `API_REFERENCE.md`.
+7. **Response caching for hub/dashboard endpoints.** Reasonable once load data
+   exists; premature without it. The presenters are pure given input, so caching
+   layers cleanly on top of the services.
+8. **Pagination.** Spec/client currently expect bare arrays; coordinate a
+   client change before introducing cursor pagination on large lists (users,
+   security log, gallery, discussions, notifications).
+
+## 35. Net deliverable
+
+- 14 feature modules, 86 v2 endpoints, 141 tests, 855 assertions.
+- 0 lines of v1/web code changed.
+- 13 additive/guarded migrations; the live `trackerx` was untouched throughout.
+- One ~1300-line living spec (`docs/API_V2_IMPLEMENTATION_NOTES.md`) capturing
+  every decision, gap, guardrail, and follow-up — enough for a new engineer to
+  pick up cold.
+
+The API is **ready for the mobile team to integrate against**. The follow-ups in
+§34 are real, but none are blockers for the documented client contract.
