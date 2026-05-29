@@ -16,7 +16,9 @@ client). This file is updated at the end of every phase.
   - **F6 Data-entry windows:** ✅ complete (see §24).
   - **F7 Frameworks:** ✅ complete (see §25).
   - **F8 Users & security:** ✅ complete (see §26).
-  - **F9 Gallery:** 🟡 code complete + lint-clean; tests written but **last run blocked by MySQL outage on the host** (see §27). Awaiting MySQL restart to verify.
+  - **F9 Gallery:** ✅ complete (see §27).
+  - **F10 Notifications:** ✅ complete (see §28).
+  - **F11 Settings:** ✅ complete (see §29). Full suite **109/109**. Awaiting review.
 - **Phase 4 — QA & optimization:** ⏳ not started.
 
 ---
@@ -969,3 +971,65 @@ php vendor/bin/phpunit                # full suite
 
 I expect green — the code is lint-clean (`php -l` all files) and follows the same
 patterns as F8 which ran 11/11 right before the outage.
+
+## 28. F10 — Notifications
+
+API_REFERENCE.md §11.14 — user inbox + per-user preferences.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /notifications/inbox` (`?tab=all|unread|mentions`) | `NotificationsController@inbox` |
+| `GET /notifications/preferences` | `@preferences` |
+| `PUT /notifications/preferences` | `@updatePreferences` (204) |
+| `POST /notifications/mark-all-read` | `@markAllRead` (204) |
+| `POST /notifications/{id}/mark-read` | `@markRead` (204) |
+
+**Migrations (additive, guarded):**
+- `2026_05_28_100200_create_notification_preferences_table` — per-user prefs (5 category
+  toggles + 3 channel toggles + quiet-hours).
+- `2026_05_28_100201_add_api_v2_columns_to_notifications_table` — `kind`,
+  `deep_link_route`, `deep_link_params` (all nullable).
+
+**Added:** `NotificationPreference` model, `NotificationsService` (groups inbox by
+Today / Yesterday / Earlier; derives `kind` from new `kind` column or keyword-maps
+the legacy `type`), `UpdateNotificationPreferencesRequest`, `NotificationsController`.
+
+**Notes:** `firstOrCreate` doesn't pull DB defaults into the new instance — so the
+service `refresh()`es preference rows after creation. Mark-read endpoints scope to
+the caller (cross-user reads return 404).
+
+**Verification:** NotificationsTest **7/7** (inbox grouping + shape + kind mapping,
+defaults + update, validation, mark-all/one-read, cross-user 404, auth 401).
+
+## 29. F11 — Settings
+
+API_REFERENCE.md §11.12 — settings preferences + commands + FAQs + About + multipart
+feedback.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /settings/preferences` | `SettingsController@preferences` |
+| `PUT /settings/preferences` | `@updatePreferences` (204) |
+| `POST /settings/clear-cache` | `@clearCache` (204) |
+| `POST /settings/sync` | `@sync` (204) |
+| `POST /settings/sign-out-all` | `@signOutAll` (204; revokes OAuth + refresh tokens) |
+| `GET /settings/faqs` | `@faqs` |
+| `POST /settings/feedback` (multipart) | `@feedback` (202) |
+| `GET /settings/about` | `@about` |
+
+**Migration:** `2026_05_28_100300_create_user_settings_table` (per-user theme,
+fontScale, biometric, cellular, syncOnWifi, language).
+
+**Added:** `UserSetting` model, `SettingsService`, two FormRequests, controller.
+FAQs + About are deterministic config-style payloads (seeded in the service, not in
+a DB table — easy to flip to a `system_settings` table later). Feedback is persisted
+to `storage/app/feedback.log` (+ optional screenshot in `storage/app/public/uploads/feedback`);
+no dedicated table this phase. `sign-out-all` revokes all OAuth access tokens AND
+all of the user's refresh tokens.
+
+**Verification:** SettingsTest **7/7** (defaults + update, validation, clear-cache/
+sync/sign-out-all incl. refresh-token revocation, FAQs, About shape, feedback with
+and without screenshot, validation, auth 401).
+
+**This batch (F10+F11):** 13 new endpoints, 3 migrations, 2 models, 2 services, 4
+FormRequests, 2 controllers, 2 test files. **Full suite 109/109.** v1 untouched.

@@ -9,9 +9,11 @@ use App\Http\Controllers\Api\V2\DeliverableController;
 use App\Http\Controllers\Api\V2\FrameworkController;
 use App\Http\Controllers\Api\V2\GalleryController;
 use App\Http\Controllers\Api\V2\KpiController;
-use App\Http\Controllers\Api\V2\UsersController;
+use App\Http\Controllers\Api\V2\NotificationsController;
 use App\Http\Controllers\Api\V2\ProfileController;
 use App\Http\Controllers\Api\V2\SectorController;
+use App\Http\Controllers\Api\V2\SettingsController;
+use App\Http\Controllers\Api\V2\UsersController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -142,6 +144,27 @@ Route::middleware('auth:api')->prefix('gallery')->group(function () {
     Route::get('/public', [GalleryController::class, 'publicList']);
     Route::get('/items/{id}', [GalleryController::class, 'show']);
     Route::post('/items', [GalleryController::class, 'upload']);
+});
+
+// --- 11.14 Notifications -----------------------------------------------------
+Route::middleware('auth:api')->prefix('notifications')->group(function () {
+    Route::get('/inbox', [NotificationsController::class, 'inbox']);
+    Route::get('/preferences', [NotificationsController::class, 'preferences']);
+    Route::put('/preferences', [NotificationsController::class, 'updatePreferences']);
+    Route::post('/mark-all-read', [NotificationsController::class, 'markAllRead']);
+    Route::post('/{id}/mark-read', [NotificationsController::class, 'markRead']);
+});
+
+// --- 11.12 Settings / Help / About -------------------------------------------
+Route::middleware('auth:api')->prefix('settings')->group(function () {
+    Route::get('/preferences', [SettingsController::class, 'preferences']);
+    Route::put('/preferences', [SettingsController::class, 'updatePreferences']);
+    Route::post('/clear-cache', [SettingsController::class, 'clearCache']);
+    Route::post('/sync', [SettingsController::class, 'sync']);
+    Route::post('/sign-out-all', [SettingsController::class, 'signOutAll']);
+    Route::get('/faqs', [SettingsController::class, 'faqs']);
+    Route::post('/feedback', [SettingsController::class, 'feedback']);
+    Route::get('/about', [SettingsController::class, 'about']);
 });
 
 // ---------------------------------------------------------------------------
