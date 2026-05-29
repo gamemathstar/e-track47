@@ -6,13 +6,16 @@ use App\Http\Controllers\Api\V2\CommitmentController;
 use App\Http\Controllers\Api\V2\DashboardController;
 use App\Http\Controllers\Api\V2\DataEntryWindowController;
 use App\Http\Controllers\Api\V2\DeliverableController;
+use App\Http\Controllers\Api\V2\DiscussionsController;
 use App\Http\Controllers\Api\V2\FrameworkController;
 use App\Http\Controllers\Api\V2\GalleryController;
 use App\Http\Controllers\Api\V2\KpiController;
 use App\Http\Controllers\Api\V2\NotificationsController;
 use App\Http\Controllers\Api\V2\ProfileController;
+use App\Http\Controllers\Api\V2\ReportsController;
 use App\Http\Controllers\Api\V2\SectorController;
 use App\Http\Controllers\Api\V2\SettingsController;
+use App\Http\Controllers\Api\V2\SystemController;
 use App\Http\Controllers\Api\V2\UsersController;
 use Illuminate\Support\Facades\Route;
 
@@ -165,6 +168,38 @@ Route::middleware('auth:api')->prefix('settings')->group(function () {
     Route::get('/faqs', [SettingsController::class, 'faqs']);
     Route::post('/feedback', [SettingsController::class, 'feedback']);
     Route::get('/about', [SettingsController::class, 'about']);
+});
+
+// --- 11.8 Reports ------------------------------------------------------------
+Route::middleware('auth:api')->prefix('reports')->group(function () {
+    Route::get('/hub', [ReportsController::class, 'hub']);
+    Route::post('/setup-preview', [ReportsController::class, 'setupPreview']);
+    Route::post('/viewer', [ReportsController::class, 'viewer']);
+    Route::post('/comprehensive', [ReportsController::class, 'comprehensive']);
+    Route::post('/word', [ReportsController::class, 'word']);
+    Route::get('/print-preview', [ReportsController::class, 'printPreview']);
+});
+
+// --- 11.10 System signals ----------------------------------------------------
+// status / update / onboarding-slides are public-capable (auth.optional) per A6.
+Route::middleware('auth.optional')->prefix('system')->group(function () {
+    Route::get('/status', [SystemController::class, 'status']);
+    Route::get('/update', [SystemController::class, 'update']);
+    Route::get('/onboarding', [SystemController::class, 'onboardingSlides']);
+});
+Route::middleware('auth:api')->prefix('system')->group(function () {
+    Route::get('/offline-snapshot', [SystemController::class, 'offlineSnapshot']);
+    Route::post('/retry', [SystemController::class, 'retry']);
+    Route::post('/onboarding/complete', [SystemController::class, 'completeOnboarding']);
+});
+
+// --- 11.15 Discussions -------------------------------------------------------
+Route::middleware('auth:api')->prefix('discussions')->group(function () {
+    Route::get('/hub', [DiscussionsController::class, 'hub']);
+    Route::get('/sectors/{sectorId}/threads', [DiscussionsController::class, 'sectorThreads']);
+    Route::get('/threads/{threadId}', [DiscussionsController::class, 'threadDetail']);
+    Route::post('/threads/{threadId}/comments', [DiscussionsController::class, 'postComment']);
+    Route::post('/comments/{commentId}/toggle-like', [DiscussionsController::class, 'toggleLike']);
 });
 
 // ---------------------------------------------------------------------------

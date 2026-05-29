@@ -7,19 +7,11 @@ client). This file is updated at the end of every phase.
 - **Phase 1 — Analysis:** ✅ complete & approved.
 - **Phase 2 — Foundation:** ✅ complete (see §11).
 - **Phase 2.5 — Test-DB baseline (B1 resolved):** ✅ complete (see §15).
-- **Phase 3 — Feature implementation:** 🔄 in progress.
-  - **F1 Auth + Profile:** ✅ complete (see §19).
-  - **F2 Sectors → Commitments → Deliverables (read hierarchy):** ✅ complete (see §20).
-  - **F3 KPI tracking:** ✅ complete (see §21).
-  - **F4 Approvals workflow:** ✅ complete (see §22).
-  - **F5 Dashboards:** ✅ complete (see §23).
-  - **F6 Data-entry windows:** ✅ complete (see §24).
-  - **F7 Frameworks:** ✅ complete (see §25).
-  - **F8 Users & security:** ✅ complete (see §26).
-  - **F9 Gallery:** ✅ complete (see §27).
-  - **F10 Notifications:** ✅ complete (see §28).
-  - **F11 Settings:** ✅ complete (see §29). Full suite **109/109**. Awaiting review.
-- **Phase 4 — QA & optimization:** ⏳ not started.
+- **Phase 3 — Feature implementation:** ✅ complete (all 14 features; full suite **134/134**; **86 v2 routes**; v1 intact).
+  - **F1 Auth + Profile** (§19) · **F2 Sectors → Commitments → Deliverables** (§20) · **F3 KPI tracking** (§21) · **F4 Approvals workflow** (§22) · **F5 Dashboards** (§23)
+  - **F6 Data-entry windows** (§24) · **F7 Frameworks** (§25) · **F8 Users & security** (§26) · **F9 Gallery** (§27)
+  - **F10 Notifications** (§28) · **F11 Settings** (§29) · **F12 Reports** (§30) · **F13 System** (§31) · **F14 Discussions** (§32)
+- **Phase 4 — QA & optimization:** ⏳ not started (optional polish).
 
 ---
 
@@ -1033,3 +1025,171 @@ and without screenshot, validation, auth 401).
 
 **This batch (F10+F11):** 13 new endpoints, 3 migrations, 2 models, 2 services, 4
 FormRequests, 2 controllers, 2 test files. **Full suite 109/109.** v1 untouched.
+
+## 30. F12 — Reports
+
+Implements API_REFERENCE.md §11.8 — 6 endpoints: hub data, setup preview, viewer
+content, comprehensive generation, Word generation, and print preview.
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /reports/hub` (`?sectorId,?quarter,?year`) | `ReportsController@hub` |
+| `POST /reports/setup-preview` (body: sectorIds[], year?, quarter?, includeEvidence) | `@setupPreview` |
+| `POST /reports/viewer` (body: same as setup) | `@viewer` |
+| `POST /reports/comprehensive` (body: setup + `format`) | `@comprehensive` (returns `GeneratedReportModel`) |
+| `POST /reports/word` (body: WordReportDraft) | `@word` (returns `GeneratedReportModel`) |
+| `GET /reports/print-preview` | `@printPreview` |
+
+**Architecture:** `ReportsService` reuses `HierarchyMetrics` for sector progress
+(keeping numbers consistent with §11.3/§11.11). Hub builds sector bars + a real
+KPI status mix (achieved ≥85% / on-track 60–84% / critical <60%, no-data → critical).
+Viewer composes KPI rows (target, current, percent, trend points, evidence count).
+
+**File generation:** writes a text summary artifact under
+`storage/app/public/uploads/reports/` with the right extension (`xlsx`/`docx`/`pdf`)
+and returns `GeneratedReportModel { id, format, fileSizeLabel, downloadUrl }` via
+`Storage::disk('public')->url(...)`. The client fetches the file separately per the
+contract — bytes are never inline. Note: artifacts are **plain-text summaries**
+named with binary extensions (a deliberate, lightweight choice for v2); when the
+team wants real Excel/Word output, drop in phpspreadsheet/phpword writers in
+`ReportsService::writeArtifact` without touching the controller.
+
+**Validation:** three FormRequests (`ReportSetupRequest`/`GenerateComprehensiveRequest`/
+`GenerateWordRequest`) enforce the contract shapes. ReportsTest **8/8** (hub shape,
+setup-preview counts, viewer groups/rows, generate comprehensive + word with
+downloadUrl, print preview, validation, auth 401).
+
+## 31. F13 — System
+
+Implements API_REFERENCE.md §11.10. Three endpoints are **public-capable** via the
+`auth.optional` middleware (A6): status, update, onboarding slides — the app can
+show them before login. Offline snapshot, retry, and onboarding-complete are
+bearer-protected.
+
+| Method & path | Auth | Handler |
+| --- | --- | --- |
+| `GET /system/status` | optional | `SystemController@status` |
+| `GET /system/update` | optional | `@update` |
+| `GET /system/onboarding` | optional | `@onboardingSlides` |
+| `GET /system/offline-snapshot` | bearer | `@offlineSnapshot` |
+| `POST /system/retry` | bearer | `@retry` (204) |
+| `POST /system/onboarding/complete` | bearer | `@completeOnboarding` (204) |
+
+**Added:** `SystemService` (config/static payloads), `SystemController`, new
+`config/apiv2.php` with env-driven keys (`APIV2_SYSTEM_MODE`, `APIV2_VERSION_*`,
+`APIV2_RELEASE_NOTES_URL`, etc.). Flip `apiv2.system.mode` and populate title/body
+to put the app into a maintenance banner without code changes; flip the version
+keys to drive a force-update flow. Easy to swap for a `system_settings` table later
+without contract change. SystemTest **5/5**.
+
+**This batch (F12+F13):** 12 new endpoints, 1 new config file, 2 services, 3
+FormRequests, 2 controllers, 2 test files. **Full suite 122/122.** v1 untouched.
+
+## 32. F14 — Discussions
+
+Implements API_REFERENCE.md §11.15 — the largest net-new domain (3 brand-new
+tables, no reuse from v1).
+
+| Method & path | Handler |
+| --- | --- |
+| `GET /discussions/hub` (`?filter=all|priority|recent`) | `DiscussionsController@hub` |
+| `GET /discussions/sectors/{sectorId}/threads` (`?tab=commitments|stakeholders`) | `@sectorThreads` |
+| `GET /discussions/threads/{threadId}` | `@threadDetail` |
+| `POST /discussions/threads/{threadId}/comments` | `@postComment` (202) |
+| `POST /discussions/comments/{commentId}/toggle-like` | `@toggleLike` (202) |
+
+**Migrations (3 new, guarded):**
+- `discussion_threads` — id, sector_id, title, status (in_progress/resolved/blocked),
+  status_label, lead_* , preview_body, author_name, timestamps.
+- `discussion_comments` — id, thread_id, parent_id (self-FK, single-level replies),
+  user_id, author_* , body, like_count (denormalized counter), timestamps.
+- `discussion_comment_likes` — id, comment_id, user_id (unique pair); per-user
+  toggle store.
+
+**Added:** 3 Eloquent models (`DiscussionThread`, `DiscussionComment`,
+`DiscussionCommentLike`), `DiscussionsService`, `PostCommentRequest`, controller.
+
+**Behavioral notes:**
+- Hub `trending` is a deterministic seeded payload — swap for real "trending"
+  analytics later without contract change.
+- Posting a reply validates the parent belongs to the same thread (else 422).
+- Like toggle is idempotent + transactional: inserts/deletes a per-user row AND
+  increments/decrements the denormalized `like_count`. Thread detail surfaces
+  `isLikedByCurrentUser` per comment by joining the caller's like rows.
+- Author identity captured from the posting user (`full_name`, current role,
+  initials) at write time — no lookups at read time.
+
+**Verification:** DiscussionsTest **12/12** (hub shape + validation, sector feed,
+404s, post + reply, validation, wrong-parent 422, toggle-like idempotent, my-like
+flag, auth 401). **Full suite 134/134.** `php -l` clean; v1 intact.
+
+---
+
+# Phase 3 — summary
+
+**14 features, 86 endpoints, 134 tests across 14 feature test files (807 assertions).**
+
+| # | Feature | §§ | Endpoints | Tests |
+|---|---|---|---|---|
+| F1 | Auth + Profile | 11.1 / 11.2 | 6 | 11 |
+| F2 | Sectors → Commitments → Deliverables | 11.3 | 6 | 6 |
+| F3 | KPI tracking | 11.4 | 5 | 10 |
+| F4 | Approvals workflow | 11.6 | 8 | 14 |
+| F5 | Dashboards (6 role snapshots) | 11.11 | 6 | 8 |
+| F6 | Data-entry windows | 11.7 | 7 | 8 |
+| F7 | Frameworks | 11.5 | 7 | 9 |
+| F8 | Users & security | 11.9 | 6 | 11 |
+| F9 | Gallery | 11.13 | 4 | 8 |
+| F10 | Notifications | 11.14 | 5 | 7 |
+| F11 | Settings, Help & About | 11.12 | 8 | 7 |
+| F12 | Reports (hub/viewer/generation/print) | 11.8 | 6 | 8 |
+| F13 | System (status/update/onboarding/…) | 11.10 | 6 | 5 |
+| F14 | Discussions | 11.15 | 5 | 12 |
+| — | Foundation (ping, error-shape, web-untouched, db baseline) | — | 1 | 8 |
+| — | Default ExampleTest | — | — | 1 |
+
+**Architecture honored throughout:**
+- Thin controllers → FormRequests → Services → models (no business logic in controllers).
+- Resources for §11.1–§11.4 (clear 1:1 model→DTO); raw computed arrays for the rest
+  (queues/dashboards/reports/discussions/etc. are aggregates, not model maps).
+- Single `SectorAccessService` for role-based scoping; `WireEnums` for DB↔wire mapping;
+  `Presenter` base + per-domain helpers (SectorPresenter, etc.).
+- Route-scoped error contract `{code, message, fieldErrors?}` — never leaks into web/v1.
+- v2 collection-wrapping disabled via `ForceRawJsonResources` middleware on the
+  `api/v2` group only.
+
+**Schema additions** (all additive, guarded, web-app inert per GR1–GR5):
+- New tables: `api_refresh_tokens`, `notification_preferences`, `user_settings`,
+  `discussion_threads`, `discussion_comments`, `discussion_comment_likes`.
+- Additive columns: `users` (`must_change_password`, `avatar_key`), `frameworks`
+  (`subtitle`, `is_default`, `inherited_from_framework_id`), `galleries`
+  (`category`, `is_public`, `icon_key`, `gradient_keys`), `notifications`
+  (`kind`, `deep_link_route`, `deep_link_params`).
+- + The Phase 2.5 baseline create-migrations (`users`, `password_reset_tokens`,
+  `user_roles`, `files`, `notifications`, `sector_budgets`, `commitment_budgets`,
+  `fund_releases`).
+
+**Backward-compatibility (the binding constraint):**
+- `routes/api.php`, `Api/AuthController`, `Api/ProjectController`, and **every** web
+  controller, model, view, and middleware group are byte-for-byte unchanged.
+- The exception handler renderable, the Resource unwrapping, and the route group
+  are all scoped to `api/v2/*`.
+- All new migrations are `hasTable`/`hasColumn`-guarded — running them against the
+  live DB is a safe no-op.
+- Live `trackerx` left untouched throughout (verified after every batch).
+
+**Known follow-ups (intentional, non-blocking):**
+- Workflow **notifications dispatch** (FCM/in-app) for v2-initiated reviews is not
+  wired yet — the web app still emits them for web actions; state transitions are
+  complete (F4 note).
+- Reports artifacts are **text summaries with binary extensions** — drop in
+  `phpspreadsheet`/`phpword` writers in `ReportsService::writeArtifact` when ready
+  (F12 note).
+- `security_events` audit table not yet created; security-log returns OAuth-derived
+  rows for `filter=logins` (F8 note).
+- `POST /users` does not yet accept a `sectorId` — sector-scoped roles start with
+  `entity_id=0` and must be retargeted via a future admin endpoint (F8 note).
+
+Phase 4 (QA & optimization) is optional polish: more thorough N+1 audit, response
+caching where appropriate, additional edge-case tests, OpenAPI schema generation,
+and consolidating the response-shape conventions into a single doc.
