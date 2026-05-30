@@ -30,9 +30,23 @@ class DataEntryWindowService
         [$year, $quarter] = $this->resolvePeriod($year, $quarterWire);
         $this->ensureRows($year, $quarter);
 
+        $sectorIds = $this->sectorIdsForYear($year);
+
+        // Constraint:
+        //   - Restrict to the year's framework sectors. Web-side flows
+        //     (DataEntryAccessController::lockAll / unlockAll / initializeQuarter)
+        //     seed rows for EVERY sector regardless of framework, leaving cross-
+        //     framework rows we must hide here.
+        //   - Dedup by sector_id (keep newest row) defensively — production tables
+        //     created from older SQL dumps may not carry the unique constraint
+        //     the recent migration adds.
         return DataEntryAccess::with('sector')
             ->where('year', $year)->where('quarter', $quarter)
-            ->whereHas('sector')->get()
+            ->whereIn('sector_id', $sectorIds)
+            ->whereHas('sector')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('sector_id')
             ->sortBy(fn ($r) => optional($r->sector)->sector_name)
             ->map(fn (DataEntryAccess $r) => $this->row($r, $year, $quarter))
             ->values()->all();
@@ -45,10 +59,17 @@ class DataEntryWindowService
         [$year, $quarter] = $this->resolvePeriod($year, $quarterWire);
         $this->ensureRows($year, $quarter);
 
-        $total = $this->activeFrameworkSectorIds()->count();
+        $sectorIds = $this->sectorIdsForYear($year);
+        $total = $sectorIds->count();
+
+        // distinct sector_id (not raw row count) — protects against duplicate
+        // rows that may exist on production tables imported from older dumps
+        // without the unique(sector_id, year, quarter) constraint.
         $open = DataEntryAccess::where('year', $year)->where('quarter', $quarter)
-            ->whereIn('status', ['open', 'override'])->count();
-        $rate = $this->submissionRate($year, $quarter);
+            ->whereIn('sector_id', $sectorIds)
+            ->whereIn('status', ['open', 'override'])
+            ->distinct('sector_id')->count('sector_id');
+        $rate = $this->submissionRate($year, $quarter, $sectorIds);
 
         return [
             'totalSectors' => (int) $total,
@@ -123,22 +144,30 @@ class DataEntryWindowService
         ];
     }
 
-    private function activeFrameworkSectorIds()
+    /**
+     * Sectors belonging to the framework that matches the requested year. Falls
+     * back to the Active framework's sectors when the year doesn't have its own
+     * framework yet, then to an empty collection. Always returns unique ids.
+     */
+    private function sectorIdsForYear(int $year)
     {
-        $fw = Framework::where('status', 'Active')->first();
+        $fw = Framework::where('year', $year)->first()
+            ?? Framework::where('status', 'Active')->first();
 
-        return $fw ? Sector::where('framework_id', $fw->id)->pluck('id') : collect();
+        return $fw
+            ? Sector::where('framework_id', $fw->id)->pluck('id')->unique()->values()
+            : collect();
     }
 
     private function ensureRows(int $year, int $quarter): void
     {
-        $sectorIds = $this->activeFrameworkSectorIds();
+        $sectorIds = $this->sectorIdsForYear($year);
         if ($sectorIds->isEmpty()) {
             return;
         }
 
         $existing = DataEntryAccess::where('year', $year)->where('quarter', $quarter)
-            ->whereIn('sector_id', $sectorIds)->pluck('sector_id');
+            ->whereIn('sector_id', $sectorIds)->pluck('sector_id')->unique();
 
         $missing = $sectorIds->diff($existing);
         if ($missing->isEmpty()) {
@@ -187,9 +216,10 @@ class DataEntryWindowService
         ];
     }
 
-    private function submissionRate(int $year, int $quarter): int
+    private function submissionRate(int $year, int $quarter, $sectorIds = null): int
     {
-        $total = $this->activeFrameworkSectorIds()->count();
+        $sectorIds ??= $this->sectorIdsForYear($year);
+        $total = $sectorIds->count();
         if ($total === 0) {
             return 0;
         }
@@ -199,6 +229,7 @@ class DataEntryWindowService
             ->join('deliverables as d', 'd.id', '=', 'k.deliverable_id')
             ->join('commitments as c', 'c.id', '=', 'd.commitment_id')
             ->where('pt.year', $year)->where('pt.quarter', $quarter)
+            ->whereIn('c.sector_id', $sectorIds)
             ->whereNotNull('pt.actual_value')->where('pt.actual_value', '!=', '')
             ->distinct('c.sector_id')->count('c.sector_id');
 

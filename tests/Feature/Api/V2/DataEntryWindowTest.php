@@ -110,4 +110,28 @@ class DataEntryWindowTest extends TestCase
     {
         $this->getJson('/api/v2/data-entry/windows')->assertStatus(401);
     }
+
+    public function test_stats_scopes_to_the_year_framework_not_the_active_one(): void
+    {
+        // Two frameworks: 2023 (Archived) with one sector, 2024 (Active) with two.
+        $fw2023 = $this->makeFramework(['year' => 2023, 'status' => 'Archived']);
+        // makeFramework() archives all other frameworks; recreate active 2024 last.
+        $fw2024 = $this->makeFramework(['year' => 2024, 'status' => 'Active']);
+        $fw2023->refresh();
+
+        $this->makeSector($fw2023, ['sector_name' => 'Legacy Health']);
+        $this->makeSector($fw2024, ['sector_name' => 'Health']);
+        $this->makeSector($fw2024, ['sector_name' => 'Education']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        // Querying 2023 should report 1 sector (Legacy Health), NOT 2024's two.
+        $this->getJson('/api/v2/data-entry/stats?year=2023&quarter=q1')
+            ->assertOk()->assertJsonPath('totalSectors', 1);
+
+        // Querying 2024 should report 2 sectors.
+        $this->getJson('/api/v2/data-entry/stats?year=2024&quarter=q1')
+            ->assertOk()->assertJsonPath('totalSectors', 2);
+    }
+
 }
