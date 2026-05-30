@@ -20,6 +20,7 @@ class SectorResource extends BaseResource
         return static::pruneNulls([
             'id' => (string) $this->id,
             'name' => $this->sector_name,
+            'short' => $this->description,
             'ministry' => $this->ministry ?? '',
             'icon' => SectorPresenter::icon($this->resource),
             'progressPercent' => round((float) ($this->progress_fraction ?? 0), 4),

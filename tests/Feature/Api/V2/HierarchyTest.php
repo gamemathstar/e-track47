@@ -19,7 +19,11 @@ class HierarchyTest extends TestCase
     public function test_list_sectors_returns_raw_array_with_required_shape(): void
     {
         $fw = $this->makeFramework();
-        $sector = $this->makeSector($fw, ['sector_name' => 'Health', 'ministry' => 'Ministry of Health']);
+        $sector = $this->makeSector($fw, [
+            'sector_name' => 'Health',
+            'ministry' => 'Ministry of Health',
+            'description' => 'MoH',
+        ]);
         $this->makeCommitment($sector, ['status' => 'Completed']);
         $this->makeCommitment($sector, ['status' => 'At Risk']);
 
@@ -28,8 +32,9 @@ class HierarchyTest extends TestCase
         $this->getJson('/api/v2/sectors')
             ->assertOk()
             ->assertJsonCount(1)
-            ->assertJsonStructure([['id', 'name', 'ministry', 'icon', 'progressPercent', 'completedCommitments', 'atRiskCommitments']])
+            ->assertJsonStructure([['id', 'name', 'short', 'ministry', 'icon', 'progressPercent', 'completedCommitments', 'atRiskCommitments']])
             ->assertJsonPath('0.name', 'Health')
+            ->assertJsonPath('0.short', 'MoH')
             ->assertJsonPath('0.icon', 'medical_services')
             ->assertJsonPath('0.completedCommitments', 1)
             ->assertJsonPath('0.atRiskCommitments', 1)
@@ -107,6 +112,19 @@ class HierarchyTest extends TestCase
 
         // The other sector is invisible → 404 (no existence leak).
         $this->getJson("/api/v2/sectors/{$other->id}")->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_system_admin_sees_every_sector(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw, ['sector_name' => 'Health']);
+        $this->makeSector($fw, ['sector_name' => 'Education']);
+        $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'System'], 'System Admin'), [], 'api');
+
+        $this->getJson('/api/v2/sectors')
+            ->assertOk()->assertJsonCount(3);
     }
 
     public function test_unknown_sector_returns_404(): void

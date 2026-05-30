@@ -7,14 +7,20 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Single source of truth for v2 role-based sector access, reusing the web app's
- * existing User role helpers. Shared by the hierarchy reads (§11.3) and the KPI
- * tracking mutations (§11.4) so authorization stays consistent.
+ * Single source of truth for v2 role-based sector access. Shared by the
+ * hierarchy reads (§11.3) and the KPI tracking mutations (§11.4) so
+ * authorization stays consistent.
  *
- *  - all-access roles (coordinator / deputy / governor / system admin) → every sector
+ *  - all-access roles → every sector
+ *      - Coordinator / Deputy Coordinator (via User::canAccessAllSectors)
+ *      - System Admin (v2-only escalation — the web's helper excludes them,
+ *        but the mobile admin directory needs read access everywhere)
  *  - facilitator → assigned sectors
  *  - sector head / data admin → own sector
  *  - otherwise → none
+ *
+ * The System Admin escalation lives here (not on the shared User model) so the
+ * web app's role-based access stays exactly as it was (GR1).
  */
 class SectorAccessService
 {
@@ -26,7 +32,7 @@ class SectorAccessService
             $query->where('framework_id', $frameworkId);
         }
 
-        if ($user->canAccessAllSectors()) {
+        if ($this->hasAllSectorAccess($user)) {
             return $query;
         }
 
@@ -58,7 +64,7 @@ class SectorAccessService
      */
     public function accessibleSectorIds(User $user): ?array
     {
-        if ($user->canAccessAllSectors()) {
+        if ($this->hasAllSectorAccess($user)) {
             return null;
         }
 
@@ -71,6 +77,19 @@ class SectorAccessService
         }
 
         return [];
+    }
+
+    /**
+     * v2-scoped "all sectors visible" check. Delegates to the web app's
+     * User::canAccessAllSectors() (Coordinator / Deputy Coordinator) and
+     * additionally treats System Admin as all-access — needed for the mobile
+     * admin directory, gallery management, and other read-everywhere flows
+     * that the web app handles via system-level routes instead of sector
+     * scoping.
+     */
+    private function hasAllSectorAccess(User $user): bool
+    {
+        return $user->canAccessAllSectors() || $user->isSystemAdmin();
     }
 }
 
