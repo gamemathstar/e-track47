@@ -75,8 +75,11 @@ class DashboardService
 
         $fw = $this->activeFramework();
         $kpiIds = $this->frameworkKpiIds($fw);
+        // Submission rate is anchored to the framework's reporting year, not
+        // the calendar quarter — a KPI is considered submitted if it has any
+        // actual_value entered for the framework year (across all quarters).
         $submitted = PerformanceTracking::whereIn('kpi_id', $kpiIds)
-            ->where('quarter', $this->currentQuarter())
+            ->where('year', $this->frameworkYear($fw))
             ->whereNotNull('actual_value')->where('actual_value', '!=', '')
             ->distinct('kpi_id')->count('kpi_id');
         $rate = count($kpiIds) > 0 ? round($submitted / count($kpiIds) * 100, 1) : 0.0;
@@ -170,26 +173,28 @@ class DashboardService
 
         $kpis = Kpi::whereHas('deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
             ->with('performanceTracking')->orderBy('kpi')->get();
-        $year = (int) (optional($this->activeFramework())->year ?: date('Y'));
-        $quarter = $this->currentQuarter();
+        // Anchor completion to the framework's reporting year, not the calendar
+        // quarter: a KPI counts as completed if it has any actual_value
+        // submission for the framework year (across all quarters).
+        $year = $this->frameworkYear();
 
-        $completed = $kpis->filter(fn (Kpi $k) => $k->performanceTracking->contains(
-            fn ($t) => (int) $t->quarter === $quarter && (int) $t->year === $year && $t->actual_value !== null && $t->actual_value !== ''
-        ))->count();
+        $hasSubmission = fn (Kpi $k) => $k->performanceTracking->contains(
+            fn ($t) => (int) $t->year === $year && $t->actual_value !== null && $t->actual_value !== ''
+        );
 
-        $deadlines = $kpis->filter(fn (Kpi $k) => ! $k->performanceTracking->contains(
-            fn ($t) => (int) $t->quarter === $quarter && (int) $t->year === $year && $t->actual_value !== null && $t->actual_value !== ''
-        ))->take(5)->map(fn (Kpi $k) => [
+        $completed = $kpis->filter($hasSubmission)->count();
+
+        $deadlines = $kpis->reject($hasSubmission)->take(5)->map(fn (Kpi $k) => [
             'id' => (string) $k->id,
             'title' => $k->kpi,
-            'dueLabel' => 'Due this quarter',
+            'dueLabel' => 'Due this period',
             'ctaLabel' => 'Enter Actual',
             'accent' => 'primary',
         ])->values()->all();
 
         return [
             'sectorName' => $sector->sector_name,
-            'quarterLabel' => 'Q'.$quarter,
+            'quarterLabel' => 'FY '.$year,
             'completedKpis' => (int) $completed,
             'totalKpis' => (int) $kpis->count(),
             'completionPercent' => $kpis->count() > 0 ? round($completed / $kpis->count() * 100, 1) : 0.0,
@@ -236,6 +241,19 @@ class DashboardService
         return Framework::where('status', 'Active')->first();
     }
 
+    /**
+     * Reporting year the dashboards filter against. By design every dashboard
+     * surfaces the Active framework's data — NOT the calendar year. Falls back
+     * to the calendar year only when no framework is currently Active (which
+     * is an edge case; the system should always have one).
+     */
+    private function frameworkYear(?Framework $fw = null): int
+    {
+        $fw ??= $this->activeFramework();
+
+        return (int) ($fw->year ?? date('Y'));
+    }
+
     /** @return \Illuminate\Support\Collection<int,Sector> */
     private function frameworkSectors(?Framework $fw)
     {
@@ -280,9 +298,13 @@ class DashboardService
             return 0;
         }
 
+        // Counts distinct sectors with any open/override window in the Active
+        // framework's reporting year — across all quarters. Matches the
+        // dashboard's framework-period convention rather than the calendar.
         return (int) DB::table('data_entry_accesses')
-            ->where('year', (int) date('Y'))->where('quarter', $this->currentQuarter())
-            ->whereIn('status', ['open', 'override'])->distinct('sector_id')->count('sector_id');
+            ->where('year', $this->frameworkYear())
+            ->whereIn('status', ['open', 'override'])
+            ->distinct('sector_id')->count('sector_id');
     }
 
     /** @return \Illuminate\Support\Collection<int,array> */
