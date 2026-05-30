@@ -157,9 +157,20 @@ class GalleryService
 
     /**
      * Absolute URL for the uploaded gallery asset, or null when no file was
-     * attached. `Storage::disk('public')->url()` honours config('filesystems.disks.public.url')
-     * — i.e. when APP_URL is set correctly the returned URL is absolute and
-     * mobile clients can render it directly.
+     * attached. Two upload paths feed this column:
+     *
+     *  - Web admin (app/Http/Controllers/GalleryController.php) writes files
+     *    DIRECTLY into public/uploads/gallery/ via `$image->move(public_path(...))`
+     *    and stores image_path = "uploads/gallery/<file>". The right URL is
+     *    asset($path) → {APP_URL}/uploads/gallery/<file>.
+     *
+     *  - v2 admin (this service's upload()) writes via Storage::disk('public'),
+     *    landing in storage/app/public/uploads/galleries/ and storing
+     *    image_path = "uploads/galleries/<file>". The right URL is
+     *    Storage::disk('public')->url($path) → {APP_URL}/storage/uploads/galleries/<file>
+     *    (requires `php artisan storage:link` on the server).
+     *
+     * We distinguish by the path prefix the upload code wrote.
      */
     private function imageUrlFor(Gallery $g): ?string
     {
@@ -168,7 +179,13 @@ class GalleryService
             return null;
         }
 
-        return Storage::disk('public')->url(ltrim($path, '/'));
+        $path = ltrim($path, '/');
+
+        if (str_starts_with($path, 'uploads/galleries/')) {
+            return Storage::disk('public')->url($path);
+        }
+
+        return asset($path);
     }
 
     private function iconForCategory(string $category): string
