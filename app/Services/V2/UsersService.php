@@ -87,6 +87,8 @@ class UsersService
         return [
             'id' => (string) $user->id,
             'name' => $user->full_name,
+            'email' => $user->email,
+            'phone' => $user->phone_number,
             'initials' => Presenter::initials($user->full_name),
             'accent' => SectorPresenter::accent($user->id),
             'role' => WireEnums::roleToWire(optional($role)->role),

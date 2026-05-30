@@ -44,7 +44,11 @@ class UsersTest extends TestCase
     {
         $fw = $this->makeFramework();
         $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
-        $target = $this->makeSectorHead($sector, ['full_name' => 'Amina Egbe']);
+        $target = $this->makeSectorHead($sector, [
+            'full_name' => 'Amina Egbe',
+            'email' => 'amina.egbe@jigawastate.gov.ng',
+            'phone_number' => '+2348012345678',
+        ]);
 
         Passport::actingAs($this->makeUser(['target_entity' => 'System'], 'System Admin'), [], 'api');
 
@@ -52,6 +56,8 @@ class UsersTest extends TestCase
             ->assertOk()
             ->assertJsonPath('id', (string) $target->id)
             ->assertJsonPath('name', 'Amina Egbe')
+            ->assertJsonPath('email', 'amina.egbe@jigawastate.gov.ng')
+            ->assertJsonPath('phone', '+2348012345678')
             ->assertJsonPath('roleLabel', 'Sector Head')
             ->assertJsonPath('sectorLabel', 'Health')
             ->assertJsonStructure(['initials', 'accent', 'role', 'fullLegalName', 'staffId', 'joinDate', 'bio', 'twoFactorStatus', 'isVerified']);
