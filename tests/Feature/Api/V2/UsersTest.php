@@ -40,6 +40,38 @@ class UsersTest extends TestCase
             ->assertJsonPath('0.role', 'sector_head');
     }
 
+    public function test_list_users_orders_by_role_rank_governor_first(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+
+        // Seed one user per active role, deliberately created in non-rank order.
+        $this->makeDataAdmin($sector,        ['full_name' => 'Tunde Data',       'email' => 'tunde@pdcu.gov.ng']);
+        $this->makeSectorHead($sector,       ['full_name' => 'Amina Head',       'email' => 'amina@pdcu.gov.ng']);
+        $this->makeUser(['target_entity' => 'State'],                  'Governor',          );
+        $this->makeUser(['target_entity' => 'System'],                 'System Admin',      );
+        $this->makeUser(['target_entity' => 'Deliverable'],            'Coordinator',       );
+        $this->makeUser(['target_entity' => 'Deliverable'],            'Deputy Coordinator',);
+        $this->makeFacilitator($sector);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'System'], 'System Admin'), [], 'api');
+
+        $rolesInOrder = collect($this->getJson('/api/v2/users')->assertOk()->json())
+            ->pluck('role')
+            ->all();
+
+        // Governor first, then coordinator/deputy/sector_head/facilitator/data_admin/system_admin.
+        // (Two system_admins were created — the actor and the seeded one — both land at the end.)
+        $this->assertSame('governor',          $rolesInOrder[0]);
+        $this->assertSame('coordinator',       $rolesInOrder[1]);
+        $this->assertSame('deputy_coordinator',$rolesInOrder[2]);
+        $this->assertSame('sector_head',       $rolesInOrder[3]);
+        $this->assertSame('facilitator',       $rolesInOrder[4]);
+        $this->assertSame('data_admin',        $rolesInOrder[5]);
+        $this->assertSame('system_admin',      $rolesInOrder[6]);
+        $this->assertSame('system_admin',      $rolesInOrder[7]);
+    }
+
     public function test_user_detail(): void
     {
         $fw = $this->makeFramework();

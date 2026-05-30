@@ -44,12 +44,36 @@ class UsersService
         'Facilitator' => 'Sector',
     ];
 
+    /**
+     * Display rank for GET /users. Lower number = higher rank = appears earlier
+     * in the list. Anything not listed (legacy/unknown roles, deprecated rows,
+     * or users whose active role got revoked between query and sort) falls to
+     * rank 99 and sorts last.
+     */
+    private const ROLE_RANK = [
+        'Governor' => 1,
+        'Coordinator' => 2,
+        'Deputy Coordinator' => 3,
+        'Sector Head' => 4,
+        'Facilitator' => 5,
+        'Data Admin' => 6,
+        'System Admin' => 7,
+        // Deprecated DB roles — kept just above unknown so legacy rows still
+        // sort sensibly if any remain in production.
+        'Sector Admin' => 8,
+        'Delivery Department' => 8,
+    ];
+
     public function listUsers(User $user, ?string $search, string $roleFilter, string $sectorFilter): array
     {
         $this->assertAdmin($user);
 
         $query = User::query()
-            ->whereHas('roles', fn ($q) => $q->where('role_status', 'Active'));
+            ->whereHas('roles', fn ($q) => $q->where('role_status', 'Active'))
+            // Eager-load active roles (newest first) so the rank-sort below
+            // doesn't fire one query per user. Matches User::getCurrentRole()'s
+            // ordering so the rank we sort by lines up with the role listRow displays.
+            ->with(['roles' => fn ($q) => $q->where('role_status', 'Active')->orderByDesc('id')]);
 
         if ($search !== null && $search !== '') {
             $query->where(function ($q) use ($search) {
@@ -69,7 +93,19 @@ class UsersService
             $query->whereHas('roles', fn ($q) => $q->where('role_status', 'Active')->whereIn('entity_id', $matchingSectorIds ?: [-1]));
         }
 
-        return $query->orderBy('full_name')->get()->map(fn (User $u) => $this->listRow($u))->all();
+        // Sort by rank (Governor → ... → System Admin → deprecated → unknown),
+        // then alphabetically by full name within each rank. The composite
+        // key string sorts the zero-padded rank first, then the lowercased
+        // name — single-pass equivalent of a multi-column ORDER BY.
+        return $query->get()
+            ->sortBy(fn (User $u) => sprintf(
+                '%02d|%s',
+                self::ROLE_RANK[optional($u->roles->first())->role ?? ''] ?? 99,
+                strtolower((string) $u->full_name),
+            ))
+            ->values()
+            ->map(fn (User $u) => $this->listRow($u))
+            ->all();
     }
 
     public function getUserProfile(User $caller, string $id): array
