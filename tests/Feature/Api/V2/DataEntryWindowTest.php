@@ -75,16 +75,57 @@ class DataEntryWindowTest extends TestCase
 
     public function test_lock_all_and_unlock_all(): void
     {
-        $fw = $this->makeFramework();
+        $fw = $this->makeFramework(['year' => 2024]);
         $this->makeSector($fw, ['sector_name' => 'A']);
         $this->makeSector($fw, ['sector_name' => 'B']);
+        $coordinator = $this->makeUser([], 'Coordinator');
+        Passport::actingAs($coordinator, [], 'api');
+
+        // unlock-all now requires reason + year + quarter; optional expiresAt.
+        // Marks every sector window as override (audited grant), stamps reason +
+        // granted_by/granted_at.
+        $this->postJson('/api/v2/data-entry/windows/unlock-all', [
+            'reason' => 'Bulk reopen after deadline extension',
+            'year' => 2024,
+            'quarter' => 'q1',
+            'expiresAt' => '2024-04-30T23:59:59.000',
+        ])->assertStatus(202);
+
+        $overrides = DataEntryAccess::where('year', 2024)->where('quarter', 1)->where('status', 'override')->get();
+        $this->assertCount(2, $overrides);
+        $this->assertSame('Bulk reopen after deadline extension', $overrides->first()->override_reason);
+        $this->assertSame($coordinator->id, (int) $overrides->first()->granted_by);
+        $this->assertNotNull($overrides->first()->override_deadline);
+
+        // lock-all requires year + quarter; flips every row to closed.
+        $this->postJson('/api/v2/data-entry/windows/lock-all', [
+            'year' => 2024,
+            'quarter' => 'q1',
+        ])->assertStatus(202);
+
+        $this->assertSame(2, DataEntryAccess::where('year', 2024)->where('quarter', 1)->where('status', 'closed')->count());
+    }
+
+    public function test_lock_all_requires_year_and_quarter(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw);
         Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
 
-        $this->postJson('/api/v2/data-entry/windows/unlock-all')->assertStatus(202);
-        $this->assertSame(2, DataEntryAccess::where('status', 'open')->count());
+        $this->postJson('/api/v2/data-entry/windows/lock-all', [])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['year', 'quarter']]);
+    }
 
-        $this->postJson('/api/v2/data-entry/windows/lock-all')->assertStatus(202);
-        $this->assertSame(2, DataEntryAccess::where('status', 'closed')->count());
+    public function test_unlock_all_requires_reason_year_and_quarter(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/data-entry/windows/unlock-all', [])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['reason', 'year', 'quarter']]);
     }
 
     public function test_grant_override_validation(): void

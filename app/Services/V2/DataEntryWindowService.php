@@ -78,24 +78,43 @@ class DataEntryWindowService
         ];
     }
 
-    public function lockAll(User $user): void
+    /**
+     * Lock every sector window for a named period. `year` and `quarter` come
+     * from the request body (the mobile contract is explicit — no implicit
+     * defaulting here). Existing rows go to status='closed'; rows are
+     * pre-seeded for any framework sectors missing one.
+     */
+    public function lockAll(User $user, ?int $year, ?string $quarterWire): void
     {
         $this->assert($user);
 
-        [$year, $quarter] = $this->resolvePeriod(null, null);
+        [$year, $quarter] = $this->resolvePeriod($year, $quarterWire);
         $this->ensureRows($year, $quarter);
         DataEntryAccess::where('year', $year)->where('quarter', $quarter)
             ->update(['status' => 'closed']);
     }
 
-    public function unlockAll(User $user): void
+    /**
+     * Bulk-grant override access to every sector for a named period. Marks
+     * each row as status='override' (so the coordinator's grant is auditable),
+     * stamps `override_reason`, optional `override_deadline`, and the grant
+     * metadata (`granted_by` / `granted_at`).
+     */
+    public function unlockAll(User $user, ?int $year, ?string $quarterWire, string $reason, ?string $expiresAt = null): void
     {
         $this->assert($user);
 
-        [$year, $quarter] = $this->resolvePeriod(null, null);
+        [$year, $quarter] = $this->resolvePeriod($year, $quarterWire);
         $this->ensureRows($year, $quarter);
+
         DataEntryAccess::where('year', $year)->where('quarter', $quarter)
-            ->update(['status' => 'open']);
+            ->update([
+                'status' => 'override',
+                'override_reason' => $reason,
+                'override_deadline' => $expiresAt ? Carbon::parse($expiresAt) : null,
+                'granted_by' => $user->id,
+                'granted_at' => now(),
+            ]);
     }
 
     public function open(User $user, string $sectorId): void

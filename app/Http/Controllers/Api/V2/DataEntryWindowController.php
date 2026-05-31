@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V2;
 
 use App\Http\Requests\V2\DataEntry\GrantOverrideRequest;
+use App\Http\Requests\V2\DataEntry\LockAllRequest;
+use App\Http\Requests\V2\DataEntry\UnlockAllRequest;
 use App\Services\V2\DataEntryWindowService;
 use Illuminate\Http\Request;
 
@@ -35,16 +37,24 @@ class DataEntryWindowController extends BaseController
         );
     }
 
-    public function lockAll(Request $request)
+    public function lockAll(LockAllRequest $request)
     {
-        $this->windows->lockAll($request->user());
+        $data = $request->validated();
+        $this->windows->lockAll($request->user(), (int) $data['year'], $data['quarter']);
 
         return $this->accepted();
     }
 
-    public function unlockAll(Request $request)
+    public function unlockAll(UnlockAllRequest $request)
     {
-        $this->windows->unlockAll($request->user());
+        $data = $request->validated();
+        $this->windows->unlockAll(
+            $request->user(),
+            (int) $data['year'],
+            $data['quarter'],
+            $data['reason'],
+            $data['expiresAt'] ?? null,
+        );
 
         return $this->accepted();
     }
