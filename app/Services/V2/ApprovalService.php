@@ -216,7 +216,7 @@ class ApprovalService
         $role = $params['role'];
         $this->assertRole($user, $role, (int) $sectorId);
 
-        if ($t->confirmation_status !== (self::STATE_FOR_ROLE[$role] ?? null)) {
+        if (! $this->isAwaitingReviewFromRole($t, $user, $role)) {
             throw ApiException::conflict('This submission is not awaiting your review.');
         }
 
@@ -243,7 +243,7 @@ class ApprovalService
                 throw ApiException::notFound('Submission not found.');
             }
             $this->assertRole($user, 'sector_head', (int) $sectorId);
-            if ($t->confirmation_status !== 'Pending Sector Head Approval') {
+            if (! $this->isAwaitingReviewFromRole($t, $user, 'sector_head')) {
                 throw ApiException::conflict('One or more submissions are not awaiting sector-head approval.');
             }
         }
@@ -257,6 +257,52 @@ class ApprovalService
     }
 
     // --- transition helpers --------------------------------------------------
+
+    /**
+     * Whether this submission is awaiting review by the current user acting in
+     * the given role — derived from the WHO columns rather than
+     * confirmation_status. Lets v2 stay aligned with the web's review semantics
+     * (which derive from WHO columns), so a row approved by Sector Head via the
+     * web's older flow — which doesn't always update confirmation_status — can
+     * still be acted on from the mobile facilitator/coordinator queues.
+     */
+    private function isAwaitingReviewFromRole(PerformanceTracking $t, User $user, string $role): bool
+    {
+        $sh = $t->sector_head_approved_by !== null;
+        $facDone = $t->facilitator_confirmed_by !== null;
+        $coDone = $t->coordinator_confirmed_by !== null;
+
+        switch ($role) {
+            case 'sector_head':
+                // Sector head hasn't acted yet (no SH approval, no facilitator/
+                // coordinator decisions either).
+                return ! $sh && ! $facDone && ! $coDone;
+
+            case 'facilitator':
+                // SH has approved AND facilitator hasn't yet decided AND
+                // coordinator hasn't confirmed. Also let this facilitator pick
+                // back up a row they previously rejected (resubmit flow).
+                if ($sh && ! $facDone && ! $coDone) {
+                    return true;
+                }
+                if ($facDone
+                    && (int) $t->facilitator_confirmed_by === (int) $user->id
+                    && $t->facilitator_decision === 'Reject'
+                    && ! $coDone) {
+                    return true;
+                }
+
+                return false;
+
+            case 'coordinator':
+                // Facilitator has accepted, coordinator hasn't yet confirmed.
+                return $facDone
+                    && $t->facilitator_decision === 'Accept'
+                    && ! $coDone;
+        }
+
+        return false;
+    }
 
     private function applyAccept(PerformanceTracking $t, string $role, User $user, array $params): void
     {

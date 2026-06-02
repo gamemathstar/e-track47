@@ -144,6 +144,59 @@ class ApprovalsTest extends TestCase
         $this->assertSame('q3', $q3[0]['items'][0]['quarter']);
     }
 
+    public function test_facilitator_can_accept_when_confirmation_status_is_stale(): void
+    {
+        // Production scenario: web's older sector-head approval flow set
+        // sector_head_approved_by but didn't update confirmation_status, so
+        // the row reads as "Pending Sector Head Approval" even though the WHO
+        // columns say it's awaiting facilitator. Mobile facilitator must still
+        // be able to act on it (previously got 409 here).
+        [$sector, $kpi] = $this->seedKpi();
+        $sectorHead = $this->makeSectorHead($sector);
+        $tracking = $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '49', 'milestone' => '100',
+            'sector_head_approved_by' => $sectorHead->id,
+            'sector_head_approved_at' => now(),
+            // Stale — should still be 'Pending Facilitator' but isn't.
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ]);
+
+        Passport::actingAs($this->makeFacilitator($sector), [], 'api');
+
+        $this->postJson("/api/v2/approvals/submissions/{$tracking->id}/review", [
+            'role' => 'facilitator',
+            'decision' => 'accept',
+            'validatedValue' => '49',
+            'acceptRemarks' => 'confirmed',
+        ])->assertStatus(202);
+
+        $tracking->refresh();
+        $this->assertSame('Pending Coordinator', $tracking->confirmation_status);
+        $this->assertSame('Accept', $tracking->facilitator_decision);
+        $this->assertSame('49', $tracking->delivery_department_value);
+    }
+
+    public function test_facilitator_review_409_when_sector_head_has_not_approved(): void
+    {
+        // The 409 is still correct when the row genuinely isn't ready for the
+        // facilitator (no SH approval yet, regardless of status string).
+        [$sector, $kpi] = $this->seedKpi();
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '49', 'milestone' => '100',
+            // No sector_head_approved_by set.
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ]);
+        $tracking = \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)->first();
+
+        Passport::actingAs($this->makeFacilitator($sector), [], 'api');
+
+        $this->postJson("/api/v2/approvals/submissions/{$tracking->id}/review", [
+            'role' => 'facilitator',
+            'decision' => 'accept',
+            'validatedValue' => '49',
+        ])->assertStatus(409)->assertJsonPath('code', 'conflict');
+    }
+
     public function test_facilitator_queue_narrows_to_requested_sector(): void
     {
         // Two assigned sectors with one pending row each.
