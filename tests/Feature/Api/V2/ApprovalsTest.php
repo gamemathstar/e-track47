@@ -144,6 +144,65 @@ class ApprovalsTest extends TestCase
         $this->assertSame('q3', $q3[0]['items'][0]['quarter']);
     }
 
+    public function test_coordinator_queue_shows_rows_when_confirmation_status_is_stale(): void
+    {
+        // Production scenario: facilitator accepted via a flow that set the
+        // WHO columns but left confirmation_status stale (e.g. 'Pending
+        // Facilitator'). The coordinator queue must still surface the row.
+        [$sector, $kpi] = $this->seedKpi();
+        $sectorHead = $this->makeSectorHead($sector);
+        $facilitator = $this->makeFacilitator($sector);
+
+        $tracking = $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '49', 'milestone' => '100',
+            'sector_head_approved_by' => $sectorHead->id,
+            'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $facilitator->id,
+            'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'delivery_department_value' => '49',
+            // Stale — should be 'Pending Coordinator' but isn't.
+            'confirmation_status' => 'Pending Facilitator',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/approvals/coordinator/queue')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', (string) $tracking->id);
+
+        // Dashboard reviewQueueCount picks it up too.
+        $this->getJson('/api/v2/dashboard/coordinator')
+            ->assertOk()
+            ->assertJsonPath('reviewQueueCount', 1);
+    }
+
+    public function test_coordinator_queue_excludes_facilitator_rejected_rows(): void
+    {
+        // A facilitator REJECTION must not appear in the coordinator queue —
+        // those rows go back to data admin, not forward to coordinator.
+        [$sector, $kpi] = $this->seedKpi();
+        $sectorHead = $this->makeSectorHead($sector);
+        $facilitator = $this->makeFacilitator($sector);
+
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '49', 'milestone' => '100',
+            'sector_head_approved_by' => $sectorHead->id,
+            'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $facilitator->id,
+            'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Reject',
+            'facilitator_rejection_reason' => 'Insufficient evidence',
+            'confirmation_status' => 'Rejected',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/approvals/coordinator/queue')
+            ->assertOk()->assertJsonCount(0);
+    }
+
     public function test_facilitator_can_accept_when_confirmation_status_is_stale(): void
     {
         // Production scenario: web's older sector-head approval flow set

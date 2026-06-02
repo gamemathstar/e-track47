@@ -40,7 +40,7 @@ class ApprovalService
 
     public function coordinatorQueue(User $user): array
     {
-        return $this->trackingsInState($user, 'Pending Coordinator')
+        return $this->trackingsAwaitingCoordinator($user)
             ->map(fn ($t) => $this->queueItem($t))->all();
     }
 
@@ -456,6 +456,45 @@ class ApprovalService
                     ->whereNull('coordinator_confirmed_by');
             });
         });
+    }
+
+    /**
+     * Apply the "awaiting coordinator confirmation" WHERE clause to a query
+     * builder. Mirrors UserController::pendingForCoordinator on the web:
+     * sector head approved, facilitator accepted, coordinator hasn't acted.
+     * Facilitator-rejected rows do NOT escalate to the coordinator — they
+     * return to data admin for resubmit.
+     */
+    public static function applyCoordinatorAwaitingScope(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('sector_head_approved_by')
+            ->whereNotNull('facilitator_confirmed_by')
+            ->where('facilitator_decision', 'Accept')
+            ->whereNull('coordinator_confirmed_by');
+    }
+
+    /**
+     * Coordinator "awaiting" rows, derived from WHO columns so a row whose
+     * facilitator-accept flow didn't update confirmation_status still shows
+     * up. Mirrors the web's coordinator awaiting query.
+     *
+     * @return Collection<int,PerformanceTracking>
+     */
+    private function trackingsAwaitingCoordinator(User $user): Collection
+    {
+        $sectorIds = $this->access->accessibleSectorIds($user);
+
+        return self::applyCoordinatorAwaitingScope(
+            PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
+        )
+            ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
+                if ($sectorIds !== null) {
+                    $q->whereIn('sector_id', $sectorIds);
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->get();
     }
 
     private function queueItem(PerformanceTracking $t): array

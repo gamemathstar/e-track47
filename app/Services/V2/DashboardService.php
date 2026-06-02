@@ -86,7 +86,12 @@ class DashboardService
 
         return [
             'greeting' => $this->greeting('Coordinator.'),
-            'reviewQueueCount' => (int) PerformanceTracking::whereIn('kpi_id', $kpiIds)->where('confirmation_status', 'Pending Coordinator')->count(),
+            // Derive from WHO columns rather than confirmation_status so a
+            // facilitator-accepted row whose status didn't get updated still
+            // counts. Same pattern as the facilitator dashboard.
+            'reviewQueueCount' => (int) ApprovalService::applyCoordinatorAwaitingScope(
+                PerformanceTracking::query()->whereIn('kpi_id', $kpiIds),
+            )->count(),
             'dataEntryOpenSectors' => (int) $this->openDataEntrySectors(),
             'submissionRatePercent' => (float) $rate,
             'submissionRateTarget' => 95.0,
