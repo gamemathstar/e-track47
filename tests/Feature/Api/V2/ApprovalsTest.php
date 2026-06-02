@@ -30,11 +30,41 @@ class ApprovalsTest extends TestCase
         return [$sector, $kpi];
     }
 
+    /** Real user we can reference from the WHO columns (FK to users.id). */
+    private ?int $workflowActorId = null;
+
+    private function workflowActorId(): int
+    {
+        return $this->workflowActorId ??= $this->makeUser([], 'Coordinator')->id;
+    }
+
     private function tracking($kpi, string $state, int $quarter = 1, array $attrs = []): PerformanceTracking
     {
+        // Mirror the workflow's WHO columns for each state so the v2 services
+        // (which now derive "awaiting facilitator" from those columns) see a
+        // realistic row. Without this, a row with confirmation_status =
+        // 'Pending Facilitator' but no sector_head_approved_by would be
+        // invisible to ApprovalService::applyFacilitatorAwaitingScope.
+        $actor = $this->workflowActorId();
+        $whoColumns = match ($state) {
+            'Pending Facilitator' => ['sector_head_approved_by' => $actor, 'sector_head_approved_at' => now()],
+            'Pending Coordinator' => [
+                'sector_head_approved_by' => $actor, 'sector_head_approved_at' => now(),
+                'facilitator_confirmed_by' => $actor, 'facilitator_confirmed_at' => now(),
+                'facilitator_decision' => 'Accept',
+            ],
+            'Confirmed' => [
+                'sector_head_approved_by' => $actor, 'sector_head_approved_at' => now(),
+                'facilitator_confirmed_by' => $actor, 'facilitator_confirmed_at' => now(),
+                'facilitator_decision' => 'Accept',
+                'coordinator_confirmed_by' => $actor, 'coordinator_confirmed_at' => now(),
+            ],
+            default => [],
+        };
+
         return $this->makeTracking($kpi, array_merge([
             'quarter' => $quarter, 'actual_value' => '80', 'milestone' => '100', 'confirmation_status' => $state,
-        ], $attrs));
+        ], $whoColumns, $attrs));
     }
 
     public function test_coordinator_queue_lists_pending_coordinator(): void

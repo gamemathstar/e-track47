@@ -64,6 +64,44 @@ class DashboardTest extends TestCase
             ->assertJsonStructure(['awaitingReviewCount', 'sectorQueues' => [['sectorId', 'name', 'iconKey', 'lastReviewedLabel', 'awaitingCount']], 'recentDecisions', 'avgResponseDays', 'reviewAccuracyPercent']);
     }
 
+    public function test_facilitator_awaiting_count_derives_from_who_columns_not_status_string(): void
+    {
+        // Same shape as a row approved via the WEB sector-head flow that
+        // forgot to update confirmation_status: WHO columns say "sector head
+        // approved, facilitator not yet", but the status string is stale.
+        // Mobile must still see it. (Mirrors the production discrepancy where
+        // /delivery/tracking/awaiting showed 1 row but /api/v2/dashboard/facilitator
+        // reported 0.)
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+        $commitment = $this->makeCommitment($sector);
+        $deliverable = $this->makeDeliverable($commitment);
+        $kpi = $this->makeKpi($deliverable);
+
+        $sectorHead = $this->makeSectorHead($sector);
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '80', 'milestone' => '100',
+            // WHO columns set as a sector-head approval would set them...
+            'sector_head_approved_by' => $sectorHead->id,
+            'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => null,
+            'coordinator_confirmed_by' => null,
+            // ...but confirmation_status stayed at the pre-approval value.
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ]);
+
+        Passport::actingAs($this->makeFacilitator($sector), [], 'api');
+
+        $this->getJson('/api/v2/dashboard/facilitator')
+            ->assertOk()
+            ->assertJsonPath('awaitingReviewCount', 1)
+            ->assertJsonPath('sectorQueues.0.awaitingCount', 1);
+
+        $this->getJson('/api/v2/approvals/facilitator/queue?grouping=by_sector')
+            ->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.title', 'Agriculture');
+    }
+
     public function test_sector_head_dashboard(): void
     {
         [$sector] = $this->seedSector();

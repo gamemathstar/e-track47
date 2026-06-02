@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\V2\Presenters\SectorPresenter;
 use App\Support\V2\WireEnums;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -77,7 +78,7 @@ class ApprovalService
 
     public function facilitatorQueue(User $user, string $grouping): array
     {
-        $tracks = $this->trackingsInState($user, 'Pending Facilitator');
+        $tracks = $this->trackingsAwaitingFacilitator($user);
 
         $groups = $tracks->groupBy(function ($t) use ($grouping) {
             if ($grouping === 'by_kpi') {
@@ -330,6 +331,59 @@ class ApprovalService
             })
             ->orderByDesc('updated_at')
             ->get();
+    }
+
+    /**
+     * Facilitator "awaiting review" rows, derived from the WHO columns rather
+     * than `confirmation_status` — mirrors the web's
+     * UserController::facilitatorAwaitingSectorsWithCounts so the two surfaces
+     * agree on the same dataset even when the web's sector-head approval flow
+     * leaves `confirmation_status` out of sync.
+     *
+     * @return Collection<int,PerformanceTracking>
+     */
+    private function trackingsAwaitingFacilitator(User $user): Collection
+    {
+        $sectorIds = $this->access->accessibleSectorIds($user);
+
+        return self::applyFacilitatorAwaitingScope(
+            PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
+            $user,
+        )
+            ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
+                if ($sectorIds !== null) {
+                    $q->whereIn('sector_id', $sectorIds);
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    /**
+     * Apply the "awaiting this facilitator's review" WHERE clause to a query
+     * builder. Shared between ApprovalService and DashboardService so the
+     * mobile dashboard count and the queue endpoint use identical semantics.
+     *
+     * The clause matches two row populations (matching the web):
+     *   - Sector Head has approved, no facilitator decision yet, not yet
+     *     escalated to coordinator.
+     *   - The same facilitator previously rejected this submission and the
+     *     coordinator hasn't acted yet — i.e. it's waiting for the resubmit
+     *     they need to re-review.
+     */
+    public static function applyFacilitatorAwaitingScope(Builder $query, User $user): Builder
+    {
+        return $query->where(function (Builder $outer) use ($user) {
+            $outer->where(function (Builder $w) {
+                $w->whereNotNull('sector_head_approved_by')
+                    ->whereNull('facilitator_confirmed_by')
+                    ->whereNull('coordinator_confirmed_by');
+            })->orWhere(function (Builder $w) use ($user) {
+                $w->where('facilitator_confirmed_by', $user->id)
+                    ->where('facilitator_decision', 'Reject')
+                    ->whereNull('coordinator_confirmed_by');
+            });
+        });
     }
 
     private function queueItem(PerformanceTracking $t): array

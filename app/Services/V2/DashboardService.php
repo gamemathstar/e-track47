@@ -105,7 +105,13 @@ class DashboardService
         $sectorIds = $user->getAssignedSectorIds() ?: [];
         $kpiIds = $this->kpiIdsForSectors($sectorIds);
 
-        $sectorQueues = Sector::whereIn('id', $sectorIds)->orderBy('sector_name')->get()->map(function (Sector $s) {
+        // "Awaiting" is derived from the WHO columns (sector_head_approved_by,
+        // facilitator_confirmed_by, coordinator_confirmed_by) rather than the
+        // confirmation_status string — keeps mobile in sync with the web's
+        // /delivery/tracking/awaiting view even when the web's older sector-head
+        // approval flow doesn't update confirmation_status. See
+        // ApprovalService::applyFacilitatorAwaitingScope for the exact clause.
+        $sectorQueues = Sector::whereIn('id', $sectorIds)->orderBy('sector_name')->get()->map(function (Sector $s) use ($user) {
             $kids = $this->kpiIdsForSectors([$s->id]);
             $lastReviewed = PerformanceTracking::whereIn('kpi_id', $kids)->whereNotNull('facilitator_confirmed_at')->max('facilitator_confirmed_at');
 
@@ -114,12 +120,18 @@ class DashboardService
                 'name' => $s->sector_name,
                 'iconKey' => SectorPresenter::icon($s),
                 'lastReviewedLabel' => $lastReviewed ? Carbon::parse($lastReviewed)->diffForHumans(['short' => true]) : 'No reviews yet',
-                'awaitingCount' => (int) PerformanceTracking::whereIn('kpi_id', $kids)->where('confirmation_status', 'Pending Facilitator')->count(),
+                'awaitingCount' => (int) ApprovalService::applyFacilitatorAwaitingScope(
+                    PerformanceTracking::query()->whereIn('kpi_id', $kids),
+                    $user,
+                )->count(),
             ];
         })->values()->all();
 
         return [
-            'awaitingReviewCount' => (int) PerformanceTracking::whereIn('kpi_id', $kpiIds)->where('confirmation_status', 'Pending Facilitator')->count(),
+            'awaitingReviewCount' => (int) ApprovalService::applyFacilitatorAwaitingScope(
+                PerformanceTracking::query()->whereIn('kpi_id', $kpiIds),
+                $user,
+            )->count(),
             'sectorQueues' => $sectorQueues,
             'recentDecisions' => $this->recentDecisions($user, 5),
             'avgResponseDays' => 1.4,        // placeholder: no review-timing telemetry stored
