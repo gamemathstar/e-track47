@@ -127,6 +127,28 @@ class HierarchyTest extends TestCase
             ->assertOk()->assertJsonCount(3);
     }
 
+    public function test_facilitator_only_sees_assigned_sectors(): void
+    {
+        $fw = $this->makeFramework();
+        $assigned = $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+        $other    = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $alsoOther = $this->makeSector($fw, ['sector_name' => 'Education']);
+
+        // Facilitator is only assigned to "Agriculture".
+        Passport::actingAs($this->makeFacilitator($assigned), [], 'api');
+
+        $this->getJson('/api/v2/sectors')
+            ->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.id', (string) $assigned->id)
+            ->assertJsonPath('0.name', 'Agriculture');
+
+        // Sectors they aren't assigned to are invisible (404, no existence leak).
+        $this->getJson("/api/v2/sectors/{$other->id}")
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+        $this->getJson("/api/v2/sectors/{$alsoOther->id}")
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
     public function test_unknown_sector_returns_404(): void
     {
         Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');

@@ -40,9 +40,20 @@ class ApprovalController extends BaseController
     /** GET /approvals/facilitator/queue */
     public function facilitatorQueue(Request $request): array
     {
-        $validated = $request->validate(['grouping' => ['required', 'in:by_sector,by_kpi']]);
+        $validated = $request->validate([
+            'grouping' => ['required', 'in:by_sector,by_kpi'],
+            'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
+            // sector accepts a numeric id; ignored if the facilitator isn't
+            // assigned to it (see service layer).
+            'sector' => ['nullable'],
+        ]);
 
-        return $this->approvals->facilitatorQueue($request->user(), $validated['grouping']);
+        return $this->approvals->facilitatorQueue(
+            $request->user(),
+            $validated['grouping'],
+            $validated['quarter'] ?? null,
+            $validated['sector'] ?? null,
+        );
     }
 
     /** GET /approvals/data-admin/my-kpis */

@@ -119,8 +119,67 @@ class ApprovalsTest extends TestCase
 
         $this->getJson('/api/v2/approvals/facilitator/queue?grouping=by_sector')
             ->assertOk()
-            ->assertJsonStructure([['id', 'title', 'accent', 'items' => [['id', 'kpiId', 'state']]]])
-            ->assertJsonPath('0.items.0.state', 'pending_facilitator');
+            ->assertJsonStructure([['id', 'title', 'accent', 'items' => [['id', 'kpiId', 'state', 'quarter']]]])
+            ->assertJsonPath('0.items.0.state', 'pending_facilitator')
+            ->assertJsonPath('0.items.0.quarter', 'q1');
+    }
+
+    public function test_facilitator_queue_narrows_to_requested_quarter(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $this->tracking($kpi, 'Pending Facilitator', 1);
+        $this->tracking($kpi, 'Pending Facilitator', 3);
+
+        Passport::actingAs($this->makeFacilitator($sector), [], 'api');
+
+        // No filter → both quarters present.
+        $all = $this->getJson('/api/v2/approvals/facilitator/queue?grouping=by_sector')
+            ->assertOk()->json();
+        $this->assertCount(2, $all[0]['items']);
+
+        // ?quarter=q3 → only the Q3 row.
+        $q3 = $this->getJson('/api/v2/approvals/facilitator/queue?grouping=by_sector&quarter=q3')
+            ->assertOk()->json();
+        $this->assertCount(1, $q3[0]['items']);
+        $this->assertSame('q3', $q3[0]['items'][0]['quarter']);
+    }
+
+    public function test_facilitator_queue_narrows_to_requested_sector(): void
+    {
+        // Two assigned sectors with one pending row each.
+        $fw = $this->makeFramework();
+        $health = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $agri = $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+        $kpiHealth = $this->makeKpi($this->makeDeliverable($this->makeCommitment($health)));
+        $kpiAgri = $this->makeKpi($this->makeDeliverable($this->makeCommitment($agri)));
+        $this->tracking($kpiHealth, 'Pending Facilitator');
+        $this->tracking($kpiAgri, 'Pending Facilitator');
+
+        // Facilitator assigned to both sectors.
+        $facilitator = $this->makeFacilitator($health);
+        \App\Models\FacilitatorSector::create([
+            'user_role_id' => $facilitator->getCurrentRole()->id,
+            'sector_id' => $agri->id,
+        ]);
+        Passport::actingAs($facilitator, [], 'api');
+
+        // No sector filter → both sectors appear as groups.
+        $all = $this->getJson('/api/v2/approvals/facilitator/queue?grouping=by_sector')
+            ->assertOk()->json();
+        $this->assertCount(2, $all);
+
+        // ?sector={agriId} → only Agriculture group.
+        $scoped = $this->getJson("/api/v2/approvals/facilitator/queue?grouping=by_sector&sector={$agri->id}")
+            ->assertOk()->json();
+        $this->assertCount(1, $scoped);
+        $this->assertSame('Agriculture', $scoped[0]['title']);
+
+        // Asking for a sector NOT assigned to this facilitator (Education) — the
+        // contract says ignore it, so we get the full assigned list back, not 403.
+        $education = $this->makeSector($fw, ['sector_name' => 'Education']);
+        $fallback = $this->getJson("/api/v2/approvals/facilitator/queue?grouping=by_sector&sector={$education->id}")
+            ->assertOk()->json();
+        $this->assertCount(2, $fallback);
     }
 
     public function test_data_admin_my_kpis(): void

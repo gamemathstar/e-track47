@@ -83,7 +83,11 @@ trait InteractsWithPdcuAuth
     /** A facilitator assigned (via facilitator_sectors) to a specific sector. */
     protected function makeFacilitator(Sector $sector, array $attrs = []): User
     {
-        $user = $this->makeUser($attrs, 'Facilitator');
+        // target_entity defaults to 'System' in makeUser(); a real Facilitator
+        // role row has target_entity='Sector' (see UserRole::roleToTargetEntity).
+        // Setting it correctly here avoids fixtures that look like a System
+        // Admin to any code that checks target_entity.
+        $user = $this->makeUser(array_merge(['target_entity' => 'Sector'], $attrs), 'Facilitator');
         FacilitatorSector::create([
             'user_role_id' => $user->getCurrentRole()->id,
             'sector_id' => $sector->id,

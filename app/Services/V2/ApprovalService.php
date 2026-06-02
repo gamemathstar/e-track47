@@ -76,10 +76,30 @@ class ApprovalService
         ])->values()->all();
     }
 
-    public function facilitatorQueue(User $user, string $grouping): array
+    /**
+     * @param  string|null  $quarterWire  q1–q4 (null = all quarters)
+     * @param  string|null  $sectorId     sector id to narrow the queue to a
+     *                                    single assigned sector; silently
+     *                                    ignored if the facilitator isn't
+     *                                    assigned to it
+     */
+    public function facilitatorQueue(User $user, string $grouping, ?string $quarterWire = null, ?string $sectorId = null): array
     {
-        $tracks = $this->trackingsAwaitingFacilitator($user);
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : null;
 
+        // Narrow within the facilitator's assigned sectors. If the requested
+        // sector isn't in that set, fall back to "all assigned" — same effect
+        // as the client omitting the param.
+        $assigned = $this->access->accessibleSectorIds($user) ?? [];
+        $scopedSectorId = null;
+        if ($sectorId !== null && $sectorId !== '' && in_array((int) $sectorId, $assigned, true)) {
+            $scopedSectorId = (int) $sectorId;
+        }
+
+        $tracks = $this->trackingsAwaitingFacilitator($user, $quarter, $scopedSectorId);
+
+        // Groups with no in-scope items naturally don't appear (groupBy only
+        // creates buckets for keys that show up in the source collection).
         $groups = $tracks->groupBy(function ($t) use ($grouping) {
             if ($grouping === 'by_kpi') {
                 return 'kpi:'.optional($t->kpi)->id;
@@ -340,16 +360,22 @@ class ApprovalService
      * agree on the same dataset even when the web's sector-head approval flow
      * leaves `confirmation_status` out of sync.
      *
+     * @param  int|null  $quarter        1–4 narrows to that quarter
+     * @param  int|null  $singleSectorId narrows to one assigned sector
      * @return Collection<int,PerformanceTracking>
      */
-    private function trackingsAwaitingFacilitator(User $user): Collection
+    private function trackingsAwaitingFacilitator(User $user, ?int $quarter = null, ?int $singleSectorId = null): Collection
     {
         $sectorIds = $this->access->accessibleSectorIds($user);
+        if ($singleSectorId !== null) {
+            $sectorIds = [$singleSectorId];
+        }
 
         return self::applyFacilitatorAwaitingScope(
             PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
             $user,
         )
+            ->when($quarter !== null, fn ($q) => $q->where('quarter', $quarter))
             ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
                 if ($sectorIds !== null) {
                     $q->whereIn('sector_id', $sectorIds);

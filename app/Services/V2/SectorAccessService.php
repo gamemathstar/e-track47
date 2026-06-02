@@ -4,6 +4,7 @@ namespace App\Services\V2;
 
 use App\Models\Sector;
 use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -86,10 +87,22 @@ class SectorAccessService
      * admin directory, gallery management, and other read-everywhere flows
      * that the web app handles via system-level routes instead of sector
      * scoping.
+     *
+     * NB: we don't use `$user->isSystemAdmin()` here. That helper only checks
+     * `target_entity === 'System'` without verifying the role name, so any
+     * user whose current role row happens to have target_entity='System'
+     * (data error, legacy fixture, etc.) would be granted cross-sector
+     * access. We check the role name explicitly instead.
      */
     private function hasAllSectorAccess(User $user): bool
     {
-        return $user->canAccessAllSectors() || $user->isSystemAdmin();
+        if ($user->canAccessAllSectors()) {
+            return true;
+        }
+
+        $role = $user->getCurrentRole();
+
+        return $role && $role->isActive() && $role->role === UserRole::ROLE_SYSTEM_ADMIN;
     }
 }
 

@@ -1463,7 +1463,25 @@ item requires all four string fields.
 | **Purpose** | Submissions awaiting facilitator verification, grouped for the verification page. |
 | **Method / Path** | `GET /approvals/facilitator/queue` |
 | **Auth** | Bearer required |
-| **Query params** | `grouping` (**required**) — `by_sector` \| `by_kpi`. |
+
+**Query parameters**
+
+| Param | Req. | Notes |
+| --- | --- | --- |
+| `grouping` | ✅ | `by_sector` \| `by_kpi` — how rows are bucketed into groups. |
+| `quarter` | ❌ | Quarter wire token (`q1`–`q4`). Scopes the queue to that quarter; the client always sends the selected quarter chip. |
+| `sector` | ❌ | Sector id. Scopes the queue to a single sector; omitted for "all sectors". The client also omits this filter entirely (and never sends `sector`) when the facilitator is assigned only one sector. |
+
+The facilitator's assigned sectors are resolved server-side from the auth token;
+`sector` narrows within those. A scoped request returns only the matching
+groups, each carrying only its in-scope items; a group left with no items is
+omitted.
+
+**Example request**
+
+```text
+GET /approvals/facilitator/queue?grouping=by_sector&quarter=q3&sector=agriculture
+```
 
 **Success — `200 OK`** (raw array of `FacilitatorVerificationGroupModel`):
 
@@ -1481,6 +1499,7 @@ item requires all four string fields.
         "sectorLabel": "Agriculture",
         "sectorAccent": "primary",
         "state": "pending_facilitator",
+        "quarter": "q3",
         "actualValue": "120 units"
       }
     ]
@@ -2351,6 +2370,8 @@ error).
   "role": "sector_head",
   "roleLabel": "Administrator",
   "sectorLabel": "Public Sector",
+  "email": "amina.egbe@pdcu.gov.ng",
+  "phone": "+2348030000001",
   "fullLegalName": "Amina Yusuf Egbe",
   "staffId": "PDCU-2023-441",
   "joinDate": "Oct 12, 2023",
@@ -2371,6 +2392,8 @@ error).
 | `role` | string | ✅ | wire enum (snake_case) |
 | `roleLabel` | string | ✅ | human label |
 | `sectorLabel` | string | ✅ | human label |
+| `email` | string | ❌ | powers the Email quick action (`mailto:`); button disabled when absent |
+| `phone` | string | ❌ | powers the Call/SMS quick actions (`tel:`/`sms:`); buttons disabled when absent |
 | `fullLegalName` | string | ✅ | |
 | `staffId` | string | ✅ | |
 | `joinDate` | string | ✅ | display string (not necessarily ISO — e.g. `"Oct 12, 2023"`) |
@@ -2378,7 +2401,9 @@ error).
 | `twoFactorStatus` | string | ✅ | display string, e.g. `"Enabled (SMS/Email)"` |
 | `isVerified` | bool | ✅ | |
 
-All fields required; any wrong-typed field raises a parse error.
+All required fields must be present and correctly typed or the payload
+raises a parse error. The optional `email`/`phone` degrade to empty
+strings when absent or wrong-typed.
 
 **Status codes:** `200` · `401` · `404` unknown `id`.
 
