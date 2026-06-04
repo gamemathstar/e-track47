@@ -48,13 +48,13 @@ class ApprovalService
     {
         $quarter = WireEnums::wireToQuarter($quarterWire);
 
-        return $this->trackingsInState($user, 'Pending Sector Head Approval', $quarter)
+        return $this->trackingsAwaitingSectorHead($user, $quarter)
             ->map(fn ($t) => $this->queueItem($t))->all();
     }
 
     public function sectorHeadBulk(User $user, string $grouping): array
     {
-        $tracks = $this->trackingsInState($user, 'Pending Sector Head Approval');
+        $tracks = $this->trackingsAwaitingSectorHead($user);
 
         $groups = $tracks->groupBy(function ($t) use ($grouping) {
             $commitment = optional(optional($t->kpi)->deliverable)->commitment;
@@ -475,6 +475,28 @@ class ApprovalService
     }
 
     /**
+     * Apply the "awaiting sector head approval" WHERE clause to a query
+     * builder. Derives from WHO columns rather than confirmation_status so
+     * rows where the data admin submitted but `confirmation_status` is stuck
+     * at 'Not Confirmed' (a known production drift) still surface.
+     *
+     * Rules:
+     *  - actual_value is set (data admin has submitted)
+     *  - sector_head_approved_by IS NULL (SH hasn't acted yet)
+     *  - facilitator_confirmed_by IS NULL (nothing past SH yet)
+     *  - coordinator_confirmed_by IS NULL (nothing past SH yet)
+     */
+    public static function applySectorHeadAwaitingScope(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('actual_value')
+            ->where('actual_value', '<>', '')
+            ->whereNull('sector_head_approved_by')
+            ->whereNull('facilitator_confirmed_by')
+            ->whereNull('coordinator_confirmed_by');
+    }
+
+    /**
      * Coordinator "awaiting" rows, derived from WHO columns so a row whose
      * facilitator-accept flow didn't update confirmation_status still shows
      * up. Mirrors the web's coordinator awaiting query.
@@ -488,6 +510,31 @@ class ApprovalService
         return self::applyCoordinatorAwaitingScope(
             PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
         )
+            ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
+                if ($sectorIds !== null) {
+                    $q->whereIn('sector_id', $sectorIds);
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    /**
+     * Sector-head "awaiting" rows, derived from WHO columns rather than the
+     * confirmation_status string — production currently has rows submitted by
+     * data admin but stuck at 'Not Confirmed' status, which would be invisible
+     * to a status-only filter.
+     *
+     * @return Collection<int,PerformanceTracking>
+     */
+    private function trackingsAwaitingSectorHead(User $user, ?int $quarter = null): Collection
+    {
+        $sectorIds = $this->access->accessibleSectorIds($user);
+
+        return self::applySectorHeadAwaitingScope(
+            PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
+        )
+            ->when($quarter !== null, fn ($q) => $q->where('quarter', $quarter))
             ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
                 if ($sectorIds !== null) {
                     $q->whereIn('sector_id', $sectorIds);

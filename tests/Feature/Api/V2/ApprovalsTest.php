@@ -144,6 +144,53 @@ class ApprovalsTest extends TestCase
         $this->assertSame('q3', $q3[0]['items'][0]['quarter']);
     }
 
+    public function test_sector_head_queue_includes_rows_with_stale_not_confirmed_status(): void
+    {
+        // Production scenario: data admin submitted (actual_value set) but
+        // confirmation_status is stuck at 'Not Confirmed' instead of moving
+        // to 'Pending Sector Head Approval'. The SH queue must still surface
+        // these — they're genuinely waiting on the sector head.
+        [$sector, $kpi] = $this->seedKpi();
+        $tracking = $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '80', 'milestone' => '100',
+            // WHO columns all null — SH hasn't acted, no one downstream either.
+            'sector_head_approved_by' => null,
+            'facilitator_confirmed_by' => null,
+            'coordinator_confirmed_by' => null,
+            // Stale status — should be 'Pending Sector Head Approval'.
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->getJson('/api/v2/approvals/sector-head/queue')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', (string) $tracking->id);
+
+        // Dashboard pendingApprovals agrees with the queue count.
+        $this->getJson('/api/v2/dashboard/sector-head')
+            ->assertOk()
+            ->assertJsonPath('pendingApprovals', 1);
+    }
+
+    public function test_sector_head_queue_excludes_pre_submission_rows(): void
+    {
+        // Rows where the data admin hasn't entered actual_value yet are NOT
+        // awaiting sector head — they're awaiting the data admin.
+        [$sector, $kpi] = $this->seedKpi();
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'milestone' => '100',
+            'actual_value' => null,
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->getJson('/api/v2/approvals/sector-head/queue')
+            ->assertOk()->assertJsonCount(0);
+    }
+
     public function test_coordinator_queue_shows_rows_when_confirmation_status_is_stale(): void
     {
         // Production scenario: facilitator accepted via a flow that set the

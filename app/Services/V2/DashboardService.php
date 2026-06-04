@@ -176,7 +176,14 @@ class DashboardService
             'completedCommitments' => (int) ($m['completed'] ?? 0),
             'inProgressCommitments' => (int) ($m['in_progress'] ?? 0),
             'atRiskCommitments' => (int) ($m['at_risk'] ?? 0),
-            'pendingApprovals' => (int) $this->sectorPending($sector->id, 'Pending Sector Head Approval'),
+            // WHO-derived: a row submitted by data admin but stuck at
+            // 'Not Confirmed' is still pending the sector head — match the
+            // queue endpoint (/approvals/sector-head/queue) so the dashboard
+            // and the queue agree on the count.
+            'pendingApprovals' => (int) ApprovalService::applySectorHeadAwaitingScope(
+                PerformanceTracking::query()
+                    ->whereHas('kpi.deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
+            )->count(),
             'commitments' => $rows,
         ];
     }
@@ -302,10 +309,19 @@ class DashboardService
             ->where('confirmation_status', $state)->count();
     }
 
+    /**
+     * "Anything still in the pipeline" — used by the Governor dashboard. Derived
+     * from WHO columns so rows with stale confirmation_status still count: a
+     * row is pending if the data admin has submitted AND the coordinator
+     * hasn't finalised it. Facilitator-rejected-and-waiting-resubmit rows are
+     * also still pending (they will re-enter the queue once the admin acts).
+     */
     private function pendingVerifications(?Framework $fw): int
     {
         return PerformanceTracking::whereIn('kpi_id', $this->frameworkKpiIds($fw))
-            ->whereIn('confirmation_status', ['Pending Sector Head Approval', 'Pending Facilitator', 'Pending Coordinator'])
+            ->whereNotNull('actual_value')
+            ->where('actual_value', '<>', '')
+            ->whereNull('coordinator_confirmed_by')
             ->count();
     }
 
