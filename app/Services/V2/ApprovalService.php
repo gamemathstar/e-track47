@@ -195,6 +195,30 @@ class ApprovalService
             throw ApiException::notFound('No submission available for this KPI.');
         }
 
+        // The delivery-department verification block only exists once the
+        // facilitator has acted (rows at pending_coordinator and beyond);
+        // each field is independently optional and omitted when absent.
+        $facilitatorActed = $t->facilitator_confirmed_by !== null
+            && $t->facilitator_decision === 'Accept';
+        $deliveryValue = $facilitatorActed
+            && $t->delivery_department_value !== null
+            && $t->delivery_department_value !== ''
+                ? (string) $t->delivery_department_value
+                : null;
+        $deliveryRemarks = $facilitatorActed
+            && $t->delivery_department_remark !== null
+            && $t->delivery_department_remark !== ''
+                ? (string) $t->delivery_department_remark
+                : null;
+        $deliveryDateLabel = $facilitatorActed && $t->facilitator_confirmed_at
+            ? Carbon::parse($t->facilitator_confirmed_at)->format('M j, Y')
+            : null;
+        // The schema has no facilitator-stage file relation today, so we
+        // surface an empty list when the facilitator has acted (so the mobile
+        // UI shows the section without a duplicate of `attachments`), and omit
+        // the field entirely when they haven't.
+        $deliveryAttachments = $facilitatorActed ? [] : null;
+
         return array_filter([
             'id' => (string) $t->id,
             'kpiId' => (string) $kpi->id,
@@ -208,6 +232,10 @@ class ApprovalService
             'targetValue' => $this->targetValue($kpi, (int) $t->year) ?? '—',
             'remarks' => $t->remarks ?: null,
             'attachments' => $t->files->map(fn ($f) => $f->name ?: 'document')->values()->all(),
+            'deliveryDateLabel' => $deliveryDateLabel,
+            'deliveryValue' => $deliveryValue,
+            'deliveryRemarks' => $deliveryRemarks,
+            'deliveryAttachments' => $deliveryAttachments,
         ], fn ($v) => $v !== null);
     }
 

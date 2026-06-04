@@ -446,6 +446,62 @@ class ApprovalsTest extends TestCase
             ->assertJsonStructure(['id', 'kpiTitle', 'sectorLabel', 'trackingDateLabel', 'milestoneValue', 'attachments']);
     }
 
+    public function test_submission_detail_includes_delivery_verification_when_facilitator_accepted(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+
+        $this->makeTracking($kpi, [
+            'quarter' => 3, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '40',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id,
+            'facilitator_confirmed_at' => '2024-10-12 09:30:00',
+            'facilitator_decision' => 'Accept',
+            'delivery_department_value' => '41.0%',
+            'delivery_department_remark' => 'Verified against on-site audit.',
+            'confirmation_status' => 'Pending Coordinator',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson("/api/v2/approvals/submissions/{$kpi->id}")
+            ->assertOk()
+            ->assertJsonPath('deliveryDateLabel', 'Oct 12, 2024')
+            ->assertJsonPath('deliveryValue', '41.0%')
+            ->assertJsonPath('deliveryRemarks', 'Verified against on-site audit.')
+            ->assertJsonPath('deliveryAttachments', []);
+    }
+
+    public function test_submission_detail_omits_delivery_fields_before_facilitator_acts(): void
+    {
+        // A row that's only past sector-head (still awaiting facilitator) has
+        // no delivery-department verification yet. The four delivery-* fields
+        // must be omitted entirely.
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+
+        $this->makeTracking($kpi, [
+            'quarter' => 3, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '40',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            // No facilitator action yet.
+            'facilitator_confirmed_by' => null,
+            'confirmation_status' => 'Pending Facilitator',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $body = $this->getJson("/api/v2/approvals/submissions/{$kpi->id}")
+            ->assertOk()->json();
+
+        $this->assertArrayNotHasKey('deliveryDateLabel', $body);
+        $this->assertArrayNotHasKey('deliveryValue', $body);
+        $this->assertArrayNotHasKey('deliveryRemarks', $body);
+        $this->assertArrayNotHasKey('deliveryAttachments', $body);
+    }
+
     public function test_sector_head_accept_advances_to_facilitator(): void
     {
         [$sector, $kpi] = $this->seedKpi();
