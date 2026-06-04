@@ -225,6 +225,80 @@ class ApprovalsTest extends TestCase
             ->assertJsonPath('reviewQueueCount', 1);
     }
 
+    public function test_coordinator_queue_filters_by_sector_year_quarter_and_sort(): void
+    {
+        // Build two sectors and two pending-coordinator rows per sector, each at
+        // a different year/quarter, so we can exercise every filter axis.
+        $fw = $this->makeFramework(['year' => 2024]);
+        $health = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $agri = $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+
+        $kpiHealth = $this->makeKpi($this->makeDeliverable($this->makeCommitment($health)));
+        $kpiAgri   = $this->makeKpi($this->makeDeliverable($this->makeCommitment($agri)));
+
+        $sh = $this->makeSectorHead($health);
+        $fc = $this->makeFacilitator($health);
+
+        // Health rows: 2024-Q1 (older) and 2024-Q3 (newer).
+        // PerformanceTracking::create overwrites updated_at with now(); set
+        // it explicitly afterward so the sort axis is testable.
+        $hQ1 = $this->makeTracking($kpiHealth, [
+            'year' => 2024, 'quarter' => 1, 'actual_value' => '10', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now()->subDays(20),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now()->subDays(15),
+            'facilitator_decision' => 'Accept',
+        ]);
+        \DB::table('performance_trackings')->where('id', $hQ1->id)->update(['updated_at' => now()->subDays(10)]);
+
+        $hQ3 = $this->makeTracking($kpiHealth, [
+            'year' => 2024, 'quarter' => 3, 'actual_value' => '30', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now()->subDays(5),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now()->subDays(3),
+            'facilitator_decision' => 'Accept',
+        ]);
+        \DB::table('performance_trackings')->where('id', $hQ3->id)->update(['updated_at' => now()->subDays(1)]);
+
+        // Agriculture row: 2024-Q3, newest.
+        $aQ3 = $this->makeTracking($kpiAgri, [
+            'year' => 2024, 'quarter' => 3, 'actual_value' => '40', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now()->subDays(2),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now()->subDays(2),
+            'facilitator_decision' => 'Accept',
+        ]);
+        \DB::table('performance_trackings')->where('id', $aQ3->id)->update(['updated_at' => now()->subHours(6)]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        // No filters → all 3, newest first by default.
+        $all = $this->getJson('/api/v2/approvals/coordinator/queue')->assertOk()->json();
+        $this->assertCount(3, $all);
+        $this->assertSame((string) $aQ3->id, $all[0]['id']); // most recent updated_at
+
+        // sort=oldest → reversed order, oldest first.
+        $oldest = $this->getJson('/api/v2/approvals/coordinator/queue?sort=oldest')->assertOk()->json();
+        $this->assertSame((string) $hQ1->id, $oldest[0]['id']);
+
+        // sector filter → only Health rows (both quarters).
+        $bySector = $this->getJson("/api/v2/approvals/coordinator/queue?sector={$health->id}")
+            ->assertOk()->json();
+        $this->assertCount(2, $bySector);
+
+        // quarter filter → only Q3 rows (Health + Agri).
+        $byQ = $this->getJson('/api/v2/approvals/coordinator/queue?quarter=q3')
+            ->assertOk()->json();
+        $this->assertCount(2, $byQ);
+
+        // year filter (2024) → all three; year=2023 → none.
+        $this->assertCount(3, $this->getJson('/api/v2/approvals/coordinator/queue?year=2024')->assertOk()->json());
+        $this->assertCount(0, $this->getJson('/api/v2/approvals/coordinator/queue?year=2023')->assertOk()->json());
+
+        // Combined: sector=Health & quarter=q3 → exactly hQ3.
+        $combined = $this->getJson("/api/v2/approvals/coordinator/queue?sector={$health->id}&quarter=q3&year=2024&sort=newest")
+            ->assertOk()->json();
+        $this->assertCount(1, $combined);
+        $this->assertSame((string) $hQ3->id, $combined[0]['id']);
+    }
+
     public function test_coordinator_queue_excludes_facilitator_rejected_rows(): void
     {
         // A facilitator REJECTION must not appear in the coordinator queue —

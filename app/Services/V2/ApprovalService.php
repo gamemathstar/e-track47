@@ -38,9 +38,20 @@ class ApprovalService
 
     // --- queues (return arrays) ---------------------------------------------
 
-    public function coordinatorQueue(User $user): array
-    {
-        return $this->trackingsAwaitingCoordinator($user)
+    /**
+     * @param  string|null  $sectorId      optional sector id to scope the queue
+     * @param  int|null     $year          optional year to scope the queue
+     * @param  string|null  $quarterWire   optional q1–q4 to scope the queue
+     * @param  string       $sort          'newest' (default) or 'oldest' — by updated_at
+     */
+    public function coordinatorQueue(
+        User $user,
+        ?string $sectorId = null,
+        ?int $year = null,
+        ?string $quarterWire = null,
+        string $sort = 'newest',
+    ): array {
+        return $this->trackingsAwaitingCoordinator($user, $sectorId, $year, $quarterWire, $sort)
             ->map(fn ($t) => $this->queueItem($t))->all();
     }
 
@@ -501,22 +512,52 @@ class ApprovalService
      * facilitator-accept flow didn't update confirmation_status still shows
      * up. Mirrors the web's coordinator awaiting query.
      *
+     * Optional filters (each applied only when provided):
+     *   - $sectorId   narrow to one sector (silently ignored if not in the
+     *                 coordinator's accessible set)
+     *   - $year       narrow to that reporting year
+     *   - $quarter    narrow to that quarter (wire q1–q4)
+     * $sort controls ordering: 'newest' (default) or 'oldest' by updated_at.
+     *
      * @return Collection<int,PerformanceTracking>
      */
-    private function trackingsAwaitingCoordinator(User $user): Collection
-    {
-        $sectorIds = $this->access->accessibleSectorIds($user);
+    private function trackingsAwaitingCoordinator(
+        User $user,
+        ?string $sectorId = null,
+        ?int $year = null,
+        ?string $quarterWire = null,
+        string $sort = 'newest',
+    ): Collection {
+        $accessibleSectorIds = $this->access->accessibleSectorIds($user);
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : null;
 
-        return self::applyCoordinatorAwaitingScope(
+        // Caller-requested sector narrows within the accessible set. If they
+        // pass a sector outside their scope, silently ignore the filter
+        // (matches the facilitator-queue contract).
+        $scopedSectorId = null;
+        if ($sectorId !== null && $sectorId !== '') {
+            $candidate = (int) $sectorId;
+            if ($accessibleSectorIds === null || in_array($candidate, $accessibleSectorIds, true)) {
+                $scopedSectorId = $candidate;
+            }
+        }
+
+        $query = self::applyCoordinatorAwaitingScope(
             PerformanceTracking::with(['kpi.deliverable.commitment.sector']),
         )
-            ->whereHas('kpi.deliverable.commitment', function ($q) use ($sectorIds) {
-                if ($sectorIds !== null) {
-                    $q->whereIn('sector_id', $sectorIds);
+            ->when($year !== null, fn ($q) => $q->where('year', $year))
+            ->when($quarter !== null, fn ($q) => $q->where('quarter', $quarter))
+            ->whereHas('kpi.deliverable.commitment', function ($q) use ($accessibleSectorIds, $scopedSectorId) {
+                if ($scopedSectorId !== null) {
+                    $q->where('sector_id', $scopedSectorId);
+                } elseif ($accessibleSectorIds !== null) {
+                    $q->whereIn('sector_id', $accessibleSectorIds);
                 }
-            })
-            ->orderByDesc('updated_at')
-            ->get();
+            });
+
+        return $sort === 'oldest'
+            ? $query->orderBy('updated_at')->get()
+            : $query->orderByDesc('updated_at')->get();
     }
 
     /**

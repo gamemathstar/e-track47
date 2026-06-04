@@ -1301,7 +1301,21 @@ Request params: `review_submission_params.dart` (`ReviewSubmissionParams`,
 | **Purpose** | List submissions awaiting final coordinator approval. |
 | **Method / Path** | `GET /approvals/coordinator/queue` |
 | **Auth** | Bearer required |
-| **Params** | none |
+
+**Query parameters** — all optional except `sort` (always sent):
+
+| Param | Req. | Notes |
+| --- | --- | --- |
+| `sector` | ❌ | Sector id; scopes the queue to a single sector. Omitted for "all sectors". |
+| `year` | ❌ | Reporting year (int) — the active framework's year; scopes the queue to that cycle. |
+| `quarter` | ❌ | Quarter wire token (`q1`–`q4`); scopes the queue to that quarter. The client always sends the selected quarter. |
+| `sort` | ✅ | Sort order — `newest` \| `oldest` (by submission/update time). Defaults to `newest`. |
+
+**Example request**
+
+```text
+GET /approvals/coordinator/queue?sector=health&year=2024&quarter=q3&sort=newest
+```
 
 **Success — `200 OK`** (raw array of `ApprovalQueueItemModel`):
 

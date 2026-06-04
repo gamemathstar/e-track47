@@ -20,7 +20,20 @@ class ApprovalController extends BaseController
     /** GET /approvals/coordinator/queue */
     public function coordinatorQueue(Request $request): array
     {
-        return $this->approvals->coordinatorQueue($request->user());
+        $validated = $request->validate([
+            'sector' => ['nullable'],
+            'year' => ['nullable', 'integer'],
+            'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
+            'sort' => ['nullable', 'in:newest,oldest'],
+        ]);
+
+        return $this->approvals->coordinatorQueue(
+            $request->user(),
+            $validated['sector'] ?? null,
+            isset($validated['year']) ? (int) $validated['year'] : null,
+            $validated['quarter'] ?? null,
+            $validated['sort'] ?? 'newest',
+        );
     }
 
     /** GET /approvals/sector-head/queue */
