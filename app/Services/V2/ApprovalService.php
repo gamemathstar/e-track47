@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The four-role approval workflow (API_REFERENCE.md §11.6) over the §4 state
@@ -358,7 +359,13 @@ class ApprovalService
             case 'coordinator':
                 $t->coordinator_confirmed_at = now();
                 $t->coordinator_confirmed_by = $user->id;
-                $t->coordinator_decision = 'Accept';
+                // coordinator_decision / coordinator_rejection_reason were added
+                // by a later migration that hasn't been applied on every prod
+                // DB. The load-bearing field is confirmation_status — only
+                // populate the supplementary columns when they exist.
+                if ($this->hasColumn('coordinator_decision')) {
+                    $t->coordinator_decision = 'Accept';
+                }
                 if (! empty($params['validatedValue'])) {
                     $t->delivery_department_value = $params['validatedValue'];
                 }
@@ -385,12 +392,32 @@ class ApprovalService
                 break;
             case 'coordinator':
                 $t->coordinator_confirmed_by = $user->id;
-                $t->coordinator_decision = 'Reject';
-                $t->coordinator_rejection_reason = $reason;
+                if ($this->hasColumn('coordinator_decision')) {
+                    $t->coordinator_decision = 'Reject';
+                }
+                if ($this->hasColumn('coordinator_rejection_reason')) {
+                    $t->coordinator_rejection_reason = $reason;
+                }
                 break;
         }
 
         $t->confirmation_status = 'Rejected';
+    }
+
+    /**
+     * Cached check for performance_trackings columns that some production
+     * databases (imported from older SQL dumps) are missing. Lets the workflow
+     * keep updating the load-bearing columns when supplementary ones are absent.
+     */
+    private array $columnCache = [];
+
+    private function hasColumn(string $column): bool
+    {
+        if (! array_key_exists($column, $this->columnCache)) {
+            $this->columnCache[$column] = Schema::hasColumn('performance_trackings', $column);
+        }
+
+        return $this->columnCache[$column];
     }
 
     private function assertRole(User $user, string $role, int $sectorId): void
