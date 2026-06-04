@@ -868,7 +868,7 @@ typically populates only the required summary fields):
 | `targetLabel` | string | ✅ | pre-formatted target label (e.g. `"Target: 85%"`) |
 | `statusLabel` | string | ✅ | display label for `status` |
 | `status` | string | ✅ | enum wire string — `active` / `stable` / `lagging` / `pending` |
-| `quartersOverview` | string[] | ✅ | per-quarter state tokens; each entry — `completed` / `in_progress` / `pending` |
+| `quartersOverview` | string[] | ✅ | Always 4 entries; indices 0–3 → Q1–Q4. Each — `completed` / `in_progress` / `pending` (see Enums for the source conditions). |
 | `lastUpdatedLabel` | string | ✅ | pre-formatted "updated" label |
 | `unit` | string | ❌ | measurement unit (e.g. `"# of boreholes"`) |
 | `targetValue` | string | ❌ | (e.g. `"85% Annual"`) |
@@ -1020,11 +1020,79 @@ typically populates only the required summary fields):
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
+#### 11.4.6 Annual targets (list + save)
+
+Backs the "Set Annual Targets" sheet
+(`ui-designs/kpi_tracking/#23 set_target_bottom_sheet.html`) — set the
+annual benchmark for each KPI under a deliverable, for a fiscal year.
+
+| | |
+| --- | --- |
+| **Purpose** | List the deliverable's KPIs (baseline + current target) and save edited targets in one batch. |
+| **List** | `GET /deliverables/{deliverableId}/annual-targets?year={year}` |
+| **Save** | `POST /deliverables/{deliverableId}/annual-targets` |
+| **Auth** | Bearer required |
+| **Path params** | `deliverableId` — deliverable identifier |
+| **Query params** | `year` (int, list only) — fiscal year scope |
+
+**List success — `200 OK`** (array of `AnnualTargetItemModel`):
+
+```json
+[
+  {
+    "kpiId": "kpi-classroom-blocks",
+    "category": "Infrastructure & Works",
+    "title": "Construction of new classroom blocks in prioritized LGAs",
+    "baselineValue": "48",
+    "baselineUnit": "blocks",
+    "targetUnit": "blocks",
+    "targetValue": "120"
+  }
+]
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `kpiId` | string | ✅ | |
+| `category` | string | ✅ | grouping eyebrow (e.g. commitment name) |
+| `title` | string | ✅ | KPI description |
+| `baselineValue` | string | ✅ | display-ready baseline figure (e.g. `"48"`, `"250k"`) |
+| `baselineUnit` | string | ✅ | baseline unit suffix |
+| `targetUnit` | string | ✅ | target input unit suffix |
+| `targetValue` | string | ❌ | last-saved target; omitted when none is set |
+
+**Save request body** — from `SaveAnnualTargetsParams`
+
+| Field | Type | Req. | Validation |
+| --- | --- | --- | --- |
+| `year` | int | ✅ | 2000..2100 (client-enforced) |
+| `targets` | object[] | ✅ | one per edited KPI; **only non-empty targets are sent** |
+| `targets[].kpiId` | string | ✅ | |
+| `targets[].value` | string | ✅ | raw input; client validates as a non-negative number (per-KPI errors keyed by `kpiId`) |
+
+```json
+{
+  "year": 2024,
+  "targets": [
+    { "kpiId": "kpi-classroom-blocks", "value": "120" },
+    { "kpiId": "kpi-textbooks", "value": "750" }
+  ]
+}
+```
+
+**Save success:** any 2xx (body ignored).
+
+**Status codes:** `200` (list) · `2xx` (save) · `401` · `404` (unknown deliverable) · `422` (target validation).
+
 **Enums in this section**
 
 - `QuarterIndex` (request `quarter`; response `activeQuarter`) → `q1` · `q2` · `q3` · `q4`
 - KPI `status` (response) → `active` · `stable` · `lagging` · `pending`
-- KPI `quartersOverview[]` entry (response) → `completed` · `in_progress` · `pending`
+- KPI `quartersOverview[]` entry (response) — fixed 4-element array, indices 0–3 = Q1–Q4:
+  - `pending` — no actual value submitted yet (no row, or `actual_value` null/empty)
+  - `in_progress` — actual value submitted but not finalised; collapses Pending SH / Pending Facilitator / Pending Coordinator / Rejected into one bucket (`confirmation_status` ≠ `Confirmed`)
+  - `completed` — coordinator finalised the quarter (`confirmation_status` = `Confirmed`)
+  - (finer-grained badges would arrive as a sibling `quartersStatusDetail` field, not new enum values here)
 - Submission `status` (response, nested) → `pending` · `confirmed`
 - Supporting-doc `kind` (response, nested) → `pdf` · `image`
 
@@ -1619,7 +1687,11 @@ is a list.
     "field_survey_q3.pdf",
     "lab_results.xlsx",
     "site_photo.jpg"
-  ]
+  ],
+  "deliveryDateLabel": "Oct 12, 2024",
+  "deliveryValue": "41.0%",
+  "deliveryRemarks": "Cross-checked against field reports; minor variance accepted.",
+  "deliveryAttachments": ["verification_report.pdf"]
 }
 ```
 
@@ -1639,8 +1711,17 @@ is a list.
 | `targetValue` | string | ✅ | |
 | `remarks` | string | ❌ | |
 | `attachments` | array&lt;string&gt; | ❌ | Defaults to `[]`; each entry must be a string. |
+| `deliveryDateLabel` | string | ❌ | Prior-stage delivery-department verification date. |
+| `deliveryValue` | string | ❌ | The delivery department's verified value. |
+| `deliveryRemarks` | string | ❌ | The delivery department's verification remark. |
+| `deliveryAttachments` | array&lt;string&gt; | ❌ | Verification evidence; defaults to `[]`, each entry a string. |
 
 The response must be a JSON object (a non-object body raises a parse error).
+
+The `delivery*` fields carry the prior **delivery-department verification**
+(the value/remark/date/attachments captured at the facilitator stage). The
+client surfaces them **only on the coordinator's review**, and only those
+present — populate them for submissions at `pending_coordinator`.
 
 **Status codes:** `200` · `401` · `404` (unknown `kpiId`).
 
