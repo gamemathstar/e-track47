@@ -238,8 +238,24 @@ class ApprovalService
         $t->save();
     }
 
+    /**
+     * Bulk-accept many submissions in one atomic call. $role is the role the
+     * caller is acting in — drives both the per-row permission gate and the
+     * lifecycle transition applied:
+     *   - sector_head → row moves to "Pending Facilitator"
+     *   - coordinator → row moves to "Confirmed" (final approval)
+     *
+     * All-or-nothing: if any submission isn't approvable for the given role
+     * (wrong stage, missing access, missing row), the whole call 409s and no
+     * row is touched. Matches the mobile contract — clients refresh the queue
+     * on success and don't try to reconcile partial failures.
+     */
     public function bulkApprove(User $user, array $submissionIds, string $role): void
     {
+        if (! in_array($role, ['sector_head', 'coordinator'], true)) {
+            throw ApiException::forbidden("Bulk approval is not supported for the {$role} role.");
+        }
+
         $tracks = PerformanceTracking::with('kpi.deliverable.commitment')
             ->whereIn('id', array_map('intval', $submissionIds))
             ->get();
@@ -248,20 +264,24 @@ class ApprovalService
             throw ApiException::conflict('One or more submissions could not be found.');
         }
 
+        $wrongStageMessage = $role === 'coordinator'
+            ? 'One or more submissions are not awaiting coordinator confirmation.'
+            : 'One or more submissions are not awaiting sector-head approval.';
+
         foreach ($tracks as $t) {
             $sectorId = optional(optional(optional($t->kpi)->deliverable)->commitment)->sector_id;
             if (! $this->access->canAccess($user, $sectorId)) {
                 throw ApiException::notFound('Submission not found.');
             }
-            $this->assertRole($user, 'sector_head', (int) $sectorId);
-            if (! $this->isAwaitingReviewFromRole($t, $user, 'sector_head')) {
-                throw ApiException::conflict('One or more submissions are not awaiting sector-head approval.');
+            $this->assertRole($user, $role, (int) $sectorId);
+            if (! $this->isAwaitingReviewFromRole($t, $user, $role)) {
+                throw ApiException::conflict($wrongStageMessage);
             }
         }
 
-        DB::transaction(function () use ($tracks, $user) {
+        DB::transaction(function () use ($tracks, $user, $role) {
             foreach ($tracks as $t) {
-                $this->applyAccept($t, 'sector_head', $user, []);
+                $this->applyAccept($t, $role, $user, []);
                 $t->save();
             }
         });

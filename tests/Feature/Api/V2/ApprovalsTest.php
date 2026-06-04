@@ -543,6 +543,78 @@ class ApprovalsTest extends TestCase
         $this->assertSame('Pending Facilitator', $t2->refresh()->confirmation_status);
     }
 
+    public function test_bulk_approve_coordinator_finalizes_all(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $t1 = $this->tracking($kpi, 'Pending Coordinator', 1);
+        $t2 = $this->tracking($kpi, 'Pending Coordinator', 2);
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => [(string) $t1->id, (string) $t2->id],
+            'role' => 'coordinator',
+        ])->assertStatus(202);
+
+        $t1->refresh();
+        $t2->refresh();
+        $this->assertSame('Confirmed', $t1->confirmation_status);
+        $this->assertSame('Confirmed', $t2->confirmation_status);
+        $this->assertNotNull($t1->coordinator_confirmed_by);
+        $this->assertNotNull($t2->coordinator_confirmed_by);
+    }
+
+    public function test_bulk_approve_coordinator_is_atomic_when_one_row_is_wrong_stage(): void
+    {
+        // One row is genuinely pending coordinator; the other is still at the
+        // sector head stage. The whole call must 409 and leave BOTH unchanged.
+        [$sector, $kpi] = $this->seedKpi();
+        $ready = $this->tracking($kpi, 'Pending Coordinator', 1);
+        $earlyStage = $this->tracking($kpi, 'Pending Sector Head Approval', 2);
+
+        $readyStatusBefore = $ready->confirmation_status;
+        $earlyStatusBefore = $earlyStage->confirmation_status;
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => [(string) $ready->id, (string) $earlyStage->id],
+            'role' => 'coordinator',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'conflict');
+
+        $this->assertSame($readyStatusBefore, $ready->refresh()->confirmation_status);
+        $this->assertSame($earlyStatusBefore, $earlyStage->refresh()->confirmation_status);
+    }
+
+    public function test_bulk_approve_coordinator_role_requires_coordinator_token(): void
+    {
+        // A sector head trying to finalize as coordinator must be rejected.
+        [$sector, $kpi] = $this->seedKpi();
+        $t = $this->tracking($kpi, 'Pending Coordinator', 1);
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => [(string) $t->id],
+            'role' => 'coordinator',
+        ])->assertStatus(403)->assertJsonPath('code', 'forbidden');
+
+        $this->assertSame('Pending Coordinator', $t->refresh()->confirmation_status);
+    }
+
+    public function test_bulk_approve_rejects_facilitator_role(): void
+    {
+        // Bulk is supported for sector_head and coordinator only.
+        [$sector, $kpi] = $this->seedKpi();
+        $t = $this->tracking($kpi, 'Pending Facilitator', 1);
+        Passport::actingAs($this->makeFacilitator($sector), [], 'api');
+
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => [(string) $t->id],
+            'role' => 'facilitator',
+        ])->assertStatus(422)->assertJsonPath('code', 'validation_error');
+    }
+
     public function test_queue_requires_auth(): void
     {
         $this->getJson('/api/v2/approvals/coordinator/queue')->assertStatus(401)->assertJsonPath('code', 'unauthenticated');

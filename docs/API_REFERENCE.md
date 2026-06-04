@@ -1308,7 +1308,7 @@ Request params: `review_submission_params.dart` (`ReviewSubmissionParams`,
 | --- | --- | --- |
 | `sector` | ❌ | Sector id; scopes the queue to a single sector. Omitted for "all sectors". |
 | `year` | ❌ | Reporting year (int) — the active framework's year; scopes the queue to that cycle. |
-| `quarter` | ❌ | Quarter wire token (`q1`–`q4`); scopes the queue to that quarter. The client always sends the selected quarter. |
+| `quarter` | ❌ | Quarter wire token (`q1`–`q4`); scopes the queue to that quarter. Omitted for "all quarters". |
 | `sort` | ✅ | Sort order — `newest` \| `oldest` (by submission/update time). Defaults to `newest`. |
 
 **Example request**
@@ -1685,7 +1685,7 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | | |
 | --- | --- |
-| **Purpose** | Sector head approves multiple submissions in one call. |
+| **Purpose** | A reviewer approves multiple submissions in one call. Used by the **sector head** (from the bulk candidates) and the **coordinator** (final review queue — accepting in bulk, finalizing each to `confirmed`). |
 | **Method / Path** | `POST /approvals/submissions/bulk-approve` |
 | **Auth** | Bearer required |
 | **Params** | none |
@@ -1694,20 +1694,23 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | Field | Type | Req. | Validation |
 | --- | --- | --- | --- |
-| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve (the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates)). |
-| `role` | string | ✅ | Reviewer role wire token — see Enums (used as `sector_head` here). |
+| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). |
+| `role` | string | ✅ | Reviewer role wire token — `sector_head` \| `coordinator` (see Enums). The server applies that role's accept transition to **every** listed submission (sector head → `pending_facilitator`; **coordinator → `confirmed`**), so the role must match the submissions' current stage. |
+
+A coordinator finalizing a multi-select from the review queue:
 
 ```json
 {
-  "submissionIds": ["bulk-1", "bulk-2", "bulk-3"],
-  "role": "sector_head"
+  "submissionIds": ["coord-mmr", "coord-electrification"],
+  "role": "coordinator"
 }
 ```
 
 **Success:** any 2xx (body ignored; the contract notes `202 Accepted`).
 
-**Status codes:** `2xx` · `401` · `409` (one or more submissions already
-decided / not approvable).
+**Status codes:** `2xx` · `401` · `403` (role not permitted for these
+submissions) · `409` (one or more submissions already decided / not
+approvable for this role's stage).
 
 ---
 
