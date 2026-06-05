@@ -311,9 +311,13 @@ class KpiTrackingService
             return null;
         }
 
+        // Echo the stored value verbatim — no trailing-zero strip (the previous
+        // rtrim($v, '0') turned a stored "120" into "12"). Value fields are
+        // opaque strings per the mobile contract.
+        $value = (string) $target;
         $unit = trim((string) $kpi->unit_of_measurement);
 
-        return $unit === '%' ? rtrim(rtrim((string) $target, '0'), '.').'%' : trim(rtrim(rtrim((string) $target, '0'), '.').' '.$unit);
+        return $unit === '%' ? $value.'%' : trim($value.' '.$unit);
     }
 
     private function lastUpdatedLabel(Collection $tracks): string

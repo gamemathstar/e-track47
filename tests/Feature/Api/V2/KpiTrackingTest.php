@@ -139,6 +139,27 @@ class KpiTrackingTest extends TestCase
             ->assertExactJson(['value' => '85']);
     }
 
+    /**
+     * Round-trip regression for the mobile contract bug — value fields are
+     * opaque strings, must never be trailing-zero-stripped or float-cast.
+     * Stored "120" must come back as "120", not "12"; "850" not "85".
+     */
+    public function test_milestone_round_trip_preserves_trailing_zeros(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        foreach (['120', '850', '1000', '8500.50'] as $value) {
+            $this->postJson("/api/v2/kpis/{$kpi->id}/milestones", [
+                'quarter' => 'q1', 'year' => 2024, 'value' => $value,
+            ])->assertStatus(202);
+
+            $this->getJson("/api/v2/kpis/{$kpi->id}/milestones?quarter=q1&year=2024")
+                ->assertOk()
+                ->assertExactJson(['value' => $value]);
+        }
+    }
+
     public function test_get_milestone_returns_null_when_unset(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();

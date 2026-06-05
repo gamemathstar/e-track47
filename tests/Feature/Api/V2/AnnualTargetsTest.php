@@ -101,9 +101,10 @@ class AnnualTargetsTest extends TestCase
             ],
         ])->assertStatus(202);
 
-        $this->assertSame('120.00', (string) KpiTarget::where(['kpi_id' => $kpis[0]->id, 'year' => 2024])->first()->target);
+        // Verbatim string storage now — no DECIMAL→".00" inflation.
+        $this->assertSame('120', (string) KpiTarget::where(['kpi_id' => $kpis[0]->id, 'year' => 2024])->first()->target);
         // The omitted KPI is unchanged.
-        $this->assertSame('50.00', (string) KpiTarget::where(['kpi_id' => $kpis[1]->id, 'year' => 2024])->first()->target);
+        $this->assertSame('50', (string) KpiTarget::where(['kpi_id' => $kpis[1]->id, 'year' => 2024])->first()->target);
     }
 
     public function test_save_is_atomic_when_one_kpi_does_not_belong_to_the_deliverable(): void

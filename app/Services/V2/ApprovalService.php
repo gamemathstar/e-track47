@@ -733,7 +733,10 @@ class ApprovalService
             return null;
         }
         $unit = trim((string) $kpi->unit_of_measurement);
-        $value = rtrim(rtrim((string) $target, '0'), '.');
+        // Echo the stored value verbatim — no trailing-zero strip (the previous
+        // rtrim($v, '0') turned a stored "120" into "12"). Value fields are
+        // opaque strings per the mobile contract.
+        $value = (string) $target;
 
         return $unit === '%' ? $value.'%' : trim($value.' '.$unit);
     }

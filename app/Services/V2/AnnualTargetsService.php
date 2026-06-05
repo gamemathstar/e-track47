@@ -181,8 +181,10 @@ class AnnualTargetsService
     }
 
     /**
-     * Display-ready numeric string for the wire — strips trailing .00 from
-     * decimals (so 120.00 → "120") while preserving meaningful precision.
+     * Return the stored value verbatim as a string — no float-cast, no
+     * trailing-zero strip. The mobile contract treats value fields as opaque
+     * strings (API_REFERENCE §11.4.4–§11.4.7), so we never reformat. The only
+     * normalisation is empty → ''.
      */
     private function formatNumber(mixed $value): string
     {
@@ -190,11 +192,6 @@ class AnnualTargetsService
             return '';
         }
 
-        $float = (float) $value;
-        if ($float == (int) $float) {
-            return (string) (int) $float;
-        }
-
-        return rtrim(rtrim(number_format($float, 4, '.', ''), '0'), '.');
+        return (string) $value;
     }
 }
