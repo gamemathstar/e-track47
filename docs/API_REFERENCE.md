@@ -983,7 +983,39 @@ typically populates only the required summary fields):
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
-#### 11.4.5 Add tracking entry
+#### 11.4.5 Get milestone
+
+| | |
+| --- | --- |
+| **Purpose** | Read the existing milestone value for a KPI + quarter + year, to pre-fill the "Set Milestone" sheet when it opens. |
+| **Method / Path** | `GET /kpis/{id}/milestones?quarter={q1..q4}&year={year}` |
+| **Auth** | Bearer required |
+| **Path params** | `id` — KPI identifier |
+| **Query params** | `quarter` — `QuarterIndex` wire string (`q1`–`q4`); `year` — int. Both always sent. |
+
+**Success — `200 OK`** (raw object):
+
+```json
+{ "value": "85" }
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `value` | string \| null | ❌ | The saved milestone value as a string. `null` (or omitted) when no milestone has been set for that KPI/quarter/year. |
+
+The client reads **only** `value` and treats a missing / `null` / non-string
+value as "no milestone set yet" → blank field. Return **`200` with
+`value: null`** for the not-set case — **not** `404`.
+
+⚠ **Backend note.** This `GET` shares the path with the `POST` in
+[§11.4.4](#1144-set-milestone). The backend currently registers **only** the
+`POST` route there, so a read returns **`405 Method Not Allowed`**. Add the
+`GET` handler on the same path (or expose it at a dedicated path and tell the
+mobile team so we repoint the client).
+
+**Status codes:** `200` · `401` · `404` (unknown KPI).
+
+#### 11.4.6 Add tracking entry
 
 | | |
 | --- | --- |
@@ -1020,7 +1052,7 @@ typically populates only the required summary fields):
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
-#### 11.4.6 Annual targets (list + save)
+#### 11.4.7 Annual targets (list + save)
 
 Backs the "Set Annual Targets" sheet
 (`ui-designs/kpi_tracking/#23 set_target_bottom_sheet.html`) — set the
@@ -1054,9 +1086,9 @@ annual benchmark for each KPI under a deliverable, for a fiscal year.
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
 | `kpiId` | string | ✅ | |
-| `category` | string | ✅ | grouping eyebrow (e.g. commitment name) |
+| `category` | string | ✅ | grouping eyebrow — the **parent commitment's name** |
 | `title` | string | ✅ | KPI description |
-| `baselineValue` | string | ✅ | display-ready baseline figure (e.g. `"48"`, `"250k"`) |
+| `baselineValue` | string | ✅ | the KPI's **latest confirmed `actual_value`** ("where you stand today"), as a display-ready string (e.g. `"48"`, `"250k"`) |
 | `baselineUnit` | string | ✅ | baseline unit suffix |
 | `targetUnit` | string | ✅ | target input unit suffix |
 | `targetValue` | string | ❌ | last-saved target; omitted when none is set |
@@ -1066,7 +1098,7 @@ annual benchmark for each KPI under a deliverable, for a fiscal year.
 | Field | Type | Req. | Validation |
 | --- | --- | --- | --- |
 | `year` | int | ✅ | 2000..2100 (client-enforced) |
-| `targets` | object[] | ✅ | one per edited KPI; **only non-empty targets are sent** |
+| `targets` | object[] | ✅ | **only KPIs the user changed** are sent; omitted KPIs = no change. A cleared target is not sent (no clear endpoint yet). |
 | `targets[].kpiId` | string | ✅ | |
 | `targets[].value` | string | ✅ | raw input; client validates as a non-negative number (per-KPI errors keyed by `kpiId`) |
 

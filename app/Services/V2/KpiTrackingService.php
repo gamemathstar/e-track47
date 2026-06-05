@@ -105,6 +105,35 @@ class KpiTrackingService
         $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? []);
     }
 
+    /**
+     * Read the milestone already saved for this KPI + quarter + year. Returns
+     * `['value' => null]` when no row exists or the row has no milestone yet
+     * — the mobile contract treats null as "no milestone" so the field renders
+     * blank rather than 404'ing the sheet.
+     *
+     * Authorization is the same as the KPI read endpoints: any user who can
+     * see the KPI can see its milestones (not gated to PDCU like the writes).
+     *
+     * @return array{value: string|null}
+     */
+    public function getMilestone(User $user, string $kpiId, string $quarterWire, int $year): array
+    {
+        $kpi = $this->findKpiOrFail($kpiId);
+        $this->authorizeRead($user, $this->sectorIdForKpi($kpi));
+
+        $quarter = WireEnums::wireToQuarter($quarterWire);
+        $tracking = PerformanceTracking::where('kpi_id', $kpi->id)
+            ->where('quarter', $quarter)
+            ->where('year', $year)
+            ->first();
+
+        $value = $tracking && $tracking->milestone !== null && (string) $tracking->milestone !== ''
+            ? (string) $tracking->milestone
+            : null;
+
+        return ['value' => $value];
+    }
+
     public function setMilestone(User $user, string $kpiId, array $params): void
     {
         $kpi = $this->findKpiOrFail($kpiId);

@@ -41,6 +41,22 @@ class KpiController extends BaseController
         return $this->accepted();
     }
 
+    /** GET /kpis/{id}/milestones?quarter=q1..q4&year={int} */
+    public function getMilestone(Request $request, string $id): array
+    {
+        $validated = $request->validate([
+            'quarter' => ['required', 'in:q1,q2,q3,q4'],
+            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        return $this->kpis->getMilestone(
+            $request->user(),
+            $id,
+            $validated['quarter'],
+            (int) $validated['year'],
+        );
+    }
+
     /** POST /kpis/{id}/milestones */
     public function setMilestone(SetMilestoneRequest $request, string $id)
     {

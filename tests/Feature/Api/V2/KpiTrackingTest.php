@@ -127,6 +127,67 @@ class KpiTrackingTest extends TestCase
         $this->assertSame('90', PerformanceTracking::where('kpi_id', $kpi->id)->where('quarter', 2)->first()->milestone);
     }
 
+    public function test_get_milestone_returns_saved_value(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $this->makeTracking($kpi, ['quarter' => 1, 'year' => 2024, 'milestone' => '85', 'actual_value' => null]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson("/api/v2/kpis/{$kpi->id}/milestones?quarter=q1&year=2024")
+            ->assertOk()
+            ->assertExactJson(['value' => '85']);
+    }
+
+    public function test_get_milestone_returns_null_when_unset(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // No tracking row exists for Q3/2024.
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson("/api/v2/kpis/{$kpi->id}/milestones?quarter=q3&year=2024")
+            ->assertOk()
+            ->assertExactJson(['value' => null]);
+    }
+
+    public function test_get_milestone_returns_null_when_row_exists_without_milestone(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Row exists for Q2 with actual_value but no milestone yet.
+        $this->makeTracking($kpi, ['quarter' => 2, 'year' => 2024, 'milestone' => null, 'actual_value' => '40']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson("/api/v2/kpis/{$kpi->id}/milestones?quarter=q2&year=2024")
+            ->assertOk()
+            ->assertExactJson(['value' => null]);
+    }
+
+    public function test_get_milestone_requires_quarter_and_year(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson("/api/v2/kpis/{$kpi->id}/milestones")
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['quarter', 'year']]);
+    }
+
+    public function test_get_milestone_404_for_unknown_kpi(): void
+    {
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/kpis/999999/milestones?quarter=q1&year=2024')
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_get_milestone_requires_auth(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $this->getJson("/api/v2/kpis/{$kpi->id}/milestones?quarter=q1&year=2024")
+            ->assertStatus(401);
+    }
+
     public function test_data_admin_can_add_tracking_entry(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();

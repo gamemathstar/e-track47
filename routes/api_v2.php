@@ -93,6 +93,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/deliverables/{id}/annual-targets', [DeliverableController::class, 'saveAnnualTargets']);
 
     Route::post('/kpis/{id}/submissions', [KpiController::class, 'submit']);
+    Route::get('/kpis/{id}/milestones', [KpiController::class, 'getMilestone']);
     Route::post('/kpis/{id}/milestones', [KpiController::class, 'setMilestone']);
     Route::post('/kpis/{id}/tracking-entries', [KpiController::class, 'addTracking']);
 });
