@@ -3172,7 +3172,7 @@ referenced from each role's response table.
 | **Purpose** | Quarter completion, upcoming deadlines, and recent activity for the Data-Admin home. |
 | **Method / Path** | `GET /dashboard/data-admin` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `quarter` (optional, `q1`–`q4`) — scope the `deadlines[*]` window lookup to that quarter. Omit → server falls back to the current calendar quarter (so legacy clients keep working). |
 
 **Response fields** (raw object)
 
@@ -3192,20 +3192,21 @@ referenced from each role's response table.
 | --- | --- | --- | --- |
 | `id` | string | ✅ | |
 | `title` | string | ✅ | |
-| `dueLabel` | string | ✅ | pre-formatted (e.g. `Due 15 Nov`) |
+| `dueLabel` | string | ✅ | pre-formatted, derived from `data_entry_accesses` for the sector + Active framework's year + the request's quarter (or current calendar quarter when the client doesn't send one). One of: `Due {M j}` (within deadline), `Extended to {M j}` (override active after deadline lapsed), `Deadline passed` (deadline past and no override), or `Due this period` (fallback when no data-entry window row exists). |
+| `periodLabel` | string | ✅ | reporting period the deadline applies to, formatted `Q{n} {year}` — e.g. `Q2 2024`. Year is the **Active framework's reporting year** (not the calendar year); quarter is the value the client passed in `?quarter=`, or the current calendar quarter when omitted. Render next to `dueLabel` so the user can see *which* quarter is in question. |
 | `ctaLabel` | string | ✅ | call-to-action label (e.g. `Enter Actual`, `Draft`) |
-| `accent` | string | ✅ | accent slot |
+| `accent` | string | ✅ | accent slot, tracks the window state alongside `dueLabel`: `primary` (in-window or fallback), `tertiary` (extension granted), `error` (deadline passed). |
 
 ```json
 {
   "sectorName": "Agriculture",
-  "quarterLabel": "Q2",
+  "quarterLabel": "FY 2024",
   "completedKpis": 3,
   "totalKpis": 12,
   "completionPercent": 25,
   "deadlines": [
-    { "id": "kpi-irrigation", "title": "Irrigation Coverage", "dueLabel": "Due 15 Nov", "ctaLabel": "Enter Actual", "accent": "primary" },
-    { "id": "kpi-crop-yield", "title": "Crop Yield Metrics", "dueLabel": "Due 18 Nov", "ctaLabel": "Draft", "accent": "secondary" }
+    { "id": "kpi-irrigation", "title": "Irrigation Coverage", "dueLabel": "Due 30 Jun", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "primary" },
+    { "id": "kpi-crop-yield",  "title": "Crop Yield Metrics",  "dueLabel": "Extended to 14 Jul", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "tertiary" }
   ],
   "recentActivity": [
     { "id": "act-fertilizer", "title": "Fertilizer Dist.", "subtitle": "Pending Sector Head", "timeLabel": "Today 10:45 AM", "accent": "primary" },

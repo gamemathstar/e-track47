@@ -147,6 +147,8 @@ class DashboardTest extends TestCase
         $this->assertNotEmpty($body['deadlines']);
         $this->assertStringStartsWith('Due ', $body['deadlines'][0]['dueLabel']);
         $this->assertSame('primary', $body['deadlines'][0]['accent']);
+        // periodLabel anchors to the Active framework's year, NOT calendar year.
+        $this->assertSame("Q{$quarter} {$year}", $body['deadlines'][0]['periodLabel']);
     }
 
     public function test_data_admin_deadlines_show_extension_when_override_active_after_deadline(): void
@@ -194,6 +196,53 @@ class DashboardTest extends TestCase
         $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
         $this->assertSame('Deadline passed', $body['deadlines'][0]['dueLabel']);
         $this->assertSame('error', $body['deadlines'][0]['accent']);
+    }
+
+    public function test_data_admin_deadlines_use_client_supplied_quarter(): void
+    {
+        [$sector, $kpi] = $this->seedSector();
+        \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)
+            ->update(['actual_value' => null, 'milestone' => '100']);
+
+        $year = (int) (\App\Models\Framework::where('status', 'Active')->first()?->year ?? date('Y'));
+
+        // Seed two different windows: Q1 already passed, Q3 still open. With
+        // ?quarter=q3 the dashboard should surface the Q3 deadline, not Q1's.
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => $year, 'quarter' => 1,
+            'deadline_date' => now()->subDays(60)->toDateString(),
+            'override_deadline' => null, 'status' => 'closed',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => $year, 'quarter' => 3,
+            'deadline_date' => now()->addDays(20)->toDateString(),
+            'override_deadline' => null, 'status' => 'open',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/data-admin?quarter=q3')->assertOk()->json();
+        $this->assertSame("Q3 {$year}", $body['deadlines'][0]['periodLabel']);
+        $this->assertStringStartsWith('Due ', $body['deadlines'][0]['dueLabel']);
+        $this->assertSame('primary', $body['deadlines'][0]['accent']);
+
+        // Re-fetch with ?quarter=q1 — same response shape, different window.
+        $q1 = $this->getJson('/api/v2/dashboard/data-admin?quarter=q1')->assertOk()->json();
+        $this->assertSame("Q1 {$year}", $q1['deadlines'][0]['periodLabel']);
+        $this->assertSame('Deadline passed', $q1['deadlines'][0]['dueLabel']);
+        $this->assertSame('error', $q1['deadlines'][0]['accent']);
+    }
+
+    public function test_data_admin_rejects_unknown_quarter_token(): void
+    {
+        [$sector] = $this->seedSector();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->getJson('/api/v2/dashboard/data-admin?quarter=q9')
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['quarter']]);
     }
 
     public function test_data_admin_deadlines_fall_back_when_no_window_configured(): void

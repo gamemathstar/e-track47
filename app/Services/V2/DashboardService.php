@@ -190,7 +190,12 @@ class DashboardService
 
     // --- data admin ----------------------------------------------------------
 
-    public function dataAdmin(User $user): array
+    /**
+     * @param  string|null  $quarterWire  q1–q4 from the client; falls back to
+     *                                    the current calendar quarter when
+     *                                    omitted, so legacy clients don't break.
+     */
+    public function dataAdmin(User $user, ?string $quarterWire = null): array
     {
         $sector = $user->isDataAdmin();
         $this->assert((bool) $sector, 'data admin');
@@ -208,16 +213,21 @@ class DashboardService
 
         $completed = $kpis->filter($hasSubmission)->count();
 
-        // Resolve the data entry window once for the (sector, year, current
-        // quarter) triple. All KPIs awaiting submission in this period share
-        // the same deadline, so we surface a single label per row.
+        // Resolve the data entry window once for the (sector, framework year,
+        // quarter) triple. Year is anchored to the Active framework; quarter
+        // is client-supplied (the screen the user is looking at owns that
+        // selection). Falls back to the calendar quarter only when the client
+        // doesn't send one, so the endpoint stays backward-compatible.
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : $this->currentQuarter();
         ['label' => $dueLabel, 'accent' => $dueAccent] =
-            $this->dataEntryDueLabel((int) $sector->id, $year, $this->currentQuarter());
+            $this->dataEntryDueLabel((int) $sector->id, $year, $quarter);
+        $periodLabel = 'Q'.$quarter.' '.$year;
 
         $deadlines = $kpis->reject($hasSubmission)->take(5)->map(fn (Kpi $k) => [
             'id' => (string) $k->id,
             'title' => $k->kpi,
             'dueLabel' => $dueLabel,
+            'periodLabel' => $periodLabel,
             'ctaLabel' => 'Enter Actual',
             'accent' => $dueAccent,
         ])->values()->all();

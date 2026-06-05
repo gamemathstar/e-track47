@@ -38,7 +38,11 @@ class DashboardController extends BaseController
 
     public function dataAdmin(Request $request): array
     {
-        return $this->dashboards->dataAdmin($request->user());
+        $validated = $request->validate([
+            'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
+        ]);
+
+        return $this->dashboards->dataAdmin($request->user(), $validated['quarter'] ?? null);
     }
 
     public function systemAdmin(Request $request): array
