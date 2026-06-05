@@ -208,12 +208,18 @@ class DashboardService
 
         $completed = $kpis->filter($hasSubmission)->count();
 
+        // Resolve the data entry window once for the (sector, year, current
+        // quarter) triple. All KPIs awaiting submission in this period share
+        // the same deadline, so we surface a single label per row.
+        ['label' => $dueLabel, 'accent' => $dueAccent] =
+            $this->dataEntryDueLabel((int) $sector->id, $year, $this->currentQuarter());
+
         $deadlines = $kpis->reject($hasSubmission)->take(5)->map(fn (Kpi $k) => [
             'id' => (string) $k->id,
             'title' => $k->kpi,
-            'dueLabel' => 'Due this period',
+            'dueLabel' => $dueLabel,
             'ctaLabel' => 'Enter Actual',
-            'accent' => 'primary',
+            'accent' => $dueAccent,
         ])->values()->all();
 
         return [
@@ -307,6 +313,50 @@ class DashboardService
     {
         return PerformanceTracking::whereHas('kpi.deliverable.commitment', fn ($q) => $q->where('sector_id', $sectorId))
             ->where('confirmation_status', $state)->count();
+    }
+
+    /**
+     * Build the wire label for the Data Admin's "deadline" rows, derived from
+     * the sector's data_entry_accesses row for (year, quarter):
+     *
+     *   - Today within deadline_date          → "Due {date}", primary accent
+     *   - deadline_date past, override set    → "Extended to {date}", tertiary
+     *   - deadline_date past, no override     → "Deadline passed", error accent
+     *   - No row / table missing              → falls back to "Due this period"
+     *
+     * @return array{label: string, accent: string}
+     */
+    private function dataEntryDueLabel(int $sectorId, int $year, int $quarter): array
+    {
+        $fallback = ['label' => 'Due this period', 'accent' => 'primary'];
+
+        if (! Schema::hasTable('data_entry_accesses')) {
+            return $fallback;
+        }
+
+        $access = DB::table('data_entry_accesses')
+            ->where('sector_id', $sectorId)
+            ->where('year', $year)
+            ->where('quarter', $quarter)
+            ->first();
+
+        if (! $access) {
+            return $fallback;
+        }
+
+        $today = Carbon::today();
+        $deadline = $access->deadline_date ? Carbon::parse($access->deadline_date) : null;
+        $override = $access->override_deadline ? Carbon::parse($access->override_deadline) : null;
+
+        if ($deadline && $today->lte($deadline)) {
+            return ['label' => 'Due '.$deadline->format('M j'), 'accent' => 'primary'];
+        }
+
+        if ($override) {
+            return ['label' => 'Extended to '.$override->format('M j'), 'accent' => 'tertiary'];
+        }
+
+        return ['label' => 'Deadline passed', 'accent' => 'error'];
     }
 
     /**

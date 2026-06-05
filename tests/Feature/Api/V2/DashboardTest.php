@@ -124,6 +124,92 @@ class DashboardTest extends TestCase
             ->assertJsonStructure(['sectorName', 'quarterLabel', 'completedKpis', 'totalKpis', 'completionPercent', 'deadlines', 'recentActivity']);
     }
 
+    public function test_data_admin_deadlines_show_due_date_when_within_window(): void
+    {
+        [$sector, $kpi] = $this->seedSector();
+        // KPI has no actual_value submission yet → it'll appear in deadlines.
+        \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)
+            ->update(['actual_value' => null, 'milestone' => '100']);
+
+        $quarter = (int) ceil((int) date('n') / 3);
+        $year = (int) (\App\Models\Framework::where('status', 'Active')->first()?->year ?? date('Y'));
+
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => $year, 'quarter' => $quarter,
+            'deadline_date' => now()->addDays(7)->toDateString(),
+            'override_deadline' => null, 'status' => 'open',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
+        $this->assertNotEmpty($body['deadlines']);
+        $this->assertStringStartsWith('Due ', $body['deadlines'][0]['dueLabel']);
+        $this->assertSame('primary', $body['deadlines'][0]['accent']);
+    }
+
+    public function test_data_admin_deadlines_show_extension_when_override_active_after_deadline(): void
+    {
+        [$sector, $kpi] = $this->seedSector();
+        \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)
+            ->update(['actual_value' => null, 'milestone' => '100']);
+
+        $quarter = (int) ceil((int) date('n') / 3);
+        $year = (int) (\App\Models\Framework::where('status', 'Active')->first()?->year ?? date('Y'));
+
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => $year, 'quarter' => $quarter,
+            'deadline_date' => now()->subDays(7)->toDateString(),
+            'override_deadline' => now()->addDays(3)->toDateString(),
+            'status' => 'override',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
+        $this->assertStringStartsWith('Extended to ', $body['deadlines'][0]['dueLabel']);
+        $this->assertSame('tertiary', $body['deadlines'][0]['accent']);
+    }
+
+    public function test_data_admin_deadlines_show_passed_when_deadline_past_and_no_override(): void
+    {
+        [$sector, $kpi] = $this->seedSector();
+        \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)
+            ->update(['actual_value' => null, 'milestone' => '100']);
+
+        $quarter = (int) ceil((int) date('n') / 3);
+        $year = (int) (\App\Models\Framework::where('status', 'Active')->first()?->year ?? date('Y'));
+
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => $year, 'quarter' => $quarter,
+            'deadline_date' => now()->subDays(7)->toDateString(),
+            'override_deadline' => null, 'status' => 'closed',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
+        $this->assertSame('Deadline passed', $body['deadlines'][0]['dueLabel']);
+        $this->assertSame('error', $body['deadlines'][0]['accent']);
+    }
+
+    public function test_data_admin_deadlines_fall_back_when_no_window_configured(): void
+    {
+        [$sector, $kpi] = $this->seedSector();
+        \App\Models\PerformanceTracking::where('kpi_id', $kpi->id)
+            ->update(['actual_value' => null, 'milestone' => '100']);
+        // No data_entry_accesses row seeded.
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
+        $this->assertSame('Due this period', $body['deadlines'][0]['dueLabel']);
+        $this->assertSame('primary', $body['deadlines'][0]['accent']);
+    }
+
     public function test_system_admin_dashboard(): void
     {
         $this->seedSector();
