@@ -232,7 +232,7 @@ class DashboardService
             $this->dataEntryDueLabel((int) $sector->id, $year, $quarter);
         $periodLabel = 'Q'.$quarter.' '.$year;
 
-        $deadlines = $kpis->reject($hasSubmission)->take(5)->map(fn (Kpi $k) => [
+        $deadlines = $kpis->reject($hasSubmission)->take(2)->map(fn (Kpi $k) => [
             'id' => (string) $k->id,
             'title' => $k->kpi,
             'dueLabel' => $dueLabel,
@@ -248,7 +248,7 @@ class DashboardService
             'totalKpis' => (int) $kpis->count(),
             'completionPercent' => $kpis->count() > 0 ? round($completed / $kpis->count() * 100, 1) : 0.0,
             'deadlines' => $deadlines,
-            'recentActivity' => $this->recentActivity($kpis->pluck('id')->all(), 5),
+            'recentActivity' => $this->recentActivity($kpis->pluck('id')->all(), 2),
         ];
     }
 
