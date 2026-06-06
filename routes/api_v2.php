@@ -97,6 +97,8 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/kpis/{id}/milestones', [KpiController::class, 'setMilestone']);
     Route::get('/kpis/{id}/tracking-context', [KpiController::class, 'trackingContext']);
     Route::post('/kpis/{id}/tracking-entries', [KpiController::class, 'addTracking']);
+    Route::post('/kpis/{id}/evidence', [KpiController::class, 'uploadEvidence']);
+    Route::delete('/kpis/{id}/evidence/{docId}', [KpiController::class, 'deleteEvidence']);
 });
 
 // --- 11.6 Approvals workflow -------------------------------------------------

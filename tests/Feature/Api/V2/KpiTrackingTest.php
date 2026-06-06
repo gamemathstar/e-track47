@@ -308,6 +308,164 @@ class KpiTrackingTest extends TestCase
             ->assertStatus(401);
     }
 
+    public function test_upload_evidence_returns_doc_id(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.jpg'),
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(201)
+            ->json();
+
+        $this->assertArrayHasKey('id', $body);
+        $this->assertIsString($body['id']);
+
+        $file = \App\Models\File::find((int) $body['id']);
+        $this->assertNotNull($file);
+        $this->assertNull($file->fileable_id);
+        $this->assertStringStartsWith('uploads/evidence/', $file->path);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($file->path);
+    }
+
+    public function test_upload_evidence_rejects_non_image(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->create('report.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['file']]);
+    }
+
+    public function test_upload_evidence_rejects_oversize_file(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            // 6 MB image exceeds 5120 KB cap.
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('big.jpg')->size(6 * 1024),
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['file']]);
+    }
+
+    public function test_upload_evidence_forbidden_for_non_data_admin(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Sector Head can read the KPI but cannot enter data.
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.jpg'),
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(403)->assertJsonPath('code', 'forbidden');
+    }
+
+    public function test_delete_evidence_removes_orphaned_file(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $docId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        $path = \App\Models\File::find((int) $docId)->path;
+
+        $this->delete("/api/v2/kpis/{$kpi->id}/evidence/{$docId}", [], ['Accept' => 'application/json'])
+            ->assertStatus(204);
+
+        $this->assertNull(\App\Models\File::find((int) $docId));
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_delete_evidence_404_when_file_belongs_to_another_user(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $uploader = $this->makeDataAdmin($sector);
+        Passport::actingAs($uploader, [], 'api');
+
+        $docId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        // Different user tries to delete uploader's orphan.
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+        $this->delete("/api/v2/kpis/{$kpi->id}/evidence/{$docId}", [], ['Accept' => 'application/json'])
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+
+        $this->assertNotNull(\App\Models\File::find((int) $docId));
+    }
+
+    public function test_delete_evidence_404_when_already_attached(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $admin = $this->makeDataAdmin($sector);
+        Passport::actingAs($admin, [], 'api');
+
+        $docId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('evidence.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        // Submit a tracking entry that attaches this file.
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q1', 'year' => 2024, 'trackingDate' => '2024-09-15T00:00:00.000',
+            'actualValue' => '62', 'evidenceDocumentIds' => [(string) $docId],
+        ])->assertStatus(202);
+
+        // Now the file is attached — delete must 404.
+        $this->delete("/api/v2/kpis/{$kpi->id}/evidence/{$docId}", [], ['Accept' => 'application/json'])
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_submit_only_attaches_files_uploaded_by_caller(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $admin = $this->makeDataAdmin($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+
+        // Coordinator uploads a file for the same KPI.
+        Passport::actingAs($coordinator, [], 'api');
+        $stolenDocId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('coord.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        // Data admin submits, including the coordinator's file id in the body.
+        Passport::actingAs($admin, [], 'api');
+        $ownDocId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('own.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q1', 'year' => 2024, 'trackingDate' => '2024-09-15T00:00:00.000',
+            'actualValue' => '62', 'evidenceDocumentIds' => [(string) $stolenDocId, (string) $ownDocId],
+        ])->assertStatus(202);
+
+        // The data admin's own upload got attached; the coordinator's orphan did NOT.
+        $this->assertNotNull(\App\Models\File::find((int) $ownDocId)->fileable_id);
+        $this->assertNull(\App\Models\File::find((int) $stolenDocId)->fileable_id);
+    }
+
+    public function test_upload_evidence_requires_auth(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $this->post("/api/v2/kpis/{$kpi->id}/evidence", [], ['Accept' => 'application/json'])
+            ->assertStatus(401);
+    }
+
     public function test_data_admin_can_add_tracking_entry(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();

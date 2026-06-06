@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V2;
 use App\Http\Requests\V2\Kpi\AddTrackingEntryRequest;
 use App\Http\Requests\V2\Kpi\SetMilestoneRequest;
 use App\Http\Requests\V2\Kpi\SubmitPerformanceRequest;
+use App\Http\Requests\V2\Kpi\UploadEvidenceRequest;
 use App\Http\Resources\V2\KpiResource;
 use App\Services\V2\KpiTrackingService;
 use Illuminate\Http\Request;
@@ -77,5 +78,22 @@ class KpiController extends BaseController
         $this->kpis->addTrackingEntry($request->user(), $id, $request->validated());
 
         return $this->accepted();
+    }
+
+    /** POST /kpis/{id}/evidence (multipart/form-data) */
+    public function uploadEvidence(UploadEvidenceRequest $request, string $id)
+    {
+        return response()->json(
+            $this->kpis->uploadEvidence($request->user(), $id, $request->file('file')),
+            201,
+        );
+    }
+
+    /** DELETE /kpis/{id}/evidence/{docId} */
+    public function deleteEvidence(Request $request, string $id, string $docId)
+    {
+        $this->kpis->deleteEvidence($request->user(), $id, $docId);
+
+        return $this->noContent();
     }
 }

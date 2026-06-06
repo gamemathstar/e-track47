@@ -11,9 +11,12 @@ use App\Models\PerformanceTracking;
 use App\Models\User;
 use App\Support\V2\WireEnums;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * KPI tracking reads + mutations (API_REFERENCE.md §11.4). Reuses the existing
@@ -104,7 +107,7 @@ class KpiTrackingService
         $tracking->coordinator_rejection_reason = null;
         $tracking->save();
 
-        $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? []);
+        $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? [], $user);
     }
 
     /**
@@ -256,7 +259,7 @@ class KpiTrackingService
         $tracking->confirmation_status ??= 'Not Confirmed';
         $tracking->save();
 
-        $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? []);
+        $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? [], $user);
     }
 
     // --- attach derived presentation -----------------------------------------
@@ -460,17 +463,77 @@ class KpiTrackingService
         }
     }
 
-    private function attachEvidence(PerformanceTracking $tracking, array $evidenceIds): void
+    /**
+     * Upload a single evidence file (API_REFERENCE §11.4.8). Files start
+     * orphaned (fileable_id = null) and only get bound to a tracking row when
+     * the user submits the entry via attachEvidence(). Caller is gated to the
+     * same role that can submit the tracking entry (data admin for the KPI's
+     * sector, or all-sector roles).
+     *
+     * @return array{id: string}
+     */
+    public function uploadEvidence(User $user, string $kpiId, UploadedFile $upload): array
+    {
+        $kpi = $this->findKpiOrFail($kpiId);
+        $this->authorizeDataEntry($user, $this->sectorIdForKpi($kpi));
+
+        $ext = strtolower($upload->getClientOriginalExtension()) ?: 'bin';
+        $name = uniqid('ev_').'.'.$ext;
+        Storage::disk('public')->putFileAs('uploads/evidence', $upload, $name);
+
+        $file = new File();
+        $file->name = (string) $upload->getClientOriginalName();
+        $file->path = 'uploads/evidence/'.$name;
+        $file->type = (string) ($upload->getMimeType() ?: 'application/octet-stream');
+        $file->size = (int) $upload->getSize();
+        $file->attached_by = (int) $user->id;
+        // fileable_id / fileable_type stay NULL until the tracking-entry submit
+        // attaches this file to a PerformanceTracking row.
+        $file->save();
+
+        return ['id' => (string) $file->id];
+    }
+
+    /**
+     * Delete an orphaned evidence upload (API_REFERENCE §11.4.8). Only the
+     * uploader can delete, and only while the file hasn't been attached to a
+     * submitted tracking entry yet — once attached, the entry's history owns
+     * the record.
+     */
+    public function deleteEvidence(User $user, string $kpiId, string $docId): void
+    {
+        $kpi = $this->findKpiOrFail($kpiId);
+        $this->authorizeDataEntry($user, $this->sectorIdForKpi($kpi));
+
+        $file = File::find((int) $docId);
+        if (! $file || (int) $file->attached_by !== (int) $user->id || $file->fileable_id !== null) {
+            throw ApiException::notFound('Evidence not found.');
+        }
+
+        Storage::disk('public')->delete($file->path);
+        $file->delete();
+    }
+
+    /**
+     * Bind the uploaded evidence files to a tracking row after the submit.
+     * Only attaches files the current user uploaded that aren't already
+     * attached to another row — prevents file-ID poaching across users or
+     * across tracking entries.
+     */
+    private function attachEvidence(PerformanceTracking $tracking, array $evidenceIds, User $user): void
     {
         $ids = array_filter(array_map('intval', $evidenceIds));
         if (empty($ids)) {
             return;
         }
 
-        File::whereIn('id', $ids)->update([
-            'fileable_id' => $tracking->id,
-            'fileable_type' => PerformanceTracking::class,
-        ]);
+        File::whereIn('id', $ids)
+            ->where('attached_by', (int) $user->id)
+            ->whereNull('fileable_id')
+            ->update([
+                'fileable_id' => $tracking->id,
+                'fileable_type' => PerformanceTracking::class,
+            ]);
     }
 
     // --- resolution & authorization ------------------------------------------
