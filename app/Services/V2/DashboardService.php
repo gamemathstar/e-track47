@@ -200,8 +200,19 @@ class DashboardService
         $sector = $user->isDataAdmin();
         $this->assert((bool) $sector, 'data admin');
 
-        $kpis = Kpi::whereHas('deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
-            ->with('performanceTracking')->orderBy('kpi')->get();
+        // Skip KPIs that have NEITHER a target row nor any performance_tracking
+        // history. Those are unconfigured KPIs the data admin can't act on yet
+        // — listing them in the dashboard's totals/deadlines is noisy and
+        // makes the completion % misleading.
+        $kpis = Kpi::query()
+            ->whereHas('deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
+            ->where(function ($q) {
+                $q->whereHas('kpiTargets')
+                    ->orWhereHas('performanceTracking');
+            })
+            ->with('performanceTracking')
+            ->orderBy('kpi')
+            ->get();
         // Anchor completion to the framework's reporting year, not the calendar
         // quarter: a KPI counts as completed if it has any actual_value
         // submission for the framework year (across all quarters).
