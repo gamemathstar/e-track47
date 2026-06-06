@@ -22,6 +22,13 @@ class DashboardTest extends TestCase
         $commitment = $this->makeCommitment($sector, ['status' => 'In Progress']);
         $deliverable = $this->makeDeliverable($commitment);
         $kpi = $this->makeKpi($deliverable);
+        // Both a target and a tracking row so the KPI satisfies the data-admin
+        // dashboard's "fully configured" filter (kpiTargets AND performanceTracking).
+        $t = new \App\Models\KpiTarget();
+        $t->kpi_id = $kpi->id;
+        $t->year = 2024;
+        $t->target = '120';
+        $t->save();
         $this->makeTracking($kpi, ['quarter' => 1, 'actual_value' => '80', 'milestone' => '100']);
 
         return [$sector, $kpi];
@@ -245,63 +252,52 @@ class DashboardTest extends TestCase
             ->assertJsonStructure(['fieldErrors' => ['quarter']]);
     }
 
-    public function test_data_admin_dashboard_excludes_kpis_without_target_or_tracking(): void
+    public function test_data_admin_dashboard_requires_both_target_and_tracking(): void
     {
-        // Set up two KPIs in the same sector:
-        //  - $configured has a performance_tracking row (no target, but tracking exists)
-        //  - $orphan has neither a target nor any performance_tracking row
-        // The orphan must NOT appear in totals or deadlines.
+        // Four KPIs in the same sector, one per state in the truth table.
+        // Only the fully-configured one (target AND tracking) is expected to
+        // appear; the other three are excluded.
         $fw = $this->makeFramework();
         $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
         $commitment = $this->makeCommitment($sector);
         $deliverable = $this->makeDeliverable($commitment);
 
-        $configured = $this->makeKpi($deliverable, ['kpi' => 'A — Configured KPI']);
-        $orphan = $this->makeKpi($deliverable, ['kpi' => 'Z — Orphan KPI']);
+        $bothSet      = $this->makeKpi($deliverable, ['kpi' => 'A — Target + Tracking']);
+        $targetOnly   = $this->makeKpi($deliverable, ['kpi' => 'B — Target only']);
+        $trackingOnly = $this->makeKpi($deliverable, ['kpi' => 'C — Tracking only']);
+        $neither      = $this->makeKpi($deliverable, ['kpi' => 'D — Neither']);
 
-        // Tracking row for the configured KPI; no actual_value yet → it'll
-        // appear in the deadlines list.
-        \App\Models\PerformanceTracking::create([
-            'kpi_id' => $configured->id, 'framework_id' => $fw->id,
-            'quarter' => 1, 'year' => 2024,
-            'milestone' => '100', 'actual_value' => null,
-            'confirmation_status' => 'Not Confirmed',
-        ]);
+        // Target rows for $bothSet and $targetOnly.
+        foreach ([$bothSet->id, $targetOnly->id] as $id) {
+            $t = new \App\Models\KpiTarget();
+            $t->kpi_id = $id;
+            $t->year = 2024;
+            $t->target = '120';
+            $t->save();
+        }
+
+        // Tracking rows for $bothSet and $trackingOnly.
+        foreach ([$bothSet->id, $trackingOnly->id] as $id) {
+            \App\Models\PerformanceTracking::create([
+                'kpi_id' => $id, 'framework_id' => $fw->id,
+                'quarter' => 1, 'year' => 2024,
+                'milestone' => '100', 'actual_value' => null,
+                'confirmation_status' => 'Not Confirmed',
+            ]);
+        }
 
         Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
 
         $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
 
-        // totalKpis counts only the configured KPI; orphan is invisible.
+        // Only the fully-configured KPI is counted.
         $this->assertSame(1, $body['totalKpis']);
 
-        // The single deadline is the configured KPI; no orphan id leaks in.
         $deadlineIds = array_column($body['deadlines'], 'id');
-        $this->assertContains((string) $configured->id, $deadlineIds);
-        $this->assertNotContains((string) $orphan->id, $deadlineIds);
-    }
-
-    public function test_data_admin_dashboard_includes_kpi_with_only_target(): void
-    {
-        // A KPI that has a kpi_targets row but no performance_tracking row
-        // should still appear (it's "configured" enough for the data admin
-        // to start entering against).
-        $fw = $this->makeFramework();
-        $sector = $this->makeSector($fw);
-        $commitment = $this->makeCommitment($sector);
-        $deliverable = $this->makeDeliverable($commitment);
-        $kpi = $this->makeKpi($deliverable, ['kpi' => 'Target-only KPI']);
-
-        $t = new \App\Models\KpiTarget();
-        $t->kpi_id = $kpi->id;
-        $t->year = 2024;
-        $t->target = '120';
-        $t->save();
-
-        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
-
-        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
-        $this->assertSame(1, $body['totalKpis']);
+        $this->assertContains((string) $bothSet->id, $deadlineIds);
+        $this->assertNotContains((string) $targetOnly->id,   $deadlineIds);
+        $this->assertNotContains((string) $trackingOnly->id, $deadlineIds);
+        $this->assertNotContains((string) $neither->id,      $deadlineIds);
     }
 
     public function test_data_admin_deadlines_fall_back_when_no_window_configured(): void

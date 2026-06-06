@@ -200,16 +200,14 @@ class DashboardService
         $sector = $user->isDataAdmin();
         $this->assert((bool) $sector, 'data admin');
 
-        // Skip KPIs that have NEITHER a target row nor any performance_tracking
-        // history. Those are unconfigured KPIs the data admin can't act on yet
-        // — listing them in the dashboard's totals/deadlines is noisy and
-        // makes the completion % misleading.
+        // Only include KPIs that have BOTH a target row AND at least one
+        // performance_tracking row. A KPI missing either side is treated as
+        // unconfigured — listing it in totals/deadlines is noisy and makes
+        // the completion % misleading.
         $kpis = Kpi::query()
             ->whereHas('deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
-            ->where(function ($q) {
-                $q->whereHas('kpiTargets')
-                    ->orWhereHas('performanceTracking');
-            })
+            ->whereHas('kpiTargets')
+            ->whereHas('performanceTracking')
             ->with('performanceTracking')
             ->orderBy('kpi')
             ->get();
