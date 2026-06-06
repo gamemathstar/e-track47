@@ -41,6 +41,12 @@ class KpiController extends BaseController
         return $this->accepted();
     }
 
+    /** GET /kpis/{id}/tracking-context */
+    public function trackingContext(Request $request, string $id): array
+    {
+        return $this->kpis->getTrackingContext($request->user(), $id);
+    }
+
     /** GET /kpis/{id}/milestones?quarter=q1..q4&year={int} */
     public function getMilestone(Request $request, string $id): array
     {

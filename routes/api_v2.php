@@ -95,6 +95,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/kpis/{id}/submissions', [KpiController::class, 'submit']);
     Route::get('/kpis/{id}/milestones', [KpiController::class, 'getMilestone']);
     Route::post('/kpis/{id}/milestones', [KpiController::class, 'setMilestone']);
+    Route::get('/kpis/{id}/tracking-context', [KpiController::class, 'trackingContext']);
     Route::post('/kpis/{id}/tracking-entries', [KpiController::class, 'addTracking']);
 });
 

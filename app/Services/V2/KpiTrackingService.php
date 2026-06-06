@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Support\V2\WireEnums;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * KPI tracking reads + mutations (API_REFERENCE.md §11.4). Reuses the existing
@@ -103,6 +105,91 @@ class KpiTrackingService
         $tracking->save();
 
         $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? []);
+    }
+
+    /**
+     * Tiny read tailored for the mobile "Add Performance Tracking" sheet
+     * (API_REFERENCE §11.4.7). Returns only the labels the sheet needs so the
+     * client can stop calling the heavy /kpis/{id} detail endpoint.
+     *
+     * Quarter resolution: pick the open data-entry window for the KPI's
+     * sector + framework year, preferring the current calendar quarter when
+     * it's among the open set. Falls back to the calendar quarter when no
+     * window is open. The submit endpoint enforces its own gating, so this is
+     * a hint, not a guarantee.
+     *
+     * @return array<string, mixed>
+     */
+    public function getTrackingContext(User $user, string $kpiId): array
+    {
+        $kpi = $this->findKpiOrFail($kpiId);
+        $sectorId = $this->sectorIdForKpi($kpi);
+        $this->authorizeRead($user, $sectorId);
+
+        $year = $this->resolvedYear($kpi);
+        $quarter = $this->resolveActiveQuarter($sectorId, $year);
+
+        $tracking = PerformanceTracking::where('kpi_id', $kpi->id)
+            ->where('quarter', $quarter)
+            ->where('year', $year)
+            ->first();
+
+        $milestone = $tracking && $tracking->milestone !== null && (string) $tracking->milestone !== ''
+            ? (string) $tracking->milestone
+            : null;
+
+        $commitment = optional($kpi->deliverable)->commitment;
+        $unit = $kpi->unit_of_measurement;
+        $unit = $unit !== null && trim((string) $unit) !== '' ? (string) $unit : null;
+
+        return array_filter([
+            'kpiId' => (string) $kpi->id,
+            'kpiTitle' => (string) $kpi->kpi,
+            'commitmentLabel' => optional($commitment)->name ?? '—',
+            'quarter' => WireEnums::quarterToWire($quarter),
+            'year' => (int) $year,
+            'unit' => $unit,
+            'currentMilestoneValue' => $milestone,
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * Pick the data-entry quarter the mobile sheet should default to. Prefers
+     * an open/override window for the KPI's sector + framework year over the
+     * raw calendar quarter, so a sector with Q3 unlocked while Q2 is locked
+     * sees the sheet open on Q3.
+     */
+    private function resolveActiveQuarter(?int $sectorId, int $year): int
+    {
+        $calendar = (int) ceil((int) date('n') / 3);
+
+        if ($sectorId === null || ! Schema::hasTable('data_entry_accesses')) {
+            return $calendar;
+        }
+
+        $today = Carbon::today()->toDateString();
+        $rows = DB::table('data_entry_accesses')
+            ->where('sector_id', $sectorId)
+            ->where('year', $year)
+            ->whereIn('status', ['open', 'override'])
+            ->where(function ($q) use ($today) {
+                $q->where('deadline_date', '>=', $today)
+                    ->orWhere('override_deadline', '>=', $today);
+            })
+            ->orderBy('quarter')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return $calendar;
+        }
+
+        // Prefer the current calendar quarter if it's in the open set, so the
+        // sheet feels natural during the active reporting window.
+        if ($rows->contains('quarter', $calendar)) {
+            return $calendar;
+        }
+
+        return (int) $rows->first()->quarter;
     }
 
     /**

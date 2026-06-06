@@ -209,6 +209,105 @@ class KpiTrackingTest extends TestCase
             ->assertStatus(401);
     }
 
+    public function test_tracking_context_returns_sheet_labels(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}/tracking-context")
+            ->assertOk()
+            ->json();
+
+        $this->assertSame((string) $kpi->id, $body['kpiId']);
+        $this->assertSame('Clinics with EHR', $body['kpiTitle']);
+        $this->assertSame('Maternal Health Expansion', $body['commitmentLabel']);
+        $this->assertSame('%', $body['unit']);
+        $this->assertSame(2024, $body['year']);
+        $this->assertMatchesRegularExpression('/^q[1-4]$/', $body['quarter']);
+    }
+
+    public function test_tracking_context_omits_unit_and_milestone_when_absent(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        $commitment = $this->makeCommitment($sector, ['name' => 'Maternal Health Expansion']);
+        $deliverable = $this->makeDeliverable($commitment);
+        $kpi = $this->makeKpi($deliverable, ['kpi' => 'Some KPI', 'unit_of_measurement' => '']);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}/tracking-context")
+            ->assertOk()
+            ->json();
+
+        $this->assertArrayNotHasKey('unit', $body);
+        $this->assertArrayNotHasKey('currentMilestoneValue', $body);
+    }
+
+    public function test_tracking_context_includes_existing_milestone(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Seed a milestone for the quarter the endpoint is going to land on
+        // (calendar quarter when no data-entry window is configured).
+        $quarter = (int) ceil((int) date('n') / 3);
+        $this->makeTracking($kpi, [
+            'quarter' => $quarter, 'year' => 2024, 'milestone' => '85', 'actual_value' => null,
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}/tracking-context")
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('85', $body['currentMilestoneValue']);
+        $this->assertSame('q'.$quarter, $body['quarter']);
+    }
+
+    public function test_tracking_context_picks_open_window_quarter(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Lock the current calendar quarter, open Q3 explicitly. The endpoint
+        // should default to Q3 instead of the calendar quarter.
+        $calendar = (int) ceil((int) date('n') / 3);
+        $other = $calendar === 3 ? 1 : 3;
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => 2024, 'quarter' => $calendar,
+            'deadline_date' => now()->subDays(30)->toDateString(),
+            'override_deadline' => null, 'status' => 'closed',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        \DB::table('data_entry_accesses')->insert([
+            'sector_id' => $sector->id, 'year' => 2024, 'quarter' => $other,
+            'deadline_date' => now()->addDays(20)->toDateString(),
+            'override_deadline' => null, 'status' => 'open',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}/tracking-context")
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('q'.$other, $body['quarter']);
+    }
+
+    public function test_tracking_context_404_for_unknown_kpi(): void
+    {
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->getJson('/api/v2/kpis/999999/tracking-context')
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_tracking_context_requires_auth(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $this->getJson("/api/v2/kpis/{$kpi->id}/tracking-context")
+            ->assertStatus(401);
+    }
+
     public function test_data_admin_can_add_tracking_entry(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();

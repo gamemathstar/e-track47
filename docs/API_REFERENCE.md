@@ -1052,7 +1052,47 @@ mobile team so we repoint the client).
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
-#### 11.4.7 Annual targets (list + save)
+#### 11.4.7 Tracking-entry context (read)
+
+| | |
+| --- | --- |
+| **Purpose** | The minimal slice the "Add Performance Tracking" sheet needs — a purpose-built read so the sheet doesn't pull the heavy [§11.4.2](#1142-get-kpi-detail) detail payload just to render a few labels. |
+| **Method / Path** | `GET /kpis/{id}/tracking-context` |
+| **Auth** | Bearer required |
+| **Path params** | `id` — KPI identifier |
+
+**Success — `200 OK`** (raw object):
+
+```json
+{
+  "kpiId": "ehr-coverage",
+  "kpiTitle": "Percentage of clinics with EHR",
+  "commitmentLabel": "Maternal Health Expansion",
+  "quarter": "q3",
+  "year": 2024,
+  "unit": "%",
+  "currentMilestoneValue": "85%"
+}
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `kpiId` | string | ✅ | |
+| `kpiTitle` | string | ✅ | shown as the sheet's header subtitle |
+| `commitmentLabel` | string | ✅ | parent commitment name — the first context chip |
+| `quarter` | string | ✅ | `QuarterIndex` wire token (`q1`–`q4`); the quarter chip + the submit payload's `quarter` |
+| `year` | int | ✅ | the year chip + the submit payload's `year` |
+| `unit` | string | ❌ | suffix for the actual-value field (e.g. `%`, `boreholes`); omit when none |
+| `currentMilestoneValue` | string | ❌ | milestone already set for this quarter (read-only readout); omit/null when none |
+
+The client parses `kpiId`/`kpiTitle`/`commitmentLabel`/`quarter` as strings and
+`year` as an int (strict); `unit`/`currentMilestoneValue` are optional. The
+submit still POSTs to [§11.4.6](#1146-add-tracking-entry) using the `quarter`
+and `year` from this payload.
+
+**Status codes:** `200` · `401` · `404` (unknown KPI).
+
+#### 11.4.8 Annual targets (list + save)
 
 Backs the "Set Annual Targets" sheet
 (`ui-designs/kpi_tracking/#23 set_target_bottom_sheet.html`) — set the
@@ -3172,7 +3212,12 @@ referenced from each role's response table.
 | **Purpose** | Quarter completion, upcoming deadlines, and recent activity for the Data-Admin home. |
 | **Method / Path** | `GET /dashboard/data-admin` |
 | **Auth** | Bearer required |
-| **Query params** | `quarter` (optional, `q1`–`q4`) — scope the `deadlines[*]` window lookup to that quarter. Omit → server falls back to the current calendar quarter (so legacy clients keep working). |
+| **Query params** | `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`). Re-scopes the snapshot (hero metrics + deadlines + activity) to that quarter. **Omitted** on the initial load, where the server resolves the active quarter and echoes it in `quarterLabel`. |
+
+The client renders quarter chips between the hero card and the deadlines;
+tapping one re-fetches with `?quarter=`. It seeds the selected chip from the
+returned `quarterLabel`, so keep that field consistent with the requested
+quarter (e.g. request `?quarter=q4` → respond with `quarterLabel: "Q4"`).
 
 **Response fields** (raw object)
 
@@ -3192,21 +3237,21 @@ referenced from each role's response table.
 | --- | --- | --- | --- |
 | `id` | string | ✅ | |
 | `title` | string | ✅ | |
-| `dueLabel` | string | ✅ | pre-formatted, derived from `data_entry_accesses` for the sector + Active framework's year + the request's quarter (or current calendar quarter when the client doesn't send one). One of: `Due {M j}` (within deadline), `Extended to {M j}` (override active after deadline lapsed), `Deadline passed` (deadline past and no override), or `Due this period` (fallback when no data-entry window row exists). |
-| `periodLabel` | string | ✅ | reporting period the deadline applies to, formatted `Q{n} {year}` — e.g. `Q2 2024`. Year is the **Active framework's reporting year** (not the calendar year); quarter is the value the client passed in `?quarter=`, or the current calendar quarter when omitted. Render next to `dueLabel` so the user can see *which* quarter is in question. |
+| `dueLabel` | string | ✅ | pre-formatted window-state label — one of `Due {M j}` / `Extended to {M j}` / `Deadline passed` / `Due this period` (fallback). Display text only; don't parse a date out of it. |
+| `periodLabel` | string | ❌ | quarter + framework year the deadline refers to (e.g. `"Q2 2024"`). Rendered next to `dueLabel`. The client treats it as optional (older/fallback rows omit it). |
 | `ctaLabel` | string | ✅ | call-to-action label (e.g. `Enter Actual`, `Draft`) |
-| `accent` | string | ✅ | accent slot, tracks the window state alongside `dueLabel`: `primary` (in-window or fallback), `tertiary` (extension granted), `error` (deadline passed). |
+| `accent` | string | ✅ | window-state colour: `primary` (in-window/fallback) · `tertiary` (extension granted) · `error` (deadline passed) |
 
 ```json
 {
   "sectorName": "Agriculture",
-  "quarterLabel": "FY 2024",
+  "quarterLabel": "Q2",
   "completedKpis": 3,
   "totalKpis": 12,
   "completionPercent": 25,
   "deadlines": [
     { "id": "kpi-irrigation", "title": "Irrigation Coverage", "dueLabel": "Due 30 Jun", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "primary" },
-    { "id": "kpi-crop-yield",  "title": "Crop Yield Metrics",  "dueLabel": "Extended to 14 Jul", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "tertiary" }
+    { "id": "kpi-crop-yield", "title": "Crop Yield Metrics", "dueLabel": "Deadline passed", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "error" }
   ],
   "recentActivity": [
     { "id": "act-fertilizer", "title": "Fertilizer Dist.", "subtitle": "Pending Sector Head", "timeLabel": "Today 10:45 AM", "accent": "primary" },
