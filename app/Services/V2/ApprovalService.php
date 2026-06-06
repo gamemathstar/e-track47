@@ -698,8 +698,48 @@ class ApprovalService
                 return 'pending_entry';
             }
 
-            return WireEnums::statusToWire($t->confirmation_status);
+            // Derive the wire state from the WHO columns rather than
+            // confirmation_status — the column drifts when the web's older
+            // submit flow doesn't promote 'Not Confirmed' to
+            // 'Pending Sector Head Approval' on submit. The WHO columns are
+            // always written, so they're the source of truth.
+            return $this->derivedStateFor($t);
         })->all();
+    }
+
+    /**
+     * Map a submitted PerformanceTracking row to its wire state using the
+     * WHO columns. Used by the data-admin "my KPIs" view so a row whose
+     * confirmation_status is stale (still 'Not Confirmed' after the data
+     * admin submitted) doesn't incorrectly read as 'pending_entry'.
+     */
+    private function derivedStateFor(PerformanceTracking $t): string
+    {
+        $shDone = $t->sector_head_approved_by !== null;
+        $facDone = $t->facilitator_confirmed_by !== null;
+        $coDone = $t->coordinator_confirmed_by !== null;
+
+        if ($coDone) {
+            $rejected = ($this->hasColumn('coordinator_decision') && $t->coordinator_decision === 'Reject')
+                || ($this->hasColumn('coordinator_rejection_reason') && ! empty($t->coordinator_rejection_reason));
+
+            return $rejected ? 'rejected' : 'confirmed';
+        }
+
+        if ($facDone && $t->facilitator_decision === 'Reject') {
+            // Facilitator rejection bounces the row back to the data admin.
+            return 'rejected';
+        }
+
+        if ($facDone && $t->facilitator_decision === 'Accept') {
+            return 'pending_coordinator';
+        }
+
+        if ($shDone) {
+            return 'pending_facilitator';
+        }
+
+        return 'pending_sector_head';
     }
 
     private function overallState(array $quarterStates): string

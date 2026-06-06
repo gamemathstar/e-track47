@@ -429,6 +429,124 @@ class ApprovalsTest extends TestCase
             ->assertJsonPath('0.overallState', 'pending_sector_head');
     }
 
+    public function test_my_kpis_reads_state_from_who_columns_when_confirmation_status_is_stale(): void
+    {
+        // The production scenario: data admin submitted, actual_value is set,
+        // but the web's older path left confirmation_status at 'Not Confirmed'.
+        // Without WHO derivation this row reads as 'pending_entry'; with the
+        // fix it reads as 'pending_sector_head' (correct — waiting on SH).
+        [$sector, $kpi] = $this->seedKpi();
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '80',
+            'sector_head_approved_by' => null,
+            'facilitator_confirmed_by' => null,
+            'coordinator_confirmed_by' => null,
+            'confirmation_status' => 'Not Confirmed', // ← stale
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->getJson('/api/v2/approvals/data-admin/my-kpis?filter=all&year=2024')
+            ->assertOk()
+            ->assertJsonPath('0.quarterStates.0', 'pending_sector_head')
+            ->assertJsonPath('0.overallState', 'pending_sector_head');
+    }
+
+    public function test_my_kpis_derives_pending_facilitator_when_sh_approved_but_status_stale(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '80',
+            'sector_head_approved_by' => $sh->id,
+            'sector_head_approved_at' => now(),
+            'confirmation_status' => 'Not Confirmed', // stale
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->getJson('/api/v2/approvals/data-admin/my-kpis?filter=all&year=2024')
+            ->assertOk()
+            ->assertJsonPath('0.quarterStates.0', 'pending_facilitator')
+            ->assertJsonPath('0.overallState', 'pending_facilitator');
+    }
+
+    public function test_my_kpis_derives_pending_coordinator_when_facilitator_accepted_but_status_stale(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '80',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'confirmation_status' => 'Pending Facilitator', // stale — should be Pending Coordinator
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $this->getJson('/api/v2/approvals/data-admin/my-kpis?filter=all&year=2024')
+            ->assertOk()
+            ->assertJsonPath('0.quarterStates.0', 'pending_coordinator')
+            ->assertJsonPath('0.overallState', 'pending_coordinator');
+    }
+
+    public function test_my_kpis_derives_rejected_when_facilitator_rejected(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '80',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Reject',
+            'facilitator_rejection_reason' => 'Evidence missing.',
+            'confirmation_status' => 'Pending Facilitator', // stale
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/approvals/data-admin/my-kpis?filter=all&year=2024')
+            ->assertOk()->json();
+
+        $this->assertSame('rejected', $body[0]['quarterStates'][0]);
+        $this->assertSame('rejected', $body[0]['overallState']);
+        $this->assertSame('Action required', $body[0]['lastUpdateLabel']);
+        $this->assertTrue($body[0]['lastUpdateIsError']);
+    }
+
+    public function test_my_kpis_derives_confirmed_when_coordinator_finalised(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024,
+            'milestone' => '100', 'actual_value' => '80',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'coordinator_confirmed_by' => $coordinator->id, 'coordinator_confirmed_at' => now(),
+            'confirmation_status' => 'Pending Coordinator', // stale — should be Confirmed
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        // Q1 is confirmed; the other 3 have no row → they're 'pending_entry'.
+        // overallState rolls up to 'pending_entry' (other quarters still need
+        // entry); the assertion focuses on the per-quarter derivation.
+        $this->getJson('/api/v2/approvals/data-admin/my-kpis?filter=all&year=2024')
+            ->assertOk()
+            ->assertJsonPath('0.quarterStates.0', 'confirmed');
+    }
+
     public function test_submission_detail(): void
     {
         [$sector, $kpi] = $this->seedKpi();
