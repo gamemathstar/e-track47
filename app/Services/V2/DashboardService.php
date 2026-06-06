@@ -200,34 +200,34 @@ class DashboardService
         $sector = $user->isDataAdmin();
         $this->assert((bool) $sector, 'data admin');
 
-        // Only include KPIs that have BOTH a target row AND at least one
-        // performance_tracking row. A KPI missing either side is treated as
-        // unconfigured — listing it in totals/deadlines is noisy and makes
-        // the completion % misleading.
+        // Resolve the (year, quarter) up front so the KPI filter can scope by
+        // them. Year = Active framework's reporting year; quarter is
+        // client-supplied (falls back to the calendar quarter when omitted).
+        $year = $this->frameworkYear();
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : $this->currentQuarter();
+
+        // Inclusion rule: KPI must have a target row AND a performance_tracking
+        // row scoped to *this* quarter/year with a non-empty milestone. Without
+        // a milestone the KPI is unconfigured for the period — the data admin
+        // has nothing to enter against.
         $kpis = Kpi::query()
             ->whereHas('deliverable.commitment', fn ($q) => $q->where('sector_id', $sector->id))
             ->whereHas('kpiTargets')
-            ->whereHas('performanceTracking')
+            ->whereHas('performanceTracking', function ($q) use ($quarter, $year) {
+                $q->where('quarter', $quarter)
+                    ->where('year', $year)
+                    ->whereNotNull('milestone')
+                    ->where('milestone', '<>', '');
+            })
             ->with('performanceTracking')
             ->orderBy('kpi')
             ->get();
-        // Anchor completion to the framework's reporting year, not the calendar
-        // quarter: a KPI counts as completed if it has any actual_value
-        // submission for the framework year (across all quarters).
-        $year = $this->frameworkYear();
 
         $hasSubmission = fn (Kpi $k) => $k->performanceTracking->contains(
             fn ($t) => (int) $t->year === $year && $t->actual_value !== null && $t->actual_value !== ''
         );
 
         $completed = $kpis->filter($hasSubmission)->count();
-
-        // Resolve the data entry window once for the (sector, framework year,
-        // quarter) triple. Year is anchored to the Active framework; quarter
-        // is client-supplied (the screen the user is looking at owns that
-        // selection). Falls back to the calendar quarter only when the client
-        // doesn't send one, so the endpoint stays backward-compatible.
-        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : $this->currentQuarter();
         ['label' => $dueLabel, 'accent' => $dueAccent] =
             $this->dataEntryDueLabel((int) $sector->id, $year, $quarter);
         $periodLabel = 'Q'.$quarter.' '.$year;

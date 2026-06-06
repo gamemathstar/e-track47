@@ -23,13 +23,22 @@ class DashboardTest extends TestCase
         $deliverable = $this->makeDeliverable($commitment);
         $kpi = $this->makeKpi($deliverable);
         // Both a target and a tracking row so the KPI satisfies the data-admin
-        // dashboard's "fully configured" filter (kpiTargets AND performanceTracking).
+        // dashboard's "fully configured" filter (kpiTargets AND a tracking
+        // row for the current quarter/year with a non-empty milestone).
         $t = new \App\Models\KpiTarget();
         $t->kpi_id = $kpi->id;
         $t->year = 2024;
         $t->target = '120';
         $t->save();
-        $this->makeTracking($kpi, ['quarter' => 1, 'actual_value' => '80', 'milestone' => '100']);
+        // Tracking matches the dashboard's resolved quarter (calendar fallback
+        // when the client doesn't send ?quarter=).
+        $currentQuarter = (int) ceil((int) date('n') / 3);
+        $this->makeTracking($kpi, [
+            'quarter' => $currentQuarter,
+            'year' => 2024,
+            'actual_value' => '80',
+            'milestone' => '100',
+        ]);
 
         return [$sector, $kpi];
     }
@@ -213,6 +222,17 @@ class DashboardTest extends TestCase
 
         $year = (int) (\App\Models\Framework::where('status', 'Active')->first()?->year ?? date('Y'));
 
+        // Ensure the KPI satisfies the strict filter for both quarters this
+        // test queries (Q1 and Q3) — each needs its own tracking row with a
+        // non-empty milestone.
+        foreach ([1, 3] as $q) {
+            \App\Models\PerformanceTracking::firstOrCreate(
+                ['kpi_id' => $kpi->id, 'quarter' => $q, 'year' => $year],
+                ['framework_id' => $kpi->framework_id, 'milestone' => '100',
+                 'actual_value' => null, 'confirmation_status' => 'Not Confirmed'],
+            );
+        }
+
         // Seed two different windows: Q1 already passed, Q3 still open. With
         // ?quarter=q3 the dashboard should surface the Q3 deadline, not Q1's.
         \DB::table('data_entry_accesses')->insert([
@@ -252,52 +272,79 @@ class DashboardTest extends TestCase
             ->assertJsonStructure(['fieldErrors' => ['quarter']]);
     }
 
-    public function test_data_admin_dashboard_requires_both_target_and_tracking(): void
+    public function test_data_admin_dashboard_requires_target_and_quarter_scoped_tracking_with_milestone(): void
     {
-        // Four KPIs in the same sector, one per state in the truth table.
-        // Only the fully-configured one (target AND tracking) is expected to
-        // appear; the other three are excluded.
+        // Five KPIs in the same sector, each one fails a different leg of the
+        // filter (or is the fully-configured one). Only the fully-configured
+        // KPI should show up.
         $fw = $this->makeFramework();
         $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
         $commitment = $this->makeCommitment($sector);
         $deliverable = $this->makeDeliverable($commitment);
 
-        $bothSet      = $this->makeKpi($deliverable, ['kpi' => 'A — Target + Tracking']);
-        $targetOnly   = $this->makeKpi($deliverable, ['kpi' => 'B — Target only']);
-        $trackingOnly = $this->makeKpi($deliverable, ['kpi' => 'C — Tracking only']);
-        $neither      = $this->makeKpi($deliverable, ['kpi' => 'D — Neither']);
+        $year = 2024;
+        $quarter = 1; // hardcoded; test uses ?quarter=q1 so the dashboard sees this quarter.
 
-        // Target rows for $bothSet and $targetOnly.
-        foreach ([$bothSet->id, $targetOnly->id] as $id) {
+        $configured     = $this->makeKpi($deliverable, ['kpi' => 'A — Target + Q1 tracking + milestone']);
+        $noTarget       = $this->makeKpi($deliverable, ['kpi' => 'B — No target row']);
+        $wrongQuarter   = $this->makeKpi($deliverable, ['kpi' => 'C — Tracking is for Q3, not Q1']);
+        $milestoneEmpty = $this->makeKpi($deliverable, ['kpi' => 'D — Milestone is empty string']);
+        $milestoneNull  = $this->makeKpi($deliverable, ['kpi' => 'E — Milestone is NULL']);
+
+        // Targets for everyone except $noTarget.
+        foreach ([$configured, $wrongQuarter, $milestoneEmpty, $milestoneNull] as $kpi) {
             $t = new \App\Models\KpiTarget();
-            $t->kpi_id = $id;
-            $t->year = 2024;
+            $t->kpi_id = $kpi->id;
+            $t->year = $year;
             $t->target = '120';
             $t->save();
         }
 
-        // Tracking rows for $bothSet and $trackingOnly.
-        foreach ([$bothSet->id, $trackingOnly->id] as $id) {
-            \App\Models\PerformanceTracking::create([
-                'kpi_id' => $id, 'framework_id' => $fw->id,
-                'quarter' => 1, 'year' => 2024,
-                'milestone' => '100', 'actual_value' => null,
-                'confirmation_status' => 'Not Confirmed',
-            ]);
-        }
+        // Tracking rows — each fails the filter for a different reason.
+        \App\Models\PerformanceTracking::create([
+            'kpi_id' => $configured->id, 'framework_id' => $fw->id,
+            'quarter' => $quarter, 'year' => $year,
+            'milestone' => '100', 'actual_value' => null,
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+        \App\Models\PerformanceTracking::create([
+            'kpi_id' => $noTarget->id, 'framework_id' => $fw->id,
+            'quarter' => $quarter, 'year' => $year,
+            'milestone' => '100', 'actual_value' => null,
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+        \App\Models\PerformanceTracking::create([
+            'kpi_id' => $wrongQuarter->id, 'framework_id' => $fw->id,
+            'quarter' => 3, 'year' => $year, // wrong quarter
+            'milestone' => '100', 'actual_value' => null,
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+        \App\Models\PerformanceTracking::create([
+            'kpi_id' => $milestoneEmpty->id, 'framework_id' => $fw->id,
+            'quarter' => $quarter, 'year' => $year,
+            'milestone' => '', 'actual_value' => null, // empty milestone
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+        \App\Models\PerformanceTracking::create([
+            'kpi_id' => $milestoneNull->id, 'framework_id' => $fw->id,
+            'quarter' => $quarter, 'year' => $year,
+            'milestone' => null, 'actual_value' => null, // null milestone
+            'confirmation_status' => 'Not Confirmed',
+        ]);
 
         Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
 
-        $body = $this->getJson('/api/v2/dashboard/data-admin')->assertOk()->json();
+        $body = $this->getJson('/api/v2/dashboard/data-admin?quarter=q1')
+            ->assertOk()->json();
 
-        // Only the fully-configured KPI is counted.
         $this->assertSame(1, $body['totalKpis']);
 
         $deadlineIds = array_column($body['deadlines'], 'id');
-        $this->assertContains((string) $bothSet->id, $deadlineIds);
-        $this->assertNotContains((string) $targetOnly->id,   $deadlineIds);
-        $this->assertNotContains((string) $trackingOnly->id, $deadlineIds);
-        $this->assertNotContains((string) $neither->id,      $deadlineIds);
+        $this->assertContains((string) $configured->id,     $deadlineIds);
+        $this->assertNotContains((string) $noTarget->id,       $deadlineIds);
+        $this->assertNotContains((string) $wrongQuarter->id,   $deadlineIds);
+        $this->assertNotContains((string) $milestoneEmpty->id, $deadlineIds);
+        $this->assertNotContains((string) $milestoneNull->id,  $deadlineIds);
     }
 
     public function test_data_admin_deadlines_fall_back_when_no_window_configured(): void
