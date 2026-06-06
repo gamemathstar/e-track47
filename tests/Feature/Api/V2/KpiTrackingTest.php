@@ -327,6 +327,10 @@ class KpiTrackingTest extends TestCase
         $this->assertNotNull($file);
         $this->assertNull($file->fileable_id);
         $this->assertStringStartsWith('uploads/evidence/', $file->path);
+        // files.type must be the lowercase extension (matches the web upload's
+        // convention so the web's preview blade renders an <img> rather than
+        // falling through to "No preview").
+        $this->assertSame('jpg', $file->type);
         \Illuminate\Support\Facades\Storage::disk('public')->assertExists($file->path);
     }
 

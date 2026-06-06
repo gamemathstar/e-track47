@@ -484,7 +484,14 @@ class KpiTrackingService
         $file = new File();
         $file->name = (string) $upload->getClientOriginalName();
         $file->path = 'uploads/evidence/'.$name;
-        $file->type = (string) ($upload->getMimeType() ?: 'application/octet-stream');
+        // Store the file *extension* (e.g. "jpg") rather than the MIME type
+        // ("image/jpeg"). The web's preview blade
+        // (resources/views/pages/sector/ajax/attachments.blade.php) decides
+        // whether to render an <img>/<iframe> via in_array($file->type,
+        // ['jpg','jpeg','png','pdf', ...]), and the web's own upload writes the
+        // extension the same way. Storing MIME here broke the web preview for
+        // v2-uploaded evidence; storing the extension keeps both paths in sync.
+        $file->type = $ext;
         $file->size = (int) $upload->getSize();
         $file->attached_by = (int) $user->id;
         // fileable_id / fileable_type stay NULL until the tracking-entry submit
