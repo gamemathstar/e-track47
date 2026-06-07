@@ -526,6 +526,12 @@ class KpiTrackingService
      * Only attaches files the current user uploaded that aren't already
      * attached to another row — prevents file-ID poaching across users or
      * across tracking entries.
+     *
+     * Also renames each newly-attached file to "Evidence N", where N
+     * continues from however many attachments are already on the tracking
+     * row. The tracking row is unique per (kpi, quarter, year), so the
+     * counter is effectively per quarter — exactly what the mobile
+     * presentation contract wants.
      */
     private function attachEvidence(PerformanceTracking $tracking, array $evidenceIds, User $user): void
     {
@@ -534,13 +540,24 @@ class KpiTrackingService
             return;
         }
 
-        File::whereIn('id', $ids)
+        // Count existing attachments so the new files continue the sequence
+        // (we don't touch already-attached file names on a resubmit).
+        $existing = File::where('fileable_type', PerformanceTracking::class)
+            ->where('fileable_id', $tracking->id)
+            ->count();
+
+        $eligible = File::whereIn('id', $ids)
             ->where('attached_by', (int) $user->id)
             ->whereNull('fileable_id')
-            ->update([
-                'fileable_id' => $tracking->id,
-                'fileable_type' => PerformanceTracking::class,
-            ]);
+            ->orderBy('id')
+            ->get();
+
+        foreach ($eligible as $i => $file) {
+            $file->fileable_id = $tracking->id;
+            $file->fileable_type = PerformanceTracking::class;
+            $file->name = 'Evidence '.($existing + $i + 1);
+            $file->save();
+        }
     }
 
     // --- resolution & authorization ------------------------------------------

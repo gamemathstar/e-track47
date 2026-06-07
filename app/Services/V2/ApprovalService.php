@@ -777,7 +777,12 @@ class ApprovalService
     private function fileWireObject(File $file): array
     {
         $name = (string) ($file->name ?: 'document');
-        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        // Image detection reads files.type (the lowercase extension stored at
+        // upload) rather than the display name — after the v2 rename pass the
+        // name is "Attachment N" with no extension, but the underlying file
+        // is still a real .jpg/.png on disk.
+        $ext = strtolower((string) ($file->type ?: pathinfo((string) $file->path, PATHINFO_EXTENSION)));
         $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
 
         if (! $isImage || ! $file->path) {

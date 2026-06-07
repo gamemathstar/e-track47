@@ -434,6 +434,90 @@ class KpiTrackingTest extends TestCase
             ->assertStatus(404)->assertJsonPath('code', 'not_found');
     }
 
+    public function test_attached_files_are_renamed_to_evidence_n_per_quarter(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $admin = $this->makeDataAdmin($sector);
+        Passport::actingAs($admin, [], 'api');
+
+        // Upload three files (orphans for now — original filenames preserved
+        // until they bind to a tracking row).
+        $ids = [];
+        foreach (['raw_one.jpg', 'raw_two.png', 'raw_three.jpg'] as $name) {
+            $ids[] = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+                'file' => \Illuminate\Http\UploadedFile::fake()->image($name),
+            ], ['Accept' => 'application/json'])->json('id');
+        }
+
+        // Submit Q1 with all three — they become Attachment 1/2/3 in id order.
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q1', 'year' => 2024,
+            'trackingDate' => '2024-04-10T00:00:00.000',
+            'actualValue' => '50',
+            'evidenceDocumentIds' => array_map('strval', $ids),
+        ])->assertStatus(202);
+
+        $q1Files = \App\Models\File::whereIn('id', $ids)->orderBy('id')->get();
+        $this->assertSame('Evidence 1', $q1Files[0]->name);
+        $this->assertSame('Evidence 2', $q1Files[1]->name);
+        $this->assertSame('Evidence 3', $q1Files[2]->name);
+
+        // Upload + submit a NEW file against Q2 → indexing resets to 1 (Q2's
+        // tracking row has zero existing attachments).
+        $q2DocId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('next_quarter.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q2', 'year' => 2024,
+            'trackingDate' => '2024-07-10T00:00:00.000',
+            'actualValue' => '60',
+            'evidenceDocumentIds' => [(string) $q2DocId],
+        ])->assertStatus(202);
+
+        $this->assertSame('Evidence 1', \App\Models\File::find((int) $q2DocId)->name);
+    }
+
+    public function test_evidence_renumbering_continues_on_resubmit_within_same_quarter(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $admin = $this->makeDataAdmin($sector);
+        Passport::actingAs($admin, [], 'api');
+
+        // First batch — two files.
+        $first = [];
+        foreach (['a.jpg', 'b.jpg'] as $name) {
+            $first[] = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+                'file' => \Illuminate\Http\UploadedFile::fake()->image($name),
+            ], ['Accept' => 'application/json'])->json('id');
+        }
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q3', 'year' => 2024,
+            'trackingDate' => '2024-09-01T00:00:00.000',
+            'actualValue' => '40',
+            'evidenceDocumentIds' => array_map('strval', $first),
+        ])->assertStatus(202);
+
+        // Second batch on the same quarter — should continue at 3, not reset.
+        $secondDocId = $this->post("/api/v2/kpis/{$kpi->id}/evidence", [
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('c.jpg'),
+        ], ['Accept' => 'application/json'])->json('id');
+
+        $this->postJson("/api/v2/kpis/{$kpi->id}/tracking-entries", [
+            'quarter' => 'q3', 'year' => 2024,
+            'trackingDate' => '2024-09-02T00:00:00.000',
+            'actualValue' => '45',
+            'evidenceDocumentIds' => [(string) $secondDocId],
+        ])->assertStatus(202);
+
+        // Existing attachments keep their names; new one continues the sequence.
+        $names = \App\Models\File::whereIn('id', array_merge($first, [$secondDocId]))
+            ->orderBy('id')->pluck('name')->all();
+        $this->assertSame(['Evidence 1', 'Evidence 2', 'Evidence 3'], $names);
+    }
+
     public function test_submit_only_attaches_files_uploaded_by_caller(): void
     {
         \Illuminate\Support\Facades\Storage::fake('public');
