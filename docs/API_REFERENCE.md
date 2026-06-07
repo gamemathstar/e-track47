@@ -1528,8 +1528,8 @@ GET /approvals/coordinator/queue?sector=health&year=2024&quarter=q3&sort=newest
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `id` | string | ✅ | Queue-row identifier (distinct from `kpiId`). |
-| `kpiId` | string | ✅ | KPI / submission key used for the detail call. |
+| `id` | string | ✅ | **Stable submission identifier.** Same key used by `BulkApprovalItem.id` (§11.6.3) and accepted by `POST /approvals/submissions/bulk-approve.submissionIds` (§11.6.8) — carry it from a queue selection straight into the bulk page or the bulk-approve call. Distinct from `kpiId` (a single KPI can have multiple submissions across quarters/years; this id identifies one submission). |
+| `kpiId` | string | ✅ | KPI identifier — use this for the detail call (`/approvals/submissions/{kpiId}`). |
 | `kpiTitle` | string | ✅ | |
 | `sectorLabel` | string | ✅ | |
 | `sectorAccent` | string | ✅ | Colour hint (`primary`/`secondary`/`tertiary`/`error`). |
@@ -1642,6 +1642,16 @@ field must be a string when present.
 
 A group fails to parse unless `title` is a string and `items` is a list; each
 item requires all four string fields.
+
+✅ **Id alignment with the review queue.** The sector-head approval queue
+([§11.6.2](#1162-sector-head-review-queue)) lets the user tick rows and tap
+**"Approve Selected"**, which opens the bulk page carrying the ticked
+`ApprovalQueueItem.id` values. **The server emits the same submission id in all
+three places** — `ApprovalQueueItem.id` (§11.6.2), `BulkApprovalItem.id` here,
+and the value `POST /approvals/submissions/bulk-approve` accepts in
+`submissionIds` (§11.6.8). The client can carry the queue selection straight
+into the bulk page intersection or the bulk-approve call. Same guarantee on the
+coordinator path (queue ids → `submissionIds` with `role: "coordinator"`).
 
 **Status codes:** `200` · `401`.
 
@@ -1890,7 +1900,7 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | Field | Type | Req. | Validation |
 | --- | --- | --- | --- |
-| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). |
+| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). **These ids must match the corresponding queue rows' `id`** so the client can carry a selection from the queue into the bulk action — see the id-alignment note in [§11.6.3](#1163-sector-head-bulk-candidates). |
 | `role` | string | ✅ | Reviewer role wire token — `sector_head` \| `coordinator` (see Enums). The server applies that role's accept transition to **every** listed submission (sector head → `pending_facilitator`; **coordinator → `confirmed`**), so the role must match the submissions' current stage. |
 
 A coordinator finalizing a multi-select from the review queue:

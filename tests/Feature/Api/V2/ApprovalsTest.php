@@ -823,6 +823,68 @@ class ApprovalsTest extends TestCase
             ->assertJsonStructure(['fieldErrors' => ['role', 'decision']]);
     }
 
+    public function test_sector_head_queue_bulk_and_bulk_approve_share_the_same_id_space(): void
+    {
+        // The mobile client carries the sector head's queue selection into
+        // the bulk-approval page. That only works if the same submission has
+        // the same id across queue + bulk + bulk-approve. Three rows here,
+        // assert the round-trip.
+        [$sector, $kpi] = $this->seedKpi();
+        $t1 = $this->tracking($kpi, 'Pending Sector Head Approval', 1);
+        $t2 = $this->tracking($kpi, 'Pending Sector Head Approval', 2);
+        $t3 = $this->tracking($kpi, 'Pending Sector Head Approval', 3);
+
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $queueIds = collect($this->getJson('/api/v2/approvals/sector-head/queue')
+            ->assertOk()->json())
+            ->pluck('id')->sort()->values()->all();
+
+        $bulkIds = collect($this->getJson('/api/v2/approvals/sector-head/bulk?grouping=by_commitment')
+            ->assertOk()->json())
+            ->flatMap(fn ($g) => array_column($g['items'], 'id'))
+            ->sort()->values()->all();
+
+        $expected = collect([$t1, $t2, $t3])->pluck('id')->map(fn ($i) => (string) $i)->sort()->values()->all();
+
+        $this->assertSame($expected, $queueIds, 'queue ids must match the submission ids');
+        $this->assertSame($expected, $bulkIds, 'bulk ids must match the submission ids');
+
+        // Sending the queue ids straight to bulk-approve should land all three.
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => $queueIds,
+            'role' => 'sector_head',
+        ])->assertStatus(202);
+
+        $this->assertSame('Pending Facilitator', $t1->refresh()->confirmation_status);
+        $this->assertSame('Pending Facilitator', $t2->refresh()->confirmation_status);
+        $this->assertSame('Pending Facilitator', $t3->refresh()->confirmation_status);
+    }
+
+    public function test_coordinator_queue_and_bulk_approve_share_the_same_id_space(): void
+    {
+        [$sector, $kpi] = $this->seedKpi();
+        $t1 = $this->tracking($kpi, 'Pending Coordinator', 1);
+        $t2 = $this->tracking($kpi, 'Pending Coordinator', 2);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $queueIds = collect($this->getJson('/api/v2/approvals/coordinator/queue')
+            ->assertOk()->json())
+            ->pluck('id')->sort()->values()->all();
+
+        $expected = collect([$t1, $t2])->pluck('id')->map(fn ($i) => (string) $i)->sort()->values()->all();
+        $this->assertSame($expected, $queueIds);
+
+        $this->postJson('/api/v2/approvals/submissions/bulk-approve', [
+            'submissionIds' => $queueIds,
+            'role' => 'coordinator',
+        ])->assertStatus(202);
+
+        $this->assertSame('Confirmed', $t1->refresh()->confirmation_status);
+        $this->assertSame('Confirmed', $t2->refresh()->confirmation_status);
+    }
+
     public function test_bulk_approve_advances_all(): void
     {
         [$sector, $kpi] = $this->seedKpi();
