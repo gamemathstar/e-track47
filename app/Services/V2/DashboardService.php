@@ -146,30 +146,44 @@ class DashboardService
 
     // --- sector head ---------------------------------------------------------
 
-    public function sectorHead(User $user): array
+    /**
+     * @param  string|null  $quarterWire  q1–q4 from the client; falls back to
+     *                                    the current calendar quarter when
+     *                                    omitted, so legacy clients don't break.
+     */
+    public function sectorHead(User $user, ?string $quarterWire = null): array
     {
         $sector = $user->isSectorHead();
         $this->assert((bool) $sector, 'sector head');
 
+        // Resolve quarter: client-supplied wins; fall back to the calendar
+        // quarter so the dashboard always reflects "what to look at now" when
+        // the chip selection isn't sent.
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : $this->currentQuarter();
+
         $m = $this->metrics->forSectors([$sector->id])[$sector->id] ?? null;
         $commitments = Commitment::where('sector_id', $sector->id)->orderBy('name')->get();
-        $commitmentMetrics = $this->metrics->forCommitments($commitments->pluck('id')->all());
+        $commitmentMetrics = $this->metrics->forCommitments($commitments->pluck('id')->all(), $quarter);
 
         $rows = $commitments->map(function (Commitment $c) use ($commitmentMetrics) {
             $progress = ($commitmentMetrics[$c->id]['progress'] ?? 0.0) * 100;
 
+            // For a specific quarter, the plan is the milestone for THAT
+            // quarter — i.e. 100% expected. Comparing actualPercent vs 100
+            // gives a clean "we're behind/ahead this quarter" read.
             return [
                 'sectorId' => (string) $c->id,
                 'name' => $c->name,
                 'iconKey' => 'inventory_2',
                 'accent' => SectorPresenter::accent($c->id),
                 'actualPercent' => round((float) $progress, 1),
-                'planPercent' => (float) $this->planPercent(),
+                'planPercent' => 100.0,
             ];
         })->values()->all();
 
         return [
             'sectorName' => 'My Sector — '.$sector->sector_name,
+            'quarterLabel' => 'Q'.$quarter,
             'overallPercent' => $this->pct($m['progress'] ?? 0.0),
             'activeKpis' => (int) $this->kpiCountForSector($sector->id),
             'totalCommitments' => (int) ($m['total'] ?? 0),

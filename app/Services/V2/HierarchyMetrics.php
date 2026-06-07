@@ -100,7 +100,7 @@ class HierarchyMetrics
      *
      * @return array<int|string, array{kpi_count:int,deliverable_count:int,at_risk_count:int,completed_deliverables:int,progress:float,next_milestone:?string}>
      */
-    public function forCommitments(array $commitmentIds): array
+    public function forCommitments(array $commitmentIds, ?int $quarter = null): array
     {
         if (empty($commitmentIds)) {
             return [];
@@ -150,10 +150,17 @@ class HierarchyMetrics
             $out[$row->cid]['kpi_count'] = (int) $row->c;
         }
 
-        $progress = DB::table('performance_trackings as pt')
+        // When $quarter is provided, the progress fraction is scoped to that
+        // quarter's tracking rows only — used by the sector-head dashboard's
+        // per-quarter chips. When null, falls back to the full-year average.
+        $progressQuery = DB::table('performance_trackings as pt')
             ->join('kpis as k', 'k.id', '=', 'pt.kpi_id')
             ->join('deliverables as d', 'd.id', '=', 'k.deliverable_id')
-            ->whereIn('d.commitment_id', $commitmentIds)
+            ->whereIn('d.commitment_id', $commitmentIds);
+        if ($quarter !== null) {
+            $progressQuery->where('pt.quarter', $quarter);
+        }
+        $progress = $progressQuery
             ->selectRaw('d.commitment_id AS cid, '.$this->fractionExpr().' AS frac')
             ->groupBy('d.commitment_id')
             ->get();

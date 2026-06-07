@@ -3212,13 +3212,22 @@ referenced from each role's response table.
 | **Purpose** | Single-sector overview and commitment breakdown for the Sector-Head home. |
 | **Method / Path** | `GET /dashboard/sector-head` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`). Scopes the **`commitments[]`** rows' `actualPercent`/`planPercent` to that quarter. **Omitted** on the initial load. |
+
+The Sector-Head dashboard renders quarter chips above the commitment-tracking
+list; tapping one re-fetches with `?quarter=`. ⚠ **Backend note:** the
+client currently defaults the selected chip to **Q1** because the response
+carries no active-quarter field — please add a `quarterLabel` (or
+`activeQuarter`) to the response (echoing the requested/active quarter, e.g.
+request `?quarter=q3` → respond `"quarterLabel": "Q3"`) so the chip can seed
+correctly, mirroring [§11.11.5](#11115-data-admin-dashboard). Until then the
+`quarter` param is accepted but the chip seeds to Q1.
 
 **Response fields** (raw object)
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `sectorName` | string | ✅ | e.g. `My Sector — Health` |
+| `sectorName` | string | ✅ | e.g. `My Sector — Health`. The client strips a leading `My Sector — ` prefix before display. |
 | `overallPercent` | number | ✅ | double |
 | `activeKpis` | int | ✅ | |
 | `totalCommitments` | int | ✅ | |
@@ -3226,7 +3235,8 @@ referenced from each role's response table.
 | `inProgressCommitments` | int | ✅ | |
 | `atRiskCommitments` | int | ✅ | |
 | `pendingApprovals` | int | ✅ | |
-| `commitments` | array | ✅ | list of [`SectorPerformanceRowModel`](#dash-sector-row) |
+| `commitments` | array | ✅ | list of [`SectorPerformanceRowModel`](#dash-sector-row); when `?quarter=` is sent, scope each row's `actualPercent`/`planPercent` to that quarter. |
+| `quarterLabel` | string | ❌ | *(recommended — not yet sent)* the active/requested quarter, e.g. `"Q3"`; seeds the chip selection. |
 
 ```json
 {

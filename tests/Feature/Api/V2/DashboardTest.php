@@ -126,7 +126,64 @@ class DashboardTest extends TestCase
         $this->getJson('/api/v2/dashboard/sector-head')
             ->assertOk()
             ->assertJsonPath('sectorName', 'My Sector — Health')
-            ->assertJsonStructure(['sectorName', 'overallPercent', 'activeKpis', 'totalCommitments', 'completedCommitments', 'inProgressCommitments', 'atRiskCommitments', 'pendingApprovals', 'commitments']);
+            ->assertJsonStructure(['sectorName', 'quarterLabel', 'overallPercent', 'activeKpis', 'totalCommitments', 'completedCommitments', 'inProgressCommitments', 'atRiskCommitments', 'pendingApprovals', 'commitments']);
+    }
+
+    public function test_sector_head_dashboard_quarter_filter_scopes_commitment_progress(): void
+    {
+        // Seed a sector + commitment + deliverable + KPI with a target.
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $commitment = $this->makeCommitment($sector, ['name' => 'Maternal Health']);
+        $deliverable = $this->makeDeliverable($commitment);
+        $kpi = $this->makeKpi($deliverable);
+        $t = new \App\Models\KpiTarget();
+        $t->kpi_id = $kpi->id; $t->year = 2024; $t->target = '120';
+        $t->save();
+
+        // Two trackings: Q1 hit 80% of milestone, Q3 hit 40%.
+        $this->makeTracking($kpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '80',  'milestone' => '100']);
+        $this->makeTracking($kpi, ['quarter' => 3, 'year' => 2024, 'actual_value' => '40',  'milestone' => '100']);
+
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        // ?quarter=q1 → actualPercent reflects Q1's 80%.
+        $q1 = $this->getJson('/api/v2/dashboard/sector-head?quarter=q1')->assertOk()->json();
+        $this->assertSame('Q1', $q1['quarterLabel']);
+        $this->assertEqualsWithDelta(80.0, $q1['commitments'][0]['actualPercent'], 0.01);
+        $this->assertEqualsWithDelta(100.0, $q1['commitments'][0]['planPercent'], 0.01);
+
+        // ?quarter=q3 → actualPercent reflects Q3's 40%.
+        $q3 = $this->getJson('/api/v2/dashboard/sector-head?quarter=q3')->assertOk()->json();
+        $this->assertSame('Q3', $q3['quarterLabel']);
+        $this->assertEqualsWithDelta(40.0, $q3['commitments'][0]['actualPercent'], 0.01);
+
+        // ?quarter=q2 → no Q2 row → actualPercent is 0.
+        $q2 = $this->getJson('/api/v2/dashboard/sector-head?quarter=q2')->assertOk()->json();
+        $this->assertSame('Q2', $q2['quarterLabel']);
+        $this->assertEqualsWithDelta(0.0, $q2['commitments'][0]['actualPercent'], 0.01);
+    }
+
+    public function test_sector_head_dashboard_default_quarter_is_calendar_quarter(): void
+    {
+        [$sector] = $this->seedSector();
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $expected = 'Q'.((int) ceil((int) date('n') / 3));
+
+        $this->getJson('/api/v2/dashboard/sector-head')
+            ->assertOk()
+            ->assertJsonPath('quarterLabel', $expected);
+    }
+
+    public function test_sector_head_dashboard_rejects_unknown_quarter_token(): void
+    {
+        [$sector] = $this->seedSector();
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $this->getJson('/api/v2/dashboard/sector-head?quarter=q9')
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['quarter']]);
     }
 
     public function test_data_admin_dashboard(): void

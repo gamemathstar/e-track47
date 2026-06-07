@@ -33,7 +33,11 @@ class DashboardController extends BaseController
 
     public function sectorHead(Request $request): array
     {
-        return $this->dashboards->sectorHead($request->user());
+        $validated = $request->validate([
+            'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
+        ]);
+
+        return $this->dashboards->sectorHead($request->user(), $validated['quarter'] ?? null);
     }
 
     public function dataAdmin(Request $request): array
