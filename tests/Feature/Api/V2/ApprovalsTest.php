@@ -564,6 +564,49 @@ class ApprovalsTest extends TestCase
             ->assertJsonStructure(['id', 'kpiTitle', 'sectorLabel', 'trackingDateLabel', 'milestoneValue', 'attachments']);
     }
 
+    public function test_submission_detail_attachments_are_objects_with_url_for_images(): void
+    {
+        // Mobile contract: each attachments[*] is {name, url?} — url only
+        // populated for image filenames (jpg/jpeg/png/gif/webp). Non-image
+        // files (pdf etc) get just {name}.
+        [$sector, $kpi] = $this->seedKpi();
+        $t = $this->tracking($kpi, 'Pending Coordinator', 1, ['actual_value' => '50', 'milestone' => '100']);
+
+        // Image evidence — should emit url.
+        $img = new \App\Models\File();
+        $img->name = 'site_photo.jpg';
+        $img->path = 'uploads/evidence/ev_aaa.jpg';
+        $img->type = 'jpg';
+        $img->size = 12345;
+        $img->fileable_id = $t->id;
+        $img->fileable_type = \App\Models\PerformanceTracking::class;
+        $img->save();
+
+        // PDF evidence — no url, just name.
+        $pdf = new \App\Models\File();
+        $pdf->name = 'field_survey_q1.pdf';
+        $pdf->path = 'uploads/evidence/ev_bbb.pdf';
+        $pdf->type = 'pdf';
+        $pdf->size = 54321;
+        $pdf->fileable_id = $t->id;
+        $pdf->fileable_type = \App\Models\PerformanceTracking::class;
+        $pdf->save();
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $body = $this->getJson("/api/v2/approvals/submissions/{$kpi->id}")
+            ->assertOk()->json();
+
+        $byName = collect($body['attachments'])->keyBy('name');
+
+        $this->assertSame('site_photo.jpg', $byName['site_photo.jpg']['name']);
+        $this->assertArrayHasKey('url', $byName['site_photo.jpg']);
+        $this->assertStringContainsString('uploads/evidence/ev_aaa.jpg', $byName['site_photo.jpg']['url']);
+
+        $this->assertSame('field_survey_q1.pdf', $byName['field_survey_q1.pdf']['name']);
+        $this->assertArrayNotHasKey('url', $byName['field_survey_q1.pdf']);
+    }
+
     public function test_submission_detail_includes_delivery_verification_when_facilitator_accepted(): void
     {
         [$sector, $kpi] = $this->seedKpi();

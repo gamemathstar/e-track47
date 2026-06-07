@@ -3,6 +3,7 @@
 namespace App\Services\V2;
 
 use App\Exceptions\V2\ApiException;
+use App\Models\File;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\PerformanceTracking;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The four-role approval workflow (API_REFERENCE.md §11.6) over the §4 state
@@ -231,7 +233,7 @@ class ApprovalService
             'actualValue' => (string) ($t->actual_value ?? '—'),
             'targetValue' => $this->targetValue($kpi, (int) $t->year) ?? '—',
             'remarks' => $t->remarks ?: null,
-            'attachments' => $t->files->map(fn ($f) => $f->name ?: 'document')->values()->all(),
+            'attachments' => $t->files->map(fn (File $f) => $this->fileWireObject($f))->values()->all(),
             'deliveryDateLabel' => $deliveryDateLabel,
             'deliveryValue' => $deliveryValue,
             'deliveryRemarks' => $deliveryRemarks,
@@ -761,6 +763,36 @@ class ApprovalService
             'confirmed' => $overall === 'confirmed',
             default => true, // all
         };
+    }
+
+    /**
+     * Build the wire object for an attachment (API_REFERENCE §11.6.6):
+     * `{name, url?}`. `url` is only emitted for image filenames (jpg, jpeg,
+     * png, gif, webp) and only when a path is available — for non-image
+     * files (PDFs, docs, etc.) the client falls back to an extension icon
+     * with no preview.
+     *
+     * @return array{name: string, url?: string}
+     */
+    private function fileWireObject(File $file): array
+    {
+        $name = (string) ($file->name ?: 'document');
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+
+        if (! $isImage || ! $file->path) {
+            return ['name' => $name];
+        }
+
+        // Both web and v2 evidence uploads write through the `public` disk
+        // (web: storeAs('uploads', …, 'public'); v2: putFileAs('uploads/evidence',
+        // …)). Storage::disk('public')->url() returns an absolute URL when
+        // APP_URL is set, matching what the mobile client needs for a
+        // direct GET.
+        return [
+            'name' => $name,
+            'url' => Storage::disk('public')->url(ltrim((string) $file->path, '/')),
+        ];
     }
 
     private function targetValue(?Kpi $kpi, int $year): ?string

@@ -276,6 +276,7 @@ Two endpoints accept binary uploads, sent as `multipart/form-data` (Dio
 - `POST /gallery/items` — gallery media upload (see §11.13).
 - `POST /users` — create user with optional avatar (see §11.9).
 - `POST /users/me/photo` — profile photo update (see §11.9).
+- `POST /kpis/{id}/evidence` — performance-tracking evidence upload (see §11.4.8).
 
 Scalar fields are sent as form fields alongside the file part. The file part is
 attached only when the user selected a local asset; when absent, the multipart
@@ -1092,7 +1093,40 @@ and `year` from this payload.
 
 **Status codes:** `200` · `401` · `404` (unknown KPI).
 
-#### 11.4.8 Annual targets (list + save)
+#### 11.4.8 Upload evidence
+
+| | |
+| --- | --- |
+| **Purpose** | Upload one evidence file for a KPI; the returned document id is then submitted in [§11.4.6](#1146-add-tracking-entry)'s `evidenceDocumentIds`. |
+| **Method / Path** | `POST /kpis/{id}/evidence` |
+| **Auth** | Bearer required |
+| **Content-Type** | `multipart/form-data` (Dio `FormData`; boundary set automatically — see §10) |
+| **Path params** | `id` — KPI identifier |
+
+**Form parts**
+
+| Part | Req. | Notes |
+| --- | --- | --- |
+| `file` | ✅ | the picked file (`MultipartFile.fromFile`); the client sends the original filename. Images are downscaled/re-encoded on-device before upload. |
+
+**Success — `200`/`201`** (raw object):
+
+```json
+{ "id": "doc-1716800000000" }
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | server document id; the **only** field the client reads. Include it in the tracking-entry submit's `evidenceDocumentIds`. |
+
+The client uploads each file as it is picked (one request per file), shows a
+per-attachment uploading / failed (retryable) state, and blocks the submit
+until every upload settles. A non-string/missing `id` is a parse error.
+
+**Status codes:** `200`/`201` · `400`/`422` (bad/oversized file) · `401` ·
+`404` (unknown KPI).
+
+#### 11.4.9 Annual targets (list + save)
 
 Backs the "Set Annual Targets" sheet
 (`ui-designs/kpi_tracking/#23 set_target_bottom_sheet.html`) — set the
@@ -1756,14 +1790,15 @@ is a list.
   "targetValue": "350 / 100k",
   "remarks": "Awaiting verification of field survey data.",
   "attachments": [
-    "field_survey_q3.pdf",
-    "lab_results.xlsx",
-    "site_photo.jpg"
+    { "name": "field_survey_q3.pdf", "url": "https://cdn.example.com/files/field_survey_q3.pdf" },
+    { "name": "site_photo.jpg", "url": "https://cdn.example.com/files/site_photo.jpg" }
   ],
   "deliveryDateLabel": "Oct 12, 2024",
   "deliveryValue": "41.0%",
   "deliveryRemarks": "Cross-checked against field reports; minor variance accepted.",
-  "deliveryAttachments": ["verification_report.pdf"]
+  "deliveryAttachments": [
+    { "name": "verification_report.pdf", "url": "https://cdn.example.com/files/verification_report.pdf" }
+  ]
 }
 ```
 
@@ -1782,11 +1817,18 @@ is a list.
 | `actualValue` | string | ✅ | |
 | `targetValue` | string | ✅ | |
 | `remarks` | string | ❌ | |
-| `attachments` | array&lt;string&gt; | ❌ | Defaults to `[]`; each entry must be a string. |
+| `attachments` | array&lt;object&gt; | ❌ | Defaults to `[]`. Each entry is `{ "name": string, "url"?: string }` (see **Attachment object** below). A bare string is still accepted for backward compatibility and treated as `name` with no `url`. |
 | `deliveryDateLabel` | string | ❌ | Prior-stage delivery-department verification date. |
 | `deliveryValue` | string | ❌ | The delivery department's verified value. |
 | `deliveryRemarks` | string | ❌ | The delivery department's verification remark. |
-| `deliveryAttachments` | array&lt;string&gt; | ❌ | Verification evidence; defaults to `[]`, each entry a string. |
+| `deliveryAttachments` | array&lt;object&gt; | ❌ | Verification evidence; same **Attachment object** shape as `attachments`. Defaults to `[]`. |
+
+**Attachment object**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `name` | string | ✅ | File name shown on the row (extension drives the image/PDF icon). |
+| `url` | string | ❌ | Absolute URL to the stored file. Required for **image** files (`.jpg/.jpeg/.png/.gif/.webp`) so the review sheet can render a thumbnail and an enlarged tap-to-zoom preview; omit (or null) for non-previewable types. Should be directly fetchable by the client (signed/public GET). |
 
 The response must be a JSON object (a non-object body raises a parse error).
 
