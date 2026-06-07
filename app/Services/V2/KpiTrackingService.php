@@ -310,7 +310,7 @@ class KpiTrackingService
             $kpi->setAttribute('v_hero_eyebrow', 'CURRENT PERFORMANCE');
             $kpi->setAttribute('v_hero_value', (string) $latestSubmitted->actual_value);
             $kpi->setAttribute('v_hero_suffix', 'submitted');
-            $kpi->setAttribute('v_hero_subtext', 'Q'.$latestSubmitted->quarter.' '.ucwords(strtolower(self::STATUS_LABELS[$latestSubmitted->confirmation_status] ?? '')));
+            $kpi->setAttribute('v_hero_subtext', 'Q'.$latestSubmitted->quarter.' '.ucwords(strtolower($this->derivedStatusLabel($latestSubmitted))));
         }
 
         if ($latest) {
@@ -340,7 +340,11 @@ class KpiTrackingService
             ->filter(fn ($t) => $t->actual_value !== null && $t->actual_value !== '')
             ->sortBy('quarter')
             ->map(function ($t) {
-                $confirmed = $t->confirmation_status === 'Confirmed';
+                $label = $this->derivedStatusLabel($t);
+                // `status` stays as the binary bucket (pending | confirmed) the
+                // mobile contract specifies; statusLabel carries the precise
+                // stage so the timeline badge shows the right text.
+                $confirmed = $label === 'CONFIRMED';
 
                 return array_filter([
                     'quarter' => WireEnums::quarterToWire($t->quarter),
@@ -350,10 +354,64 @@ class KpiTrackingService
                     'actual' => (string) ($t->actual_value ?? ''),
                     'date' => $t->tracking_date ? Carbon::parse($t->tracking_date)->format('M j, Y') : null,
                     'remarks' => $t->remarks ?: null,
-                    'statusLabel' => self::STATUS_LABELS[$t->confirmation_status] ?? null,
+                    'statusLabel' => $label,
                     'reviewCtaLabel' => $confirmed ? null : 'Review Submission',
                 ], fn ($v) => $v !== null);
             })->values()->all();
+    }
+
+    /**
+     * Derive the display-ready status label for a tracking row from the WHO
+     * columns rather than confirmation_status — the column drifts on
+     * production when older web flows submit/approve without promoting the
+     * status string. Always returns one of the contract values:
+     *
+     *   PENDING SECTOR HEAD · PENDING FACILITATOR · PENDING COORDINATOR
+     *   CONFIRMED · REJECTED
+     */
+    private function derivedStatusLabel(PerformanceTracking $t): string
+    {
+        $sh = $t->sector_head_approved_by !== null;
+        $facDone = $t->facilitator_confirmed_by !== null;
+        $coDone = $t->coordinator_confirmed_by !== null;
+
+        if ($coDone) {
+            $rejected = ($this->hasPerfTrackingColumn('coordinator_decision') && $t->coordinator_decision === 'Reject')
+                || ($this->hasPerfTrackingColumn('coordinator_rejection_reason') && ! empty($t->coordinator_rejection_reason));
+
+            return $rejected ? 'REJECTED' : 'CONFIRMED';
+        }
+
+        if ($facDone && $t->facilitator_decision === 'Reject') {
+            return 'REJECTED';
+        }
+
+        if ($facDone && $t->facilitator_decision === 'Accept') {
+            return 'PENDING COORDINATOR';
+        }
+
+        if ($sh) {
+            return 'PENDING FACILITATOR';
+        }
+
+        return 'PENDING SECTOR HEAD';
+    }
+
+    /**
+     * Cached Schema::hasColumn check for performance_trackings columns that
+     * some production DBs (imported from older SQL dumps) are missing —
+     * lets derivedStatusLabel() return the right answer without crashing on
+     * a missing coordinator_decision / coordinator_rejection_reason column.
+     */
+    private array $perfTrackingColumnCache = [];
+
+    private function hasPerfTrackingColumn(string $column): bool
+    {
+        if (! array_key_exists($column, $this->perfTrackingColumnCache)) {
+            $this->perfTrackingColumnCache[$column] = Schema::hasColumn('performance_trackings', $column);
+        }
+
+        return $this->perfTrackingColumnCache[$column];
     }
 
     private function supportingDocuments(Collection $tracks): array

@@ -50,9 +50,21 @@ class KpiTrackingTest extends TestCase
     public function test_kpi_detail_includes_submissions_and_docs(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();
-        $this->makeTracking($kpi, ['quarter' => 1, 'actual_value' => '84', 'milestone' => '100', 'confirmation_status' => 'Confirmed', 'remarks' => 'Q1 done']);
+        // Confirmed lifecycle is now WHO-derived, so a row needs the coordinator
+        // WHO columns set (not just the status string) to read as 'confirmed'.
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'actual_value' => '84', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'coordinator_confirmed_by' => $coordinator->id, 'coordinator_confirmed_at' => now(),
+            'confirmation_status' => 'Confirmed', 'remarks' => 'Q1 done',
+        ]);
 
-        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+        Passport::actingAs($coordinator, [], 'api');
 
         $this->getJson("/api/v2/kpis/{$kpi->id}")
             ->assertOk()
@@ -63,6 +75,90 @@ class KpiTrackingTest extends TestCase
             ->assertJsonPath('submissions.0.status', 'confirmed')
             ->assertJsonPath('submissions.0.actual', '84')
             ->assertJsonStructure(['submissions', 'supportingDocuments', 'activeQuarter', 'progressPercent']);
+    }
+
+    public function test_kpi_detail_submission_status_labels_reflect_actual_lifecycle_stage(): void
+    {
+        // Each quarter is at a different stage. statusLabel must report the
+        // correct human label for each — and must NOT be the catch-all from
+        // confirmation_status (which is stale on several of these rows).
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+
+        // Q1: just submitted by data admin — awaiting SH. confirmation_status
+        // stays at the v2-style "Pending Sector Head Approval".
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024, 'actual_value' => '40', 'milestone' => '100',
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ]);
+
+        // Q2: SH approved; status STILL says 'Not Confirmed' (production drift).
+        // Without WHO-derivation this would read 'NOT CONFIRMED'.
+        $this->makeTracking($kpi, [
+            'quarter' => 2, 'year' => 2024, 'actual_value' => '50', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+
+        // Q3: facilitator accepted; awaiting coordinator. Stale status again.
+        $this->makeTracking($kpi, [
+            'quarter' => 3, 'year' => 2024, 'actual_value' => '84', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'confirmation_status' => 'Pending Facilitator', // stale
+        ]);
+
+        // Q4: facilitator rejected — bounces back to data admin.
+        $this->makeTracking($kpi, [
+            'quarter' => 4, 'year' => 2024, 'actual_value' => '30', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Reject',
+            'facilitator_rejection_reason' => 'Evidence missing.',
+            'confirmation_status' => 'Pending Facilitator', // stale
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $submissions = $this->getJson("/api/v2/kpis/{$kpi->id}")->assertOk()->json('submissions');
+        $byQuarter = collect($submissions)->keyBy('quarter');
+
+        $this->assertSame('PENDING SECTOR HEAD', $byQuarter['q1']['statusLabel']);
+        $this->assertSame('PENDING FACILITATOR', $byQuarter['q2']['statusLabel']);
+        $this->assertSame('PENDING COORDINATOR', $byQuarter['q3']['statusLabel']);
+        $this->assertSame('REJECTED',            $byQuarter['q4']['statusLabel']);
+
+        // status (the binary bucket) stays 'pending' for everything that isn't
+        // coordinator-confirmed — including 'REJECTED'.
+        $this->assertSame('pending', $byQuarter['q1']['status']);
+        $this->assertSame('pending', $byQuarter['q4']['status']);
+    }
+
+    public function test_kpi_detail_submission_status_label_confirmed_when_coordinator_finalised(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+
+        $this->makeTracking($kpi, [
+            'quarter' => 1, 'year' => 2024, 'actual_value' => '90', 'milestone' => '100',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+            'coordinator_confirmed_by' => $coordinator->id, 'coordinator_confirmed_at' => now(),
+            // Stale status — should NOT prevent the wire from reading CONFIRMED.
+            'confirmation_status' => 'Pending Coordinator',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}")->assertOk()->json();
+        $this->assertSame('CONFIRMED', $body['submissions'][0]['statusLabel']);
+        $this->assertSame('confirmed', $body['submissions'][0]['status']);
     }
 
     public function test_kpi_detail_hero_value_uses_latest_submitted_not_milestone_only_row(): void
