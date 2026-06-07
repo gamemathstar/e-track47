@@ -297,11 +297,23 @@ class KpiTrackingService
         $kpi->setAttribute('v_submissions', $this->submissions($tracks));
         $kpi->setAttribute('v_supporting_documents', $this->supportingDocuments($tracks));
 
-        if ($latest) {
+        // Hero card represents "current performance" — must reflect a row the
+        // data admin actually submitted, not a milestone-only placeholder
+        // (which has actual_value=null and would render "—"). Find the
+        // latest *submitted* row; only then emit the hero attributes.
+        $latestSubmitted = $tracks
+            ->filter(fn ($t) => $t->actual_value !== null && $t->actual_value !== '')
+            ->sortByDesc(fn ($t) => sprintf('%04d%01d', (int) $t->year, (int) $t->quarter))
+            ->first();
+
+        if ($latestSubmitted) {
             $kpi->setAttribute('v_hero_eyebrow', 'CURRENT PERFORMANCE');
-            $kpi->setAttribute('v_hero_value', (string) ($latest->actual_value ?? '—'));
+            $kpi->setAttribute('v_hero_value', (string) $latestSubmitted->actual_value);
             $kpi->setAttribute('v_hero_suffix', 'submitted');
-            $kpi->setAttribute('v_hero_subtext', 'Q'.$latest->quarter.' '.ucwords(strtolower(self::STATUS_LABELS[$latest->confirmation_status] ?? '')));
+            $kpi->setAttribute('v_hero_subtext', 'Q'.$latestSubmitted->quarter.' '.ucwords(strtolower(self::STATUS_LABELS[$latestSubmitted->confirmation_status] ?? '')));
+        }
+
+        if ($latest) {
             $kpi->setAttribute('v_active_quarter', WireEnums::quarterToWire($latest->quarter));
             $kpi->setAttribute('v_active_milestone_value', $latest->milestone !== null ? (string) $latest->milestone : null);
             $kpi->setAttribute('v_active_tracking_date_label', $latest->tracking_date ? Carbon::parse($latest->tracking_date)->format('j M Y') : null);
@@ -347,11 +359,20 @@ class KpiTrackingService
     private function supportingDocuments(Collection $tracks): array
     {
         return $tracks->flatMap(fn ($t) => $t->files)->map(function (File $f) {
+            $kind = $this->fileKind($f);
+            // url is required for image kinds (so the client can render a
+            // thumbnail + zoom), optional otherwise. Storage::disk('public')
+            // returns an absolute URL when APP_URL is set.
+            $url = $kind === 'image' && $f->path
+                ? Storage::disk('public')->url(ltrim((string) $f->path, '/'))
+                : null;
+
             return array_filter([
                 'id' => (string) $f->id,
                 'filename' => $f->name ?: 'document',
-                'kind' => $this->fileKind($f),
+                'kind' => $kind,
                 'sizeLabel' => $f->size ? $this->humanSize((int) $f->size) : null,
+                'url' => $url,
             ], fn ($v) => $v !== null);
         })->values()->all();
     }
@@ -424,10 +445,25 @@ class KpiTrackingService
 
     private function fileKind(File $file): string
     {
-        $hint = strtolower((string) ($file->type ?: $file->name));
+        // Combine type + name + path so we still classify correctly after the
+        // v2 attach rename (which strips the extension from `name`).
+        $hint = strtolower(
+            (string) ($file->type ?: '').' '
+            .(string) ($file->name ?: '').' '
+            .(string) ($file->path ?: '')
+        );
 
-        return str_contains($hint, 'pdf') ? 'pdf'
-            : (preg_match('/(jpg|jpeg|png|gif|webp|image)/', $hint) ? 'image' : 'pdf');
+        if (str_contains($hint, 'pdf')) {
+            return 'pdf';
+        }
+        if (preg_match('/(jpg|jpeg|png|gif|webp|image)/', $hint)) {
+            return 'image';
+        }
+        if (preg_match('/(docx?|word|odt|rtf)/', $hint)) {
+            return 'word';
+        }
+
+        return 'pdf';
     }
 
     private function humanSize(int $bytes): string

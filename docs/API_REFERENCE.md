@@ -911,8 +911,9 @@ typically populates only the required summary fields):
 | --- | --- | --- | --- |
 | `id` | string | ✅ | |
 | `filename` | string | ✅ | |
-| `kind` | string | ✅ | document kind — `pdf` / `image` (see Notes) |
+| `kind` | string | ✅ | document kind — `pdf` / `image` / `word` (see Notes). Decoding is lenient: `jpg`/`jpeg`/`png`/`gif`/`webp` → image, `doc`/`docx`/`document` → word, anything else → pdf. |
 | `sizeLabel` | string | ❌ | pre-formatted file-size label |
+| `url` | string | ❌ | Absolute URL to the stored file. Required for **image** docs so the detail page can render a thumbnail and an enlarged tap-to-zoom preview; omit for pdf/word (rendered as a type icon). Should be directly fetchable by the client (signed/public GET). |
 
 **Status codes:** `200` · `401` · `404`.
 
@@ -1200,7 +1201,7 @@ annual benchmark for each KPI under a deliverable, for a fiscal year.
   - `completed` — coordinator finalised the quarter (`confirmation_status` = `Confirmed`)
   - (finer-grained badges would arrive as a sibling `quartersStatusDetail` field, not new enum values here)
 - Submission `status` (response, nested) → `pending` · `confirmed`
-- Supporting-doc `kind` (response, nested) → `pdf` · `image`
+- Supporting-doc `kind` (response, nested) → `pdf` · `image` · `word` (lenient decoding — see the `supportingDocuments[].kind` note above)
 
 
 ---
@@ -1916,7 +1917,7 @@ approvable for this role's stage).
 - **Review decision** (`decision`) — `accept`, `reject`.
 - **Bulk grouping** (`grouping`, [11.6.3](#1163-sector-head-bulk-candidates)) — `by_commitment`, `by_deliverable`.
 - **Verification grouping** (`grouping`, [11.6.4](#1164-facilitator-verification-queue)) — `by_sector`, `by_kpi`.
-- **My-KPIs filter** (`filter`, [11.6.5](#1165-data-admin-my-kpis)) — `all`, `pending_entry`, `pending_sh`, `confirmed`.
+- **My-KPIs filter** (`filter`, [11.6.5](#1165-data-admin-my-kpis)) — `all`, `pending_entry`, `pending_sector_head`, `pending_facilitator`, `pending_coordinator`, `confirmed`, `rejected`. Every non-`all` value equals a submission-lifecycle `overallState` token, so the server filters on `overall_state == filter`.
 - **Quarter** (`quarter`) — `q1`, `q2`, `q3`, `q4`.
 
 

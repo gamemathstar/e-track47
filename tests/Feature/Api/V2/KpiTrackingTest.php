@@ -65,6 +65,96 @@ class KpiTrackingTest extends TestCase
             ->assertJsonStructure(['submissions', 'supportingDocuments', 'activeQuarter', 'progressPercent']);
     }
 
+    public function test_kpi_detail_hero_value_uses_latest_submitted_not_milestone_only_row(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Q1: data admin submitted with actual_value=70.
+        $this->makeTracking($kpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '70', 'milestone' => '100', 'confirmation_status' => 'Pending Sector Head Approval']);
+        // Q4: PDCU pre-seeded a milestone, but no actual_value yet. Without
+        // the fix this row would dominate (latest by year+quarter) and
+        // heroValue would render "—".
+        $this->makeTracking($kpi, ['quarter' => 4, 'year' => 2024, 'actual_value' => null, 'milestone' => '120', 'confirmation_status' => 'Not Confirmed']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}")->assertOk()->json();
+
+        $this->assertSame('70', $body['heroValue']);
+        $this->assertSame('CURRENT PERFORMANCE', $body['heroEyebrow']);
+        $this->assertStringStartsWith('Q1 ', $body['heroSubtext']);
+        // activeQuarter still reflects the most-recent tracking row (Q4) since
+        // that's where the data admin would next edit.
+        $this->assertSame('q4', $body['activeQuarter']);
+    }
+
+    public function test_kpi_detail_omits_hero_block_when_nothing_submitted(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        // Only a milestone-only row exists; no actual_value yet.
+        $this->makeTracking($kpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => null, 'milestone' => '100', 'confirmation_status' => 'Not Confirmed']);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $body = $this->getJson("/api/v2/kpis/{$kpi->id}")->assertOk()->json();
+        $this->assertArrayNotHasKey('heroValue', $body);
+        $this->assertArrayNotHasKey('heroEyebrow', $body);
+        $this->assertArrayNotHasKey('heroSubtext', $body);
+    }
+
+    public function test_kpi_detail_supporting_documents_include_url_for_images_and_word_kind(): void
+    {
+        [$sector, $deliverable, $kpi] = $this->seedKpi();
+        $t = $this->makeTracking($kpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '50', 'milestone' => '100']);
+
+        // Image — should emit url + kind=image.
+        $img = new \App\Models\File();
+        $img->name = 'Evidence 1';
+        $img->path = 'uploads/evidence/ev_aaa.jpg';
+        $img->type = 'jpg';
+        $img->size = 12345;
+        $img->fileable_id = $t->id;
+        $img->fileable_type = \App\Models\PerformanceTracking::class;
+        $img->save();
+
+        // Word doc — should emit kind=word, no url.
+        $word = new \App\Models\File();
+        $word->name = 'Evidence 2';
+        $word->path = 'uploads/evidence/ev_bbb.docx';
+        $word->type = 'docx';
+        $word->size = 54321;
+        $word->fileable_id = $t->id;
+        $word->fileable_type = \App\Models\PerformanceTracking::class;
+        $word->save();
+
+        // PDF — should emit kind=pdf, no url.
+        $pdf = new \App\Models\File();
+        $pdf->name = 'Evidence 3';
+        $pdf->path = 'uploads/evidence/ev_ccc.pdf';
+        $pdf->type = 'pdf';
+        $pdf->size = 9999;
+        $pdf->fileable_id = $t->id;
+        $pdf->fileable_type = \App\Models\PerformanceTracking::class;
+        $pdf->save();
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $docs = $this->getJson("/api/v2/kpis/{$kpi->id}")->assertOk()->json('supportingDocuments');
+        $byId = collect($docs)->keyBy('id');
+
+        $imgDoc = $byId[(string) $img->id];
+        $this->assertSame('image', $imgDoc['kind']);
+        $this->assertArrayHasKey('url', $imgDoc);
+        $this->assertStringContainsString('uploads/evidence/ev_aaa.jpg', $imgDoc['url']);
+
+        $wordDoc = $byId[(string) $word->id];
+        $this->assertSame('word', $wordDoc['kind']);
+        $this->assertArrayNotHasKey('url', $wordDoc);
+
+        $pdfDoc = $byId[(string) $pdf->id];
+        $this->assertSame('pdf', $pdfDoc['kind']);
+        $this->assertArrayNotHasKey('url', $pdfDoc);
+    }
+
     public function test_data_admin_can_submit_performance(): void
     {
         [$sector, $deliverable, $kpi] = $this->seedKpi();
