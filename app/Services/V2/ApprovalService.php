@@ -68,6 +68,13 @@ class ApprovalService
 
     public function sectorHeadBulk(User $user, string $grouping): array
     {
+        // Items remain unscoped (all pending SH items, same as the previous
+        // behaviour). The quarterLabel below is informational — it tells the
+        // mobile bulk page what reporting period the user is working in,
+        // independent of any per-item filtering.
+        $year = $this->yearForUserContext();
+        $quarter = $this->currentCalendarQuarter();
+
         $tracks = $this->trackingsAwaitingSectorHead($user);
 
         $groups = $tracks->groupBy(function ($t) use ($grouping) {
@@ -79,7 +86,7 @@ class ApprovalService
                 : 'Commitment: '.(optional($commitment)->name ?? '—');
         });
 
-        return $groups->map(fn (Collection $items, string $title) => [
+        $groupList = $groups->map(fn (Collection $items, string $title) => [
             'title' => $title,
             'items' => $items->map(fn ($t) => [
                 'id' => (string) $t->id,
@@ -88,6 +95,25 @@ class ApprovalService
                 'adminName' => optional($this->approver($t))->full_name ?? 'Data Admin',
             ])->values()->all(),
         ])->values()->all();
+
+        $sector = $user->isSectorHead();
+        $sectorLabel = $sector ? (string) $sector->sector_name : '—';
+
+        return [
+            'quarterLabel' => $year.' Q'.$quarter,
+            'sectorLabel' => $sectorLabel,
+            'groups' => $groupList,
+        ];
+    }
+
+    private function yearForUserContext(): int
+    {
+        return (int) (optional(\App\Models\Framework::where('status', 'Active')->first())->year ?: date('Y'));
+    }
+
+    private function currentCalendarQuarter(): int
+    {
+        return (int) ceil((int) date('n') / 3);
     }
 
     /**

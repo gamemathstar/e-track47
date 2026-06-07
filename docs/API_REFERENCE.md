@@ -1528,8 +1528,8 @@ GET /approvals/coordinator/queue?sector=health&year=2024&quarter=q3&sort=newest
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `id` | string | ✅ | **Stable submission identifier.** Same key used by `BulkApprovalItem.id` (§11.6.3) and accepted by `POST /approvals/submissions/bulk-approve.submissionIds` (§11.6.8) — carry it from a queue selection straight into the bulk page or the bulk-approve call. Distinct from `kpiId` (a single KPI can have multiple submissions across quarters/years; this id identifies one submission). |
-| `kpiId` | string | ✅ | KPI identifier — use this for the detail call (`/approvals/submissions/{kpiId}`). |
+| `id` | string | ✅ | Submission key — the backend's `performance_trackings.id` rendered as a string. **The same value** is returned by the sector-head bulk candidates ([§11.6.3](#1163-sector-head-bulk-candidates)) and accepted by bulk-approve ([§11.6.8](#1168-bulk-approve-submissions)) for the same submission. Distinct from `kpiId`. |
+| `kpiId` | string | ✅ | KPI key used for the detail call (distinct from the submission `id`). |
 | `kpiTitle` | string | ✅ | |
 | `sectorLabel` | string | ✅ | |
 | `sectorAccent` | string | ✅ | Colour hint (`primary`/`secondary`/`tertiary`/`error`). |
@@ -1600,31 +1600,50 @@ field must be a string when present.
 | **Auth** | Bearer required |
 | **Query params** | `grouping` (**required**) — `by_commitment` \| `by_deliverable`. |
 
-**Success — `200 OK`** (raw array of `BulkApprovalGroupModel`):
+**Success — `200 OK`** (raw **object** — header metadata + `groups`):
 
 ```json
-[
-  {
-    "title": "Commitment: Reduce Maternal Mortality",
-    "items": [
-      {
-        "id": "bulk-1",
-        "title": "Antenatal coverage",
-        "value": "82%",
-        "adminName": "F. Ibrahim"
-      },
-      {
-        "id": "bulk-2",
-        "title": "Skilled birth attendance",
-        "value": "74%",
-        "adminName": "F. Ibrahim"
-      }
-    ]
-  }
-]
+{
+  "quarterLabel": "2024 Q3",
+  "sectorLabel": "Infrastructure & Transport",
+  "groups": [
+    {
+      "title": "Commitment: Reduce Maternal Mortality",
+      "items": [
+        {
+          "id": "bulk-1",
+          "title": "Antenatal coverage",
+          "value": "82%",
+          "adminName": "F. Ibrahim"
+        },
+        {
+          "id": "bulk-2",
+          "title": "Skilled birth attendance",
+          "value": "74%",
+          "adminName": "F. Ibrahim"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-**Response fields** — `BulkApprovalGroupModel`
+⚠ **Backend note — response shape changed (object, not array).** This endpoint
+now returns an **object** so the bulk page's header is fully data-driven (the
+item count is derived client-side from `groups`, but the period and sector are
+not). Populate `quarterLabel` (the active reporting period, e.g. `"2024 Q3"`)
+and `sectorLabel` (the sector head's sector name, **without** a `Sector: `
+prefix — the client adds it). The previous bare-array form is no longer parsed.
+
+**Response fields** — top level
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `quarterLabel` | string | ✅ | Reporting-period label for the header pill (e.g. `2024 Q3`). |
+| `sectorLabel` | string | ✅ | The sector head's sector name (e.g. `Health`); the client renders `Sector: {sectorLabel}`. |
+| `groups` | array&lt;BulkApprovalGroup&gt; | ✅ | Grouped candidates (below); may be an empty array. |
+
+**`BulkApprovalGroup`** (object inside `groups[]`)
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
@@ -1643,15 +1662,17 @@ field must be a string when present.
 A group fails to parse unless `title` is a string and `items` is a list; each
 item requires all four string fields.
 
-✅ **Id alignment with the review queue.** The sector-head approval queue
-([§11.6.2](#1162-sector-head-review-queue)) lets the user tick rows and tap
+✅ **Id alignment with the review queue — confirmed.** The sector-head approval
+queue ([§11.6.2](#1162-sector-head-review-queue)) lets the user tick rows and tap
 **"Approve Selected"**, which opens the bulk page carrying the ticked
-`ApprovalQueueItem.id` values. **The server emits the same submission id in all
-three places** — `ApprovalQueueItem.id` (§11.6.2), `BulkApprovalItem.id` here,
-and the value `POST /approvals/submissions/bulk-approve` accepts in
-`submissionIds` (§11.6.8). The client can carry the queue selection straight
-into the bulk page intersection or the bulk-approve call. Same guarantee on the
-coordinator path (queue ids → `submissionIds` with `role: "coordinator"`).
+**`ApprovalQueueItem.id`** values. The client then pre-selects the
+**intersection** of those ids with the `BulkApprovalItem.id`s returned here.
+Backend confirms all three endpoints — `/sector-head/queue` (§11.6.2),
+`/sector-head/bulk` (this endpoint), and `/submissions/bulk-approve`
+([§11.6.8](#1168-bulk-approve-submissions)) — return/accept the **same
+`performance_trackings.id`** for a given submission, so the carry-through
+pre-selects correctly (the carried list is a strict subset of this endpoint's
+items). The coordinator path shares the same guarantee.
 
 **Status codes:** `200` · `401`.
 
@@ -1900,7 +1921,7 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | Field | Type | Req. | Validation |
 | --- | --- | --- | --- |
-| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). **These ids must match the corresponding queue rows' `id`** so the client can carry a selection from the queue into the bulk action — see the id-alignment note in [§11.6.3](#1163-sector-head-bulk-candidates). |
+| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). These are the **same `performance_trackings.id`** the queues return, so the client carries a queue selection straight into the bulk action — see the (confirmed) id-alignment note in [§11.6.3](#1163-sector-head-bulk-candidates). |
 | `role` | string | ✅ | Reviewer role wire token — `sector_head` \| `coordinator` (see Enums). The server applies that role's accept transition to **every** listed submission (sector head → `pending_facilitator`; **coordinator → `confirmed`**), so the role must match the submissions' current stage. |
 
 A coordinator finalizing a multi-select from the review queue:

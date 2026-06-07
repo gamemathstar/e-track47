@@ -96,8 +96,39 @@ class ApprovalsTest extends TestCase
 
         $this->getJson('/api/v2/approvals/sector-head/bulk?grouping=by_commitment')
             ->assertOk()
-            ->assertJsonStructure([['title', 'items' => [['id', 'title', 'value', 'adminName']]]])
-            ->assertJsonPath('0.title', 'Commitment: Maternal Health Expansion');
+            ->assertJsonStructure([
+                'quarterLabel',
+                'sectorLabel',
+                'groups' => [['title', 'items' => [['id', 'title', 'value', 'adminName']]]],
+            ])
+            ->assertJsonPath('sectorLabel', 'Health')
+            ->assertJsonPath('groups.0.title', 'Commitment: Maternal Health Expansion');
+    }
+
+    public function test_sector_head_bulk_response_wraps_groups_with_header_metadata(): void
+    {
+        [$sector, $kpi] = $this->seedKpi('Health');
+        $this->tracking($kpi, 'Pending Sector Head Approval', 1);
+        Passport::actingAs($this->makeSectorHead($sector), [], 'api');
+
+        $body = $this->getJson('/api/v2/approvals/sector-head/bulk?grouping=by_commitment')
+            ->assertOk()->json();
+
+        // Wrapper shape: quarterLabel + sectorLabel + groups
+        $this->assertArrayHasKey('quarterLabel', $body);
+        $this->assertArrayHasKey('sectorLabel', $body);
+        $this->assertArrayHasKey('groups', $body);
+
+        // Sector label is the raw sector name — the client adds the "Sector: " prefix.
+        $this->assertSame('Health', $body['sectorLabel']);
+        // Quarter label is "{framework_year} Q{current_calendar_quarter}".
+        $expected = '2024 Q'.((int) ceil((int) date('n') / 3));
+        $this->assertSame($expected, $body['quarterLabel']);
+
+        // Items still surface inside groups[].
+        $this->assertNotEmpty($body['groups']);
+        $this->assertSame('Commitment: Maternal Health Expansion', $body['groups'][0]['title']);
+        $this->assertNotEmpty($body['groups'][0]['items']);
     }
 
     public function test_sector_head_bulk_requires_grouping(): void
@@ -841,7 +872,7 @@ class ApprovalsTest extends TestCase
             ->pluck('id')->sort()->values()->all();
 
         $bulkIds = collect($this->getJson('/api/v2/approvals/sector-head/bulk?grouping=by_commitment')
-            ->assertOk()->json())
+            ->assertOk()->json('groups'))
             ->flatMap(fn ($g) => array_column($g['items'], 'id'))
             ->sort()->values()->all();
 
