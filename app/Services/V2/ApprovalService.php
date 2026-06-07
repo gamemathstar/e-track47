@@ -759,8 +759,11 @@ class ApprovalService
     {
         return match ($filter) {
             'pending_entry' => $overall === 'pending_entry',
-            'pending_sh' => $overall === 'pending_sector_head',
+            'pending_sh', 'pending_sector_head' => $overall === 'pending_sector_head',
+            'pending_facilitator' => $overall === 'pending_facilitator',
+            'pending_coordinator' => $overall === 'pending_coordinator',
             'confirmed' => $overall === 'confirmed',
+            'rejected' => $overall === 'rejected',
             default => true, // all
         };
     }

@@ -73,7 +73,9 @@ class ApprovalController extends BaseController
     public function myKpis(Request $request): array
     {
         $validated = $request->validate([
-            'filter' => ['nullable', 'in:all,pending_entry,pending_sh,confirmed'],
+            // Filter values mirror overallState. `pending_sh` is kept as a
+            // backward-compat alias for `pending_sector_head`.
+            'filter' => ['nullable', 'in:all,pending_entry,pending_sh,pending_sector_head,pending_facilitator,pending_coordinator,confirmed,rejected'],
             'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
             'year' => ['nullable', 'integer'],
         ]);

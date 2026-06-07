@@ -429,6 +429,84 @@ class ApprovalsTest extends TestCase
             ->assertJsonPath('0.overallState', 'pending_sector_head');
     }
 
+    public function test_my_kpis_accepts_all_overall_state_filter_tokens(): void
+    {
+        // Seed one KPI per terminal/pending state and prove each filter token
+        // returns only the matching row (and the wire's `pending_sh` alias
+        // still maps to the full `pending_sector_head` state).
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $commitment = $this->makeCommitment($sector);
+        $deliverable = $this->makeDeliverable($commitment);
+        $sh = $this->makeSectorHead($sector);
+        $fc = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+
+        $shKpi = $this->makeKpi($deliverable, ['kpi' => 'A — Pending SH']);
+        $facKpi = $this->makeKpi($deliverable, ['kpi' => 'B — Pending Facilitator']);
+        $coKpi = $this->makeKpi($deliverable, ['kpi' => 'C — Pending Coordinator']);
+        $confKpi = $this->makeKpi($deliverable, ['kpi' => 'D — Confirmed']);
+        $rejKpi = $this->makeKpi($deliverable, ['kpi' => 'E — Rejected']);
+
+        $year = 2024;
+
+        $this->makeTracking($shKpi, ['quarter' => 1, 'year' => $year, 'milestone' => '100', 'actual_value' => '40']);
+
+        $this->makeTracking($facKpi, [
+            'quarter' => 1, 'year' => $year, 'milestone' => '100', 'actual_value' => '40',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+        ]);
+
+        $this->makeTracking($coKpi, [
+            'quarter' => 1, 'year' => $year, 'milestone' => '100', 'actual_value' => '40',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Accept',
+        ]);
+
+        // Confirmed: every quarter must read 'confirmed' for the rollup to be
+        // 'confirmed' (other quarters with no rows default to pending_entry
+        // and dominate).
+        foreach ([1, 2, 3, 4] as $q) {
+            $this->makeTracking($confKpi, [
+                'quarter' => $q, 'year' => $year, 'milestone' => '100', 'actual_value' => '40',
+                'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+                'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+                'facilitator_decision' => 'Accept',
+                'coordinator_confirmed_by' => $coordinator->id, 'coordinator_confirmed_at' => now(),
+            ]);
+        }
+
+        $this->makeTracking($rejKpi, [
+            'quarter' => 1, 'year' => $year, 'milestone' => '100', 'actual_value' => '40',
+            'sector_head_approved_by' => $sh->id, 'sector_head_approved_at' => now(),
+            'facilitator_confirmed_by' => $fc->id, 'facilitator_confirmed_at' => now(),
+            'facilitator_decision' => 'Reject',
+            'facilitator_rejection_reason' => 'Evidence missing.',
+        ]);
+
+        Passport::actingAs($this->makeDataAdmin($sector), [], 'api');
+
+        // Each filter token narrows to exactly one of the seeded KPIs.
+        $cases = [
+            'pending_sh'           => $shKpi,
+            'pending_sector_head'  => $shKpi, // alias of the above
+            'pending_facilitator'  => $facKpi,
+            'pending_coordinator'  => $coKpi,
+            'confirmed'            => $confKpi,
+            'rejected'             => $rejKpi,
+        ];
+        foreach ($cases as $filter => $expectedKpi) {
+            $body = $this->getJson("/api/v2/approvals/data-admin/my-kpis?filter={$filter}&year=2024")
+                ->assertOk()->json();
+            $ids = array_column($body, 'kpiId');
+            $this->assertSame(
+                [(string) $expectedKpi->id], $ids,
+                "filter={$filter} should return only kpi {$expectedKpi->id} (got: ".json_encode($ids).')'
+            );
+        }
+    }
+
     public function test_my_kpis_reads_state_from_who_columns_when_confirmation_status_is_stale(): void
     {
         // The production scenario: data admin submitted, actual_value is set,
