@@ -34,17 +34,51 @@ class DashboardService
 
     // --- governor ------------------------------------------------------------
 
-    public function governor(User $user): array
+    /**
+     * @param  string|null  $sectorId     scope every aggregate to this sector
+     *                                    (null = state-wide).
+     * @param  int|null     $year         framework reporting year (null = Active framework).
+     * @param  string|null  $quarterWire  q1–q4 (null = Annual / whole-year).
+     */
+    public function governor(User $user, ?string $sectorId = null, ?int $year = null, ?string $quarterWire = null): array
     {
         $this->assert($user->isGovernor(), 'governor');
 
-        $fw = $this->activeFramework();
-        $sectors = $this->frameworkSectors($fw);
-        $sectorMetrics = $this->metrics->forSectors($sectors->pluck('id')->all());
+        $quarter = $quarterWire ? WireEnums::wireToQuarter($quarterWire) : null;
+
+        // Year resolution: explicit year → that framework; else Active framework.
+        // Unknown year (no framework row) → empty snapshot (not 404 — the
+        // client renders the empty state gracefully).
+        $fw = $year !== null
+            ? Framework::where('year', $year)->first()
+            : $this->activeFramework();
+
+        if (! $fw) {
+            return $this->emptyGovernorSnapshot();
+        }
+
+        // Sector scoping: filter the framework's sectors to the supplied id.
+        // Unknown sector under this framework → empty snapshot.
+        $sectorsQuery = Sector::where('framework_id', $fw->id)->orderBy('sector_name');
+        if ($sectorId !== null && $sectorId !== '') {
+            $sectorsQuery->where('id', $sectorId);
+        }
+        $sectors = $sectorsQuery->get();
+        if ($sectors->isEmpty()) {
+            return $this->emptyGovernorSnapshot();
+        }
+
+        $sectorMetrics = $this->metrics->forSectors($sectors->pluck('id')->all(), $quarter, $fw->year);
         $rows = $this->sectorPerformanceRows($sectors, $sectorMetrics);
 
-        $kpiFractions = $this->fractionByKpi($this->frameworkKpiIds($fw));
-        $buckets = $this->kpiStatusBuckets($kpiFractions, count($this->frameworkKpiIds($fw)));
+        // KPI ids scoped to (framework, selected sectors). When sectorId is
+        // omitted this matches the framework-wide list as before.
+        $kpiIds = Kpi::where('framework_id', $fw->id)
+            ->whereHas('deliverable.commitment', fn ($q) => $q->whereIn('sector_id', $sectors->pluck('id')))
+            ->pluck('id')->all();
+
+        $kpiFractions = $this->fractionByKpi($kpiIds, $quarter, (int) $fw->year);
+        $buckets = $this->kpiStatusBuckets($kpiFractions, count($kpiIds));
         $overall = $rows->avg('actualPercent') ?? 0.0;
         $top = $rows->sortByDesc('actualPercent')->first();
 
@@ -56,14 +90,39 @@ class DashboardService
             'topPerformerName' => $top['name'] ?? '—',
             'topPerformerPercent' => (float) ($top['actualPercent'] ?? 0),
             'topPerformerKpiCount' => $top ? (int) $this->kpiCountForSector($top['sectorId']) : 0,
-            'pendingVerifications' => (int) $this->pendingVerifications($fw),
-            'totalKpis' => (int) count($this->frameworkKpiIds($fw)),
+            'pendingVerifications' => (int) $this->pendingVerificationsForKpis($kpiIds, $quarter, (int) $fw->year),
+            'totalKpis' => count($kpiIds),
             'onTrackCount' => (int) $buckets['on_track'],
             'atRiskCount' => (int) $buckets['at_risk'],
             'delayedCount' => (int) $buckets['delayed'],
             'sectorComparison' => $rows->values()->all(),
             'topInsights' => $rows->sortByDesc('actualPercent')->take(3)->values()->all(),
             'bottomInsights' => $rows->sortBy('actualPercent')->take(3)->values()->all(),
+        ];
+    }
+
+    /**
+     * Zeroed governor snapshot — returned when the requested year/sector
+     * combination matches nothing (mobile contract: empty state, not 404).
+     */
+    private function emptyGovernorSnapshot(): array
+    {
+        return [
+            'greeting' => $this->greeting('Your Excellency.'),
+            'greetingDate' => now()->format('l, F j, Y'),
+            'overallPercent' => 0.0,
+            'overallDeltaLabel' => '+0.0%',
+            'topPerformerName' => '—',
+            'topPerformerPercent' => 0.0,
+            'topPerformerKpiCount' => 0,
+            'pendingVerifications' => 0,
+            'totalKpis' => 0,
+            'onTrackCount' => 0,
+            'atRiskCount' => 0,
+            'delayedCount' => 0,
+            'sectorComparison' => [],
+            'topInsights' => [],
+            'bottomInsights' => [],
         ];
     }
 
@@ -442,7 +501,11 @@ class DashboardService
         })->values();
     }
 
-    private function fractionByKpi(array $kpiIds): array
+    /**
+     * @param  int|null  $quarter  q1–q4 mapped to 1–4 (null = all quarters)
+     * @param  int|null  $year     framework reporting year (null = all years)
+     */
+    private function fractionByKpi(array $kpiIds, ?int $quarter = null, ?int $year = null): array
     {
         if (empty($kpiIds)) {
             return [];
@@ -451,13 +514,45 @@ class DashboardService
         $value = "NULLIF(COALESCE(NULLIF(delivery_department_value, ''), actual_value), '')";
         $milestone = "NULLIF(milestone, '')";
 
-        return DB::table('performance_trackings')
-            ->whereIn('kpi_id', $kpiIds)
+        $query = DB::table('performance_trackings')->whereIn('kpi_id', $kpiIds);
+        if ($quarter !== null) {
+            $query->where('quarter', $quarter);
+        }
+        if ($year !== null) {
+            $query->where('year', $year);
+        }
+
+        return $query
             ->selectRaw("kpi_id, AVG(LEAST(CAST({$value} AS DECIMAL(20,4)) / CAST({$milestone} AS DECIMAL(20,4)), 1.0)) AS frac")
             ->groupBy('kpi_id')
             ->pluck('frac', 'kpi_id')
             ->map(fn ($f) => $f === null ? 0.0 : (float) $f)
             ->all();
+    }
+
+    /**
+     * Pending-verification count for a specific KPI set + period. Used by the
+     * governor dashboard once it's been scoped by sector/year/quarter; the
+     * generic pendingVerifications() above is the framework-wide variant.
+     */
+    private function pendingVerificationsForKpis(array $kpiIds, ?int $quarter = null, ?int $year = null): int
+    {
+        if (empty($kpiIds)) {
+            return 0;
+        }
+
+        $query = PerformanceTracking::whereIn('kpi_id', $kpiIds)
+            ->whereNotNull('actual_value')
+            ->where('actual_value', '<>', '')
+            ->whereNull('coordinator_confirmed_by');
+        if ($quarter !== null) {
+            $query->where('quarter', $quarter);
+        }
+        if ($year !== null) {
+            $query->where('year', $year);
+        }
+
+        return $query->count();
     }
 
     private function kpiStatusBuckets(array $fractionByKpi, int $totalKpis): array

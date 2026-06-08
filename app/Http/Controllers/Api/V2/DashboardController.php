@@ -18,7 +18,18 @@ class DashboardController extends BaseController
 
     public function governor(Request $request): array
     {
-        return $this->dashboards->governor($request->user());
+        $validated = $request->validate([
+            'sector' => ['nullable'],
+            'year' => ['nullable', 'integer'],
+            'quarter' => ['nullable', 'in:q1,q2,q3,q4'],
+        ]);
+
+        return $this->dashboards->governor(
+            $request->user(),
+            $validated['sector'] ?? null,
+            isset($validated['year']) ? (int) $validated['year'] : null,
+            $validated['quarter'] ?? null,
+        );
     }
 
     public function coordinator(Request $request): array

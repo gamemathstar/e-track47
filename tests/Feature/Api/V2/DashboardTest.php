@@ -60,6 +60,100 @@ class DashboardTest extends TestCase
             ->assertJsonMissingPath('data');
     }
 
+    /** @return array{0:\App\Models\Sector,1:\App\Models\Sector,2:\App\Models\Kpi,3:\App\Models\Kpi} */
+    private function seedTwoSectorsWithKpis(): array
+    {
+        $fw = $this->makeFramework(['year' => 2024]);
+        $health = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $edu = $this->makeSector($fw, ['sector_name' => 'Education']);
+        $hKpi = $this->makeKpi($this->makeDeliverable($this->makeCommitment($health)));
+        $eKpi = $this->makeKpi($this->makeDeliverable($this->makeCommitment($edu)));
+        $t = new \App\Models\KpiTarget();
+        $t->kpi_id = $hKpi->id; $t->year = 2024; $t->target = '120'; $t->save();
+        $t2 = new \App\Models\KpiTarget();
+        $t2->kpi_id = $eKpi->id; $t2->year = 2024; $t2->target = '120'; $t2->save();
+
+        return [$health, $edu, $hKpi, $eKpi];
+    }
+
+    public function test_governor_dashboard_filters_by_sector(): void
+    {
+        [$health, $edu, $hKpi, $eKpi] = $this->seedTwoSectorsWithKpis();
+        // Health hits 90% Q1, Education hits 20% Q1.
+        $this->makeTracking($hKpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '90', 'milestone' => '100']);
+        $this->makeTracking($eKpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '20', 'milestone' => '100']);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        // State-wide.
+        $all = $this->getJson('/api/v2/dashboard/governor')->assertOk()->json();
+        $this->assertCount(2, $all['sectorComparison']);
+
+        // Sector-scoped: only Health.
+        $h = $this->getJson("/api/v2/dashboard/governor?sector={$health->id}")->assertOk()->json();
+        $this->assertCount(1, $h['sectorComparison']);
+        $this->assertSame('Health', $h['sectorComparison'][0]['name']);
+        $this->assertSame(1, $h['totalKpis']);
+        $this->assertSame('Health', $h['topPerformerName']);
+
+        // Sector-scoped: only Education.
+        $e = $this->getJson("/api/v2/dashboard/governor?sector={$edu->id}")->assertOk()->json();
+        $this->assertCount(1, $e['sectorComparison']);
+        $this->assertSame('Education', $e['sectorComparison'][0]['name']);
+    }
+
+    public function test_governor_dashboard_filters_by_quarter(): void
+    {
+        [$health, , $hKpi] = $this->seedTwoSectorsWithKpis();
+        // Q1 = 80%, Q3 = 30% for Health KPI.
+        $this->makeTracking($hKpi, ['quarter' => 1, 'year' => 2024, 'actual_value' => '80', 'milestone' => '100']);
+        $this->makeTracking($hKpi, ['quarter' => 3, 'year' => 2024, 'actual_value' => '30', 'milestone' => '100']);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        $q1 = $this->getJson("/api/v2/dashboard/governor?sector={$health->id}&quarter=q1")->assertOk()->json();
+        $this->assertEqualsWithDelta(80.0, $q1['sectorComparison'][0]['actualPercent'], 0.5);
+
+        $q3 = $this->getJson("/api/v2/dashboard/governor?sector={$health->id}&quarter=q3")->assertOk()->json();
+        $this->assertEqualsWithDelta(30.0, $q3['sectorComparison'][0]['actualPercent'], 0.5);
+
+        // Annual (no quarter) → average of the two = ~55%.
+        $annual = $this->getJson("/api/v2/dashboard/governor?sector={$health->id}")->assertOk()->json();
+        $this->assertEqualsWithDelta(55.0, $annual['sectorComparison'][0]['actualPercent'], 0.5);
+    }
+
+    public function test_governor_dashboard_unknown_year_returns_empty_snapshot(): void
+    {
+        $this->seedTwoSectorsWithKpis();
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/governor?year=2019')->assertOk()->json();
+        $this->assertSame(0, $body['totalKpis']);
+        $this->assertEqualsWithDelta(0.0, $body['overallPercent'], 0.01);
+        $this->assertSame([], $body['sectorComparison']);
+        $this->assertSame('—', $body['topPerformerName']);
+    }
+
+    public function test_governor_dashboard_unknown_sector_returns_empty_snapshot(): void
+    {
+        $this->seedTwoSectorsWithKpis();
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        $body = $this->getJson('/api/v2/dashboard/governor?sector=999999')->assertOk()->json();
+        $this->assertSame(0, $body['totalKpis']);
+        $this->assertSame([], $body['sectorComparison']);
+    }
+
+    public function test_governor_dashboard_rejects_unknown_quarter_token(): void
+    {
+        $this->seedTwoSectorsWithKpis();
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        $this->getJson('/api/v2/dashboard/governor?quarter=q9')
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['quarter']]);
+    }
+
     public function test_coordinator_dashboard(): void
     {
         $this->seedSector();

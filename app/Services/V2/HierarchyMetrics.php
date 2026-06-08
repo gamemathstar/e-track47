@@ -38,7 +38,7 @@ class HierarchyMetrics
      *
      * @return array<int|string, array{completed:int,in_progress:int,at_risk:int,not_started:int,total:int,progress:float}>
      */
-    public function forSectors(array $sectorIds): array
+    public function forSectors(array $sectorIds, ?int $quarter = null, ?int $year = null): array
     {
         if (empty($sectorIds)) {
             return [];
@@ -66,11 +66,22 @@ class HierarchyMetrics
             $out[$row->sector_id]['total'] += (int) $row->c;
         }
 
-        $progress = DB::table('performance_trackings as pt')
+        // When $quarter / $year is provided, the progress fraction is scoped
+        // to that period's performance_tracking rows only. Used by the
+        // governor dashboard's filter row to compute per-period sector
+        // performance without touching the structural commitment counts.
+        $progressQuery = DB::table('performance_trackings as pt')
             ->join('kpis as k', 'k.id', '=', 'pt.kpi_id')
             ->join('deliverables as d', 'd.id', '=', 'k.deliverable_id')
             ->join('commitments as c', 'c.id', '=', 'd.commitment_id')
-            ->whereIn('c.sector_id', $sectorIds)
+            ->whereIn('c.sector_id', $sectorIds);
+        if ($quarter !== null) {
+            $progressQuery->where('pt.quarter', $quarter);
+        }
+        if ($year !== null) {
+            $progressQuery->where('pt.year', $year);
+        }
+        $progress = $progressQuery
             ->selectRaw('c.sector_id AS sid, '.$this->fractionExpr().' AS frac')
             ->groupBy('c.sector_id')
             ->get();

@@ -1635,6 +1635,14 @@ not). Populate `quarterLabel` (the active reporting period, e.g. `"2024 Q3"`)
 and `sectorLabel` (the sector head's sector name, **without** a `Sector: `
 prefix — the client adds it). The previous bare-array form is no longer parsed.
 
+ℹ **Header quarter when reached from the queue.** When the bulk page is opened
+from the sector-head queue's "Approve Selected", the client carries the queue's
+selected quarter and **overrides the quarter portion of the header**, keeping
+only the **year** from `quarterLabel` (e.g. response `"2024 Q3"` + selected `q1`
+→ header `"2024 Q1"`). So `quarterLabel`'s quarter is only authoritative when the
+page is opened standalone; its **year is always used**. Keep a 4-digit year in
+`quarterLabel` so the override can extract it.
+
 **Response fields** — top level
 
 | Field | Type | Req. | Notes |
@@ -3095,7 +3103,17 @@ referenced from each role's response table.
 | **Purpose** | State-wide performance snapshot for the Governor home. |
 | **Method / Path** | `GET /dashboard/governor` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `sector` (optional) — sector id; omitted = all sectors. `year` (optional int) — fiscal year. `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`); omitted = **Annual** (whole year). All omitted on the initial load. |
+
+The dashboard renders a filter row (sector dropdown · fiscal-year dropdown ·
+Annual/Q1–Q4 segmented control); changing any of them re-fetches with the
+params above. ⚠ **Backend note:** the endpoint must **scope every aggregate**
+(hero scorecard, tiles, sector comparison, portfolio donut, insights) to the
+supplied `sector`/`year`/`quarter` — they are whole-state server aggregations
+the client can't re-derive. The fiscal-year options come from the frameworks'
+`reportingYear`s ([§11.5.1](#1151-list-frameworks)); the client defaults the
+selected year to the active framework's. Until the endpoint honors these
+params, the filters change the selection but the data stays whole-state.
 
 **Response fields** (raw object)
 
