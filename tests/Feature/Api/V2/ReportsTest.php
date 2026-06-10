@@ -34,7 +34,7 @@ class ReportsTest extends TestCase
             ->assertOk()
             ->assertJsonStructure([
                 'avgPerformanceFraction', 'avgPerformanceLabel', 'topSectorLabel', 'pendingCount', 'pendingCaption',
-                'sectorBars' => [['label', 'fraction', 'valueLabel', 'accent']],
+                'sectorBars' => [['label', 'short', 'fraction', 'valueLabel', 'accent']],
                 'statusMix' => ['achievedFraction', 'onTrackFraction', 'criticalFraction', 'totalKpiCount', 'achievedPctLabel', 'onTrackPctLabel', 'criticalPctLabel'],
             ])
             ->assertJsonPath('topSectorLabel', 'Health');

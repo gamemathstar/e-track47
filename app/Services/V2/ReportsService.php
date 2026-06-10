@@ -43,6 +43,7 @@ class ReportsService
 
             return [
                 'label' => $s->sector_name,
+                'short' => (string) ($s->description ?? ''),
                 'fraction' => round($fraction, 4),
                 'valueLabel' => (string) round($fraction * 100),
                 'accent' => SectorPresenter::accent($s->id),
