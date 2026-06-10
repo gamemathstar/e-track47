@@ -83,16 +83,17 @@ class SectorAccessService
     /**
      * v2-scoped "all sectors visible" check. Delegates to the web app's
      * User::canAccessAllSectors() (Coordinator / Deputy Coordinator) and
-     * additionally treats System Admin as all-access — needed for the mobile
-     * admin directory, gallery management, and other read-everywhere flows
-     * that the web app handles via system-level routes instead of sector
-     * scoping.
+     * additionally treats System Admin and Governor as all-access — needed
+     * for the mobile admin directory, gallery management, and the governor
+     * dashboard's sector picker, which the web app handles via system-level
+     * routes instead of sector scoping.
      *
-     * NB: we don't use `$user->isSystemAdmin()` here. That helper only checks
-     * `target_entity === 'System'` without verifying the role name, so any
-     * user whose current role row happens to have target_entity='System'
-     * (data error, legacy fixture, etc.) would be granted cross-sector
-     * access. We check the role name explicitly instead.
+     * NB: we don't use `$user->isSystemAdmin()` / `$user->isGovernor()`
+     * here. Those helpers only check `target_entity` (`'System'` / `'State'`)
+     * without verifying the role name, so any user whose current role row
+     * happens to have a matching target_entity (data error, legacy fixture,
+     * etc.) would be granted cross-sector access. We check the role name
+     * explicitly instead.
      */
     private function hasAllSectorAccess(User $user): bool
     {
@@ -102,7 +103,10 @@ class SectorAccessService
 
         $role = $user->getCurrentRole();
 
-        return $role && $role->isActive() && $role->role === UserRole::ROLE_SYSTEM_ADMIN;
+        return $role && $role->isActive() && in_array($role->role, [
+            UserRole::ROLE_SYSTEM_ADMIN,
+            UserRole::ROLE_GOVERNOR,
+        ], true);
     }
 }
 

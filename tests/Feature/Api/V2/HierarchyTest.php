@@ -127,6 +127,19 @@ class HierarchyTest extends TestCase
             ->assertOk()->assertJsonCount(3);
     }
 
+    public function test_governor_sees_every_sector(): void
+    {
+        $fw = $this->makeFramework();
+        $this->makeSector($fw, ['sector_name' => 'Health']);
+        $this->makeSector($fw, ['sector_name' => 'Education']);
+        $this->makeSector($fw, ['sector_name' => 'Agriculture']);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'State'], 'Governor'), [], 'api');
+
+        $this->getJson('/api/v2/sectors')
+            ->assertOk()->assertJsonCount(3);
+    }
+
     public function test_facilitator_only_sees_assigned_sectors(): void
     {
         $fw = $this->makeFramework();
