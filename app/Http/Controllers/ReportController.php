@@ -3330,8 +3330,12 @@ class ReportController extends Controller
         // Add Section A: Summary Overview
         $this->addWordSummaryOverview($section, $sector, $performanceData);
 
-        // Add Section B: Performance Summary Tables (placeholder for chart)
-        $this->addWordPerformanceSummary($section);
+        // Performance rating legend (5-column colour-coded reference table)
+        $this->addWordRatingLegend($section);
+
+        // Add Section B: Performance Summary Tables (per-commitment breakdown)
+        $commitments = $this->getCommitmentsBreakdownForWord($sector, $year);
+        $this->addWordPerformanceSummary($section, $sector, $year, $commitments, $performanceData);
 
         // Add Section C: Observations and Recommendations
         $this->addWordObservationsRecommendations(
@@ -3491,36 +3495,64 @@ class ReportController extends Controller
 
     private function addWordReportHeader($section, $year)
     {
-        // Add empty lines
-        for ($i = 0; $i < 5; $i++) {
-            $section->addText('', ['size' => 13, 'bold' => true]);
+        // State crest / official logo (centred, top of page). Falls back
+        // silently if the asset is missing on disk.
+        $logo = public_path('jg_logo.png');
+        if (is_file($logo)) {
+            $section->addImage($logo, [
+                'width' => 70,
+                'height' => 70,
+                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
+                'wrappingStyle' => 'inline',
+            ]);
         }
 
-        // Title
-        $section->addText(
-            'PERFORMANCE DELIVERY COORDINATION UNIT,',
-            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
-        );
-        $section->addText(
-            'OFFICE OF THE EXECUTIVE GOVERNOR',
-            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
-        );
-        $section->addText(
-            "Full Year [Jan. – Dec. {$year}] Performance Assessment",
-            ['name' => 'Tahoma', 'size' => 13, 'bold' => true],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
-        );
+        // Horizontal rule above the title block.
+        $this->addWordHorizontalRule($section);
 
-        // Underlined subtitle
+        $centre = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 0];
+        $titleFont = ['name' => 'Tahoma', 'size' => 13, 'bold' => true];
+
+        $section->addText('PERFORMANCE DELIVERY COORDINATION UNIT,', $titleFont, $centre);
+        $section->addText('OFFICE OF THE EXECUTIVE GOVERNOR', $titleFont, $centre);
+
+        // Title line with the year highlighted yellow (matches the PDF).
+        $titleRun = $section->addTextRun($centre);
+        $titleRun->addText('Full Year [Jan. – Dec. ', $titleFont);
+        $titleRun->addText(
+            (string) $year,
+            array_merge($titleFont, ['bgColor' => 'FFFF00']),
+        );
+        $titleRun->addText('] Performance Assessment', $titleFont);
+
         $section->addText(
             'Ministries / Sectors Performance Report Sheet',
-            ['name' => 'Tahoma', 'size' => 13, 'bold' => true, 'underline' => 'single'],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+            array_merge($titleFont, ['underline' => 'single']),
+            $centre,
         );
 
+        // Horizontal rule below the title block.
+        $this->addWordHorizontalRule($section);
         $section->addText('', ['size' => 5]);
+    }
+
+    /**
+     * Page-wide horizontal rule. Implemented as a 1-row borderless table whose
+     * single cell has only a bottom border — renders identically across Word /
+     * Pages / LibreOffice and avoids the paragraph-border edge cases.
+     */
+    private function addWordHorizontalRule($section): void
+    {
+        $table = $section->addTable(['width' => 100 * 50, 'unit' => 'pct']);
+        $table->addRow();
+        $cell = $table->addCell(10000, [
+            'borderTopSize' => 0,
+            'borderLeftSize' => 0,
+            'borderRightSize' => 0,
+            'borderBottomSize' => 12,
+            'borderBottomColor' => '000000',
+        ]);
+        $cell->addText('', ['size' => 1]);
     }
 
     private function addWordSummaryOverview($section, $sector, $data)
@@ -3590,20 +3622,237 @@ class ReportController extends Controller
         $section->addText('', ['size' => 6]);
     }
 
-    private function addWordPerformanceSummary($section)
+    /**
+     * Colour-coded reference legend that appears under Section A — mirrors the
+     * 5-column band shown in the PDF (range / rating / expectation level).
+     */
+    private function addWordRatingLegend($section): void
+    {
+        $bands = [
+            // [range,      rating,         expectation,                bg,         fg]
+            ['Below 40%',   'Unsatisfactory', 'Below Minimum Expectations', 'FF0000', 'FFFFFF'],
+            ['40% - 59%',   'Fair',           'Needs Improvement',          'FFC000', '000000'],
+            ['60% - 69%',   'Good',           'Meets Expectations',         '92D050', '000000'],
+            ['70% - 100%',  'Very Good',      'Above Expectations',         '00B050', 'FFFFFF'],
+            ['Above 100%',  'Distinction',    'Exceptional',                '00B0F0', 'FFFFFF'],
+        ];
+
+        $table = $section->addTable([
+            'borderSize' => 4,
+            'borderColor' => 'FFFFFF',
+            'cellMargin' => 60,
+            'width' => 100 * 50,
+            'unit' => 'pct',
+        ]);
+
+        $headerStyle = ['name' => 'Tahoma', 'size' => 10, 'bold' => true];
+        $centre = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 0];
+        $cellW = 2000;
+
+        // Row 1 — range band
+        $table->addRow();
+        foreach ($bands as $b) {
+            $cell = $table->addCell($cellW, ['bgColor' => $b[3], 'valign' => 'center']);
+            $cell->addText($b[0], array_merge($headerStyle, ['color' => $b[4]]), $centre);
+        }
+        // Row 2 — rating label
+        $table->addRow();
+        foreach ($bands as $b) {
+            $cell = $table->addCell($cellW, ['bgColor' => $b[3], 'valign' => 'center']);
+            $cell->addText($b[1], array_merge($headerStyle, ['color' => $b[4]]), $centre);
+        }
+        // Row 3 — expectation level
+        $table->addRow();
+        foreach ($bands as $b) {
+            $cell = $table->addCell($cellW, ['bgColor' => $b[3], 'valign' => 'center']);
+            $cell->addText($b[2], array_merge($headerStyle, ['color' => $b[4]]), $centre);
+        }
+
+        $section->addText('', ['size' => 6]);
+    }
+
+    /**
+     * Section B — per-commitment performance summary table. Mirrors the table
+     * shown in the PDF: S/N, Commitment, No. of Outputs, No. of Results to be
+     * Delivered, performance-distribution buckets (Exceptional → Below Min),
+     * Not Assessed, Overall Performance (% + rating). Ends with a totals row.
+     */
+    private function addWordPerformanceSummary($section, $sector, $year, array $commitments, array $sectorData): void
     {
         $section->addText(
             'B: Performance Summary Tables',
             ['name' => 'Tahoma', 'size' => 11, 'bold' => true],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT]
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT, 'spaceAfter' => 80]
         );
-        $section->addText('', ['size' => 6]);
-        $section->addText(
-            '[Performance summary tables/charts would be inserted here]',
-            ['name' => 'Tahoma', 'size' => 11, 'italic' => true],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+
+        $table = $section->addTable([
+            'borderSize' => 6,
+            'borderColor' => '000000',
+            'cellMargin' => 40,
+            'width' => 100 * 50,
+            'unit' => 'pct',
+        ]);
+
+        $titleStyle = ['name' => 'Tahoma', 'size' => 9, 'bold' => true, 'color' => 'FFFFFF'];
+        $headerStyle = ['name' => 'Tahoma', 'size' => 8, 'bold' => true];
+        $bodyStyle = ['name' => 'Tahoma', 'size' => 8];
+        $centre = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 0];
+        $left = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::LEFT, 'spaceAfter' => 0];
+
+        // Top title bar — sector & date range, spans all 11 columns.
+        $table->addRow();
+        $titleCell = $table->addCell(13000, [
+            'gridSpan' => 11,
+            'bgColor' => '1F4E78',
+            'valign' => 'center',
+        ]);
+        $titleCell->addText(
+            "January to December {$year} MDA/Sector Summary of Performance on Commitments",
+            $titleStyle,
+            $centre,
         );
+
+        // Column-header rows. Five buckets get a merged super-header
+        // ("Performance for Each Result") sitting above per-bucket labels.
+        $hdrBg = ['bgColor' => 'D9E1F2', 'valign' => 'center'];
+
+        $table->addRow();
+        $table->addCell(500,  $hdrBg)->addText('S/N', $headerStyle, $centre);
+        $table->addCell(3200, $hdrBg)->addText('Commitments', $headerStyle, $centre);
+        $table->addCell(900,  $hdrBg)->addText('No. of Outputs', $headerStyle, $centre);
+        $table->addCell(1100, $hdrBg)->addText('No. Results to be Delivered', $headerStyle, $centre);
+        $bucketHeader = $table->addCell(5000, array_merge($hdrBg, ['gridSpan' => 5]));
+        $bucketHeader->addText('Performance for Each Result', $headerStyle, $centre);
+        $table->addCell(900,  $hdrBg)->addText('Not Assessed', $headerStyle, $centre);
+        $table->addCell(1400, array_merge($hdrBg, ['gridSpan' => 2]))
+            ->addText('Overall Performance', $headerStyle, $centre);
+
+        // Sub-header row for the 5 buckets + the Overall split (% / Rating).
+        $table->addRow();
+        $table->addCell(500,  array_merge($hdrBg, ['vMerge' => 'continue']));
+        $table->addCell(3200, array_merge($hdrBg, ['vMerge' => 'continue']));
+        $table->addCell(900,  array_merge($hdrBg, ['vMerge' => 'continue']));
+        $table->addCell(1100, array_merge($hdrBg, ['vMerge' => 'continue']));
+        $table->addCell(1000, $hdrBg)->addText('Exceptional', $headerStyle, $centre);
+        $table->addCell(1000, $hdrBg)->addText('Above Expectation', $headerStyle, $centre);
+        $table->addCell(1000, $hdrBg)->addText('Meets Expectation', $headerStyle, $centre);
+        $table->addCell(1000, $hdrBg)->addText('Needs Improvement', $headerStyle, $centre);
+        $table->addCell(1000, $hdrBg)->addText('Below Minimum Expectation', $headerStyle, $centre);
+        $table->addCell(900,  array_merge($hdrBg, ['vMerge' => 'continue']));
+        $table->addCell(700,  $hdrBg)->addText('Performance', $headerStyle, $centre);
+        $table->addCell(700,  $hdrBg)->addText('Rating', $headerStyle, $centre);
+
+        // Sector banner row (matches the PDF's "Jigawa State Investment …"
+        // banner above the commitments).
+        $table->addRow();
+        $table->addCell(13000, ['gridSpan' => 13, 'bgColor' => 'F2F2F2'])
+            ->addText($sector->sector_name, ['name' => 'Tahoma', 'size' => 9, 'bold' => true], $left);
+
+        // Data rows — one per commitment.
+        $totals = ['outputs' => 0, 'results' => 0, 'exceptional' => 0, 'above' => 0, 'meets' => 0, 'needs' => 0, 'below' => 0, 'not_assessed' => 0];
+        $sn = 1;
+        foreach ($commitments as $c) {
+            $table->addRow();
+            $table->addCell(500)->addText((string) $sn++, $bodyStyle, $centre);
+            $table->addCell(3200)->addText((string) $c['commitment_name'], $bodyStyle, $left);
+            $table->addCell(900)->addText((string) $c['deliverable_count'], $bodyStyle, $centre);
+            $table->addCell(1100)->addText((string) $c['kpi_count'], $bodyStyle, $centre);
+            $table->addCell(1000)->addText($c['exceptional_count'] ? (string) $c['exceptional_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(1000)->addText($c['above_expectation_count'] ? (string) $c['above_expectation_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(1000)->addText($c['meets_expectation_count'] ? (string) $c['meets_expectation_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(1000)->addText($c['needs_improvement_count'] ? (string) $c['needs_improvement_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(1000)->addText($c['below_minimum_count'] ? (string) $c['below_minimum_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(900)->addText($c['not_assessed_count'] ? (string) $c['not_assessed_count'] : '-', $bodyStyle, $centre);
+            $table->addCell(700)->addText(
+                $c['overall_performance'] !== null ? round((float) $c['overall_performance']).'%' : '-',
+                $bodyStyle, $centre,
+            );
+            $table->addCell(700)->addText((string) ($c['performance_rating'] ?: '-'), $bodyStyle, $centre);
+
+            $totals['outputs']      += (int) $c['deliverable_count'];
+            $totals['results']      += (int) $c['kpi_count'];
+            $totals['exceptional']  += (int) $c['exceptional_count'];
+            $totals['above']        += (int) $c['above_expectation_count'];
+            $totals['meets']        += (int) $c['meets_expectation_count'];
+            $totals['needs']        += (int) $c['needs_improvement_count'];
+            $totals['below']        += (int) $c['below_minimum_count'];
+            $totals['not_assessed'] += (int) $c['not_assessed_count'];
+        }
+
+        // Totals row — bottom, blue band like the PDF.
+        $totalBg = ['bgColor' => '1F4E78', 'valign' => 'center'];
+        $totalText = ['name' => 'Tahoma', 'size' => 9, 'bold' => true, 'color' => 'FFFFFF'];
+        $table->addRow();
+        $table->addCell(500, $totalBg)->addText('', $totalText, $centre);
+        $table->addCell(3200, $totalBg)->addText('Total', $totalText, $left);
+        $table->addCell(900, $totalBg)->addText((string) $totals['outputs'], $totalText, $centre);
+        $table->addCell(1100, $totalBg)->addText((string) $totals['results'], $totalText, $centre);
+        $table->addCell(1000, $totalBg)->addText($totals['exceptional'] ? (string) $totals['exceptional'] : '-', $totalText, $centre);
+        $table->addCell(1000, $totalBg)->addText($totals['above'] ? (string) $totals['above'] : '-', $totalText, $centre);
+        $table->addCell(1000, $totalBg)->addText($totals['meets'] ? (string) $totals['meets'] : '-', $totalText, $centre);
+        $table->addCell(1000, $totalBg)->addText($totals['needs'] ? (string) $totals['needs'] : '-', $totalText, $centre);
+        $table->addCell(1000, $totalBg)->addText($totals['below'] ? (string) $totals['below'] : '-', $totalText, $centre);
+        $table->addCell(900, $totalBg)->addText($totals['not_assessed'] ? (string) $totals['not_assessed'] : '-', $totalText, $centre);
+        $table->addCell(700, $totalBg)->addText(round((float) ($sectorData['full_year_performance'] ?? 0)).'%', $totalText, $centre);
+        $table->addCell(700, $totalBg)->addText((string) ($sectorData['full_year_rating'] ?? '-'), $totalText, $centre);
+
         $section->addText('', ['size' => 6]);
+    }
+
+    /**
+     * Per-commitment breakdown for the Word report's Section B. Returns one
+     * row per commitment under the sector, with the same bucketed counts the
+     * comprehensive report uses (Exceptional / Above Exp. / Meets / Needs Imp.
+     * / Below Min.) plus an "overall performance" % and rating.
+     */
+    private function getCommitmentsBreakdownForWord($sector, $year): array
+    {
+        $rows = DB::table('commitments as c')
+            ->leftJoin('deliverables as d', 'd.commitment_id', '=', 'c.id')
+            ->leftJoin('kpis as k', 'k.deliverable_id', '=', 'd.id')
+            ->leftJoin('kpi_targets as kt', function ($join) use ($year) {
+                $join->on('kt.kpi_id', '=', 'k.id')->where('kt.year', '=', $year);
+            })
+            ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
+                $join->on('pt.kpi_id', '=', 'k.id')->where('pt.year', '=', $year);
+            })
+            ->where('c.sector_id', $sector->id)
+            ->select([
+                'c.id as commitment_id',
+                'c.name as commitment_name',
+                DB::raw('COUNT(DISTINCT d.id) as deliverable_count'),
+                DB::raw('COUNT(DISTINCT k.id) as kpi_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) > 1.0 THEN 1 ELSE 0 END) as exceptional_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.7 AND (pt.actual_value / kt.target) <= 1.0 THEN 1 ELSE 0 END) as above_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.6 AND (pt.actual_value / kt.target) < 0.7 THEN 1 ELSE 0 END) as meets_expectation_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) >= 0.4 AND (pt.actual_value / kt.target) < 0.6 THEN 1 ELSE 0 END) as needs_improvement_count'),
+                DB::raw('SUM(CASE WHEN kt.target > 0 AND pt.actual_value > 0 AND (pt.actual_value / kt.target) < 0.4 THEN 1 ELSE 0 END) as below_minimum_count'),
+                DB::raw('SUM(CASE WHEN pt.actual_value IS NULL OR pt.actual_value = 0 THEN 1 ELSE 0 END) as not_assessed_count'),
+            ])
+            ->groupBy('c.id', 'c.name')
+            ->orderBy('c.id')
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $counts = $this->getCommitmentPerformanceCounts($row->commitment_id, $year, null, null);
+            $out[] = [
+                'commitment_id' => $row->commitment_id,
+                'commitment_name' => $row->commitment_name,
+                'deliverable_count' => (int) $row->deliverable_count,
+                'kpi_count' => (int) $row->kpi_count,
+                'exceptional_count' => (int) $row->exceptional_count,
+                'above_expectation_count' => (int) $row->above_expectation_count,
+                'meets_expectation_count' => (int) $row->meets_expectation_count,
+                'needs_improvement_count' => (int) $row->needs_improvement_count,
+                'below_minimum_count' => (int) $row->below_minimum_count,
+                'not_assessed_count' => (int) $row->not_assessed_count,
+                'overall_performance' => $counts['overall_performance'] ?? 0,
+                'performance_rating' => $counts['performance_rating'] ?? '',
+            ];
+        }
+
+        return $out;
     }
 
     private function addWordObservationsRecommendations($section, $observations, $recommendations)
