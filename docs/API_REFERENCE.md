@@ -2207,14 +2207,14 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 {
   "avgPerformanceFraction": 0.78,
   "avgPerformanceLabel": "78%",
-  "topSectorLabel": "Health",
+  "topSectorLabel": "Healthcare",
   "pendingCount": 12,
   "pendingCaption": "Pending review",
   "sectorBars": [
-    { "label": "Health", "fraction": 0.85, "valueLabel": "85", "accent": "primary" },
-    { "label": "Education", "fraction": 0.72, "valueLabel": "72", "accent": "secondary" },
-    { "label": "Agriculture", "fraction": 0.64, "valueLabel": "64", "accent": "tertiary" },
-    { "label": "Works", "fraction": 0.48, "valueLabel": "48", "accent": "error" }
+    { "label": "Healthcare", "short": "HLT", "fraction": 0.85, "valueLabel": "85", "accent": "#2E7D32" },
+    { "label": "Education", "short": "EDU", "fraction": 0.72, "valueLabel": "72", "accent": "#1565C0" },
+    { "label": "Agriculture", "short": "AGR", "fraction": 0.64, "valueLabel": "64", "accent": "#F9A825" },
+    { "label": "Public Works", "short": "", "fraction": 0.48, "valueLabel": "48", "accent": "#C62828" }
   ],
   "statusMix": {
     "achievedFraction": 0.6,
@@ -2234,7 +2234,7 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 | --- | --- | --- | --- |
 | `avgPerformanceFraction` | number | ✅ | 0–1 fraction (sent as number, read as double). |
 | `avgPerformanceLabel` | string | ✅ | |
-| `topSectorLabel` | string | ✅ | |
+| `topSectorLabel` | string | ✅ | Full sector name. The top-sector scorecard shows a compact form, sourced client-side from the matching `sectorBars[]` entry's `short` (no dedicated wire field). |
 | `pendingCount` | int | ✅ | Number, coerced via `toInt()`. |
 | `pendingCaption` | string | ✅ | |
 | `sectorBars` | array&lt;ReportsHubBar&gt; | ✅ | Must be a list. |
@@ -2244,10 +2244,11 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `label` | string | ✅ | |
+| `label` | string | ✅ | Full sector name. |
+| `short` | string | ✅ | Compact sector label (`sector.description`, e.g. `"HLT"`) shown in the comparison-row column. Always present; may be `""` when the sector has no description — the client then derives one (first word of `label`). |
 | `fraction` | number | ✅ | 0–1 fraction (double). |
 | `valueLabel` | string | ✅ | |
-| `accent` | string | ✅ | Colour hint. |
+| `accent` | string | ✅ | Colour hint — may be a token (`primary`…) or a hex string (`#2E7D32`). The hub bars use a primary opacity ladder regardless, so non-token values degrade to `primary`. |
 
 **`ReportsStatusMix`** (the `statusMix` object)
 
@@ -2522,9 +2523,61 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 ---
 
+#### 11.8.7 Generate comprehensive Excel / PDF report
+
+| | |
+| --- | --- |
+| **Purpose** | Mobile equivalent of the web's "Download Excel" / "Print → Save as PDF" buttons on `/reports/comprehensive`. Generates the **same** comprehensive multi-sheet workbook (Overall Summary, Grand Summary, Sector Summary Details, one sheet per sector) as Excel, **or** the same printable view as PDF — driven by `type`. Returns a `downloadUrl` to fetch the artifact. |
+| **Method / Path** | `POST /reports/comprehensive-report` |
+| **Auth** | Bearer required |
+| **Body — `ComprehensiveReportRequest`** | |
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `sectors` | int[] | optional | Sector ids to include. Empty/omitted ⇒ every sector in the framework. Ignored for Sector Head / Data Admin (they're always pinned to their own sector). |
+| `year` | int | ✅ | 4-digit year (matches a `frameworks.year`). |
+| `start_quarter` | int | ✅ | 1..4. |
+| `end_quarter` | int | ✅ | 1..4, must be `>= start_quarter`. |
+| `type` | string | ✅ | One of `excel`, `pdf`. |
+
+**Sector scoping**
+
+- **Governor / Coordinator / Deputy Coordinator / System Admin** — `sectors` honoured; empty ⇒ all framework sectors.
+- **Sector Head / Data Admin** — pinned to their own sector regardless of what's sent.
+- **Other roles** — `403 forbidden`.
+
+**Success — `200 OK`** (raw object `GeneratedReportModel`):
+
+```json
+{
+  "id": "comp-9k2x8h4l",
+  "format": "excel",
+  "filename": "All_Sectors_MDAs_Full_Year_Assessment_Reporting_2024.xlsx",
+  "fileSizeLabel": "248 KB",
+  "downloadUrl": "https://api.pdcu.gov.ng/storage/uploads/reports/comp-9k2x8h4l.xlsx"
+}
+```
+
+**Response fields**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | Opaque artifact id (also the filename stem on disk). |
+| `format` | string | ✅ | Echoes the requested `type`: `excel` or `pdf`. |
+| `filename` | string | ✅ | Suggested filename for the client to save as (extension matches `format`). |
+| `fileSizeLabel` | string | ✅ | Human-readable file size, e.g. `"248 KB"`. |
+| `downloadUrl` | string | ✅ | Public URL — client fetches the file separately. May be cached by the CDN; treat as opaque. |
+
+**Status codes:** `200` · `401` · `403` · `422` (year has no framework, `end_quarter < start_quarter`, `type` not `excel`/`pdf`, etc.).
+
+> ⚠ Generation is synchronous: large frameworks may take several seconds. Show a spinner; don't time out the request below 30s. The `downloadUrl` is a static file — no auth header required to fetch it.
+
+---
+
 **Enums in this section**
 
 - **Report format** (`format`, request body / `GeneratedReportModel.format`) — `excel`, `word`, `pdf`, `print`.
+- **Report type** (`type`, comprehensive-report request) — `excel`, `pdf`.
 - **Quarter** (`quarter`) — `q1`, `q2`, `q3`, `q4`.
 - **Accent** (colour hint on `accent`/`currentAccent`/`percentAccent`/`perfAccent` fields; client-side `ReportAccent`) — `primary`, `secondary`, `tertiary`, `error`, `on_surface`.
 

@@ -930,6 +930,102 @@ class ReportController extends Controller
         exit;
     }
 
+    /**
+     * v2 mobile entry point. Builds the SAME comprehensive Spreadsheet that
+     * `downloadComprehensiveReport` streams, but returns the in-memory object
+     * so the v2 layer can write it to disk and return a downloadUrl instead of
+     * streaming inline. Reuses every private helper used by the web flow, so
+     * the spreadsheet content is byte-identical for the same inputs.
+     */
+    public function buildComprehensiveSpreadsheet(int $year, int $startQuarter, int $endQuarter, array $sectorIds, ?Framework $framework, $userSector = null): Spreadsheet
+    {
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
+
+        $spreadsheet = new Spreadsheet();
+
+        $sectorData = $this->createIndividualSectorSheets($spreadsheet, $year, $startDate, $endDate, $userSector, $sectorIds, $framework);
+        $commitmentAverageRows = $sectorData['commitmentAverageRows'];
+        $sectorOverallAverageRows = $sectorData['sectorOverallAverageRows'];
+
+        $this->createOverallSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds, $framework);
+        $this->createGrandSummarySheet($spreadsheet, $year, $sectorOverallAverageRows, $startDate, $endDate, $userSector, $sectorIds, $framework);
+        $this->createSectorSummaryDetailsSheet($spreadsheet, $year, $commitmentAverageRows, $startDate, $endDate, $userSector, $sectorIds, $framework);
+
+        $overallSummarySheet = $spreadsheet->getSheetByName('Overall Summary');
+        $grandSummarySheet = $spreadsheet->getSheetByName('Grand Summary-Sector_MDAs+');
+        $sectorSummarySheet = $spreadsheet->getSheetByName('Sector_MDAs Summary Details');
+
+        if ($overallSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($overallSummarySheet));
+            $spreadsheet->addSheet($overallSummarySheet, 0);
+            $spreadsheet->setActiveSheetIndex($spreadsheet->getIndex($overallSummarySheet));
+        }
+
+        if ($grandSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($grandSummarySheet));
+            $spreadsheet->addSheet($grandSummarySheet, 1);
+        }
+
+        if ($sectorSummarySheet) {
+            $spreadsheet->removeSheetByIndex($spreadsheet->getIndex($sectorSummarySheet));
+            $spreadsheet->addSheet($sectorSummarySheet, 2);
+        }
+
+        return $spreadsheet;
+    }
+
+    /**
+     * v2 mobile entry point. Returns the same data array that
+     * `printComprehensiveReport` compacts into its blade view, so the v2 layer
+     * can render the same `comprehensive-print` blade and PDF-ify it.
+     */
+    public function buildComprehensivePrintData(int $year, int $startQuarter, int $endQuarter, array $sectorIds, ?Framework $framework, $userSector = null): array
+    {
+        $dateRange = $this->getQuarterDateRange($startQuarter, $endQuarter, $year);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
+
+        $sectors = !empty($sectorIds)
+            ? DB::table('sectors')->whereIn('id', $sectorIds)->where('framework_id', $framework->id)->orderBy('sector_name')->get()
+            : DB::table('sectors')->where('framework_id', $framework->id)->orderBy('sector_name')->get();
+
+        $overallSummaryData = $this->getOverallSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds, $framework);
+        $grandSummaryData = $this->getGrandSummaryData($year, $startDate, $endDate, $userSector, $sectorIds, $framework);
+        $sectorSummaryData = $this->getSectorSummaryDataForPrint($year, $startDate, $endDate, $userSector, $sectorIds, $framework);
+
+        $individualSectorData = [];
+        foreach ($sectors as $sector) {
+            if ($sector->description) {
+                $individualSectorData[$sector->id] = $this->getIndividualSectorDataForPrint($sector, $year, $startDate, $endDate, $framework);
+            }
+        }
+
+        $quarterNames = [
+            1 => 'Q1 (Jan - Mar)',
+            2 => 'Q2 (Apr - Jun)',
+            3 => 'Q3 (Jul - Sep)',
+            4 => 'Q4 (Oct - Dec)',
+        ];
+
+        return [
+            'year' => $year,
+            'startQuarter' => $startQuarter,
+            'endQuarter' => $endQuarter,
+            'startQuarterName' => $quarterNames[$startQuarter],
+            'endQuarterName' => $quarterNames[$endQuarter],
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'userSector' => $userSector,
+            'sectors' => $sectors,
+            'overallSummaryData' => $overallSummaryData,
+            'grandSummaryData' => $grandSummaryData,
+            'sectorSummaryData' => $sectorSummaryData,
+            'individualSectorData' => $individualSectorData,
+        ];
+    }
+
     private function getComprehensiveReportData($year, $startDate, $endDate, $userSector = null, $sectorIds = [])
     {
         // Get main report data with the correct structure

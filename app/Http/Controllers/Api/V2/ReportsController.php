@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2;
 
+use App\Http\Requests\V2\Reports\GenerateComprehensiveReportRequest;
 use App\Http\Requests\V2\Reports\GenerateComprehensiveRequest;
 use App\Http\Requests\V2\Reports\GenerateWordRequest;
 use App\Http\Requests\V2\Reports\ReportSetupRequest;
@@ -45,6 +46,11 @@ class ReportsController extends BaseController
     public function comprehensive(GenerateComprehensiveRequest $request): array
     {
         return $this->reports->generateComprehensive($request->user(), $request->validated());
+    }
+
+    public function comprehensiveReport(GenerateComprehensiveReportRequest $request): array
+    {
+        return $this->reports->generateComprehensiveReport($request->user(), $request->validated());
     }
 
     public function word(GenerateWordRequest $request): array

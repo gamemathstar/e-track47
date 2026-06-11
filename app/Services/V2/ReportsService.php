@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use App\Exceptions\V2\ApiException;
+use App\Http\Controllers\ReportController;
 use App\Models\Commitment;
 use App\Models\Deliverable;
 use App\Models\Framework;
@@ -11,9 +13,11 @@ use App\Models\Sector;
 use App\Models\User;
 use App\Support\V2\Presenters\SectorPresenter;
 use App\Support\V2\WireEnums;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * Reports hub + setup preview + viewer content + comprehensive/Word generation +
@@ -26,8 +30,10 @@ use Illuminate\Support\Str;
  */
 class ReportsService
 {
-    public function __construct(private readonly HierarchyMetrics $metrics)
-    {
+    public function __construct(
+        private readonly HierarchyMetrics $metrics,
+        private readonly SectorAccessService $access,
+    ) {
     }
 
     // --- 11.8.1 hub ----------------------------------------------------------
@@ -143,6 +149,109 @@ class ReportsService
         }
 
         return $this->writeArtifact('word', 'word', $content);
+    }
+
+    // --- 11.8.7 comprehensive report (real Excel / PDF) ----------------------
+
+    /**
+     * Mobile equivalent of the web's "Download Excel" / "Print → Save as PDF"
+     * comprehensive report. Delegates spreadsheet + print-data construction to
+     * ReportController so the artifact is byte-identical to the web output;
+     * here we just decide the format, write the file under the public disk,
+     * and return a downloadUrl.
+     *
+     * Sector scoping mirrors the web flow: Sector Head / Data Admin are pinned
+     * to their own sector regardless of the `sectors` param; all-access roles
+     * (Governor / Coordinator / Deputy Coordinator / System Admin) honour the
+     * provided ids, or default to every sector in the framework when omitted.
+     */
+    public function generateComprehensiveReport(User $user, array $body): array
+    {
+        $year = (int) $body['year'];
+        $startQuarter = (int) $body['start_quarter'];
+        $endQuarter = (int) $body['end_quarter'];
+        $type = $body['type'];
+        $requestedIds = array_values(array_map('intval', $body['sectors'] ?? []));
+
+        $framework = Framework::where('year', $year)->first();
+        if (! $framework) {
+            throw ApiException::unprocessable("No framework found for year {$year}.", ['year' => ["No framework found for year {$year}."]]);
+        }
+
+        $userSector = $user->isSectorHead() ?: $user->isDataAdmin();
+
+        if ($userSector) {
+            $owned = DB::table('sectors')->where('id', $userSector->id)->where('framework_id', $framework->id)->first();
+            $sectorIds = $owned ? [(int) $userSector->id] : [];
+        } else {
+            if (! $this->access->accessibleSectorQuery($user)->where('framework_id', $framework->id)->exists()) {
+                throw ApiException::forbidden();
+            }
+
+            if (! empty($requestedIds)) {
+                $sectorIds = DB::table('sectors')
+                    ->whereIn('id', $requestedIds)
+                    ->where('framework_id', $framework->id)
+                    ->pluck('id')->map(fn ($id) => (int) $id)->all();
+            } else {
+                $sectorIds = DB::table('sectors')
+                    ->where('framework_id', $framework->id)
+                    ->pluck('id')->map(fn ($id) => (int) $id)->all();
+            }
+        }
+
+        $controller = app(ReportController::class);
+
+        if ($type === 'excel') {
+            $spreadsheet = $controller->buildComprehensiveSpreadsheet(
+                $year, $startQuarter, $endQuarter, $sectorIds, $framework, $userSector,
+            );
+            return $this->writeSpreadsheetArtifact($spreadsheet, $year);
+        }
+
+        $data = $controller->buildComprehensivePrintData(
+            $year, $startQuarter, $endQuarter, $sectorIds, $framework, $userSector,
+        );
+        $html = view('pages.reports.comprehensive-print', $data)->render();
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape')->output();
+
+        return $this->writePdfArtifact($pdf, $year);
+    }
+
+    private function writeSpreadsheetArtifact(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, int $year): array
+    {
+        $id = 'comp-'.Str::lower(Str::random(8));
+        $filename = "All_Sectors_MDAs_Full_Year_Assessment_Reporting_{$year}.xlsx";
+        $path = 'uploads/reports/'.$id.'.xlsx';
+
+        $writer = new Xlsx($spreadsheet);
+        $absolute = Storage::disk('public')->path($path);
+        @mkdir(dirname($absolute), 0775, true);
+        $writer->save($absolute);
+
+        return [
+            'id' => $id,
+            'format' => 'excel',
+            'filename' => $filename,
+            'fileSizeLabel' => $this->humanSize((int) (Storage::disk('public')->size($path) ?: 0)),
+            'downloadUrl' => Storage::disk('public')->url($path),
+        ];
+    }
+
+    private function writePdfArtifact(string $pdfBytes, int $year): array
+    {
+        $id = 'comp-'.Str::lower(Str::random(8));
+        $filename = "All_Sectors_MDAs_Full_Year_Assessment_Reporting_{$year}.pdf";
+        $path = 'uploads/reports/'.$id.'.pdf';
+        Storage::disk('public')->put($path, $pdfBytes);
+
+        return [
+            'id' => $id,
+            'format' => 'pdf',
+            'filename' => $filename,
+            'fileSizeLabel' => $this->humanSize(strlen($pdfBytes)),
+            'downloadUrl' => Storage::disk('public')->url($path),
+        ];
     }
 
     // --- 11.8.6 print preview ------------------------------------------------

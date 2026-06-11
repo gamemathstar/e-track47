@@ -112,6 +112,39 @@ class ReportsTest extends TestCase
             ->assertJsonStructure(['fieldErrors' => ['sectorIds', 'includeEvidence']]);
     }
 
+    // NB: end-to-end Excel/PDF generation tests aren't included here because
+    // the web's comprehensive report flow (which the v2 endpoint reuses for
+    // byte-identical output) depends on `deliverables.end_date` and non-null
+    // `sectors.description` — both present in production schemas but not in
+    // the fresh test DB. The validation tests below cover the API contract.
+
+    public function test_comprehensive_report_validation(): void
+    {
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/reports/comprehensive-report', [])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['year', 'start_quarter', 'end_quarter', 'type']]);
+
+        $this->postJson('/api/v2/reports/comprehensive-report', [
+            'year' => 2024, 'start_quarter' => 1, 'end_quarter' => 4, 'type' => 'docx',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['type']]);
+
+        $this->postJson('/api/v2/reports/comprehensive-report', [
+            'year' => 2024, 'start_quarter' => 3, 'end_quarter' => 1, 'type' => 'pdf',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['end_quarter']]);
+    }
+
+    public function test_comprehensive_report_unknown_year(): void
+    {
+        $this->seedSmallHierarchy();
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/reports/comprehensive-report', [
+            'sectors' => [], 'year' => 2019, 'start_quarter' => 1, 'end_quarter' => 4, 'type' => 'excel',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['year']]);
+    }
+
     public function test_reports_require_auth(): void
     {
         $this->getJson('/api/v2/reports/hub')->assertStatus(401);
