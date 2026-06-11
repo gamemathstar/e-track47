@@ -16,7 +16,7 @@ class GenerateComprehensiveReportRequest extends BaseFormRequest
     {
         return [
             'sectors' => ['nullable', 'array'],
-            'sectors.*' => ['integer', 'exists:sectors,id'],
+            'sectors.*' => ['string', 'exists:sectors,id'],
             'year' => ['required', 'integer', 'digits:4'],
             'start_quarter' => ['required', 'integer', 'between:1,4'],
             'end_quarter' => ['required', 'integer', 'between:1,4', 'gte:start_quarter'],

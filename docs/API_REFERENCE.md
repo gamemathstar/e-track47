@@ -2534,7 +2534,7 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `sectors` | int[] | optional | Sector ids to include. Empty/omitted ⇒ every sector in the framework. Ignored for Sector Head / Data Admin (they're always pinned to their own sector). |
+| `sectors` | string[] | optional | Sector ids to include — the **same string ids** returned by `GET /sectors` (§11.3.1) and accepted by every other sector-scoped endpoint (`/reports/hub?sectorId`, `/dashboard/governor?sector`, `/approvals/facilitator/queue?sector`, …). Empty/omitted ⇒ every sector in the framework. Ignored for Sector Head / Data Admin (they're always pinned to their own sector). Unknown id ⇒ `422` with `fieldErrors["sectors.0"]`. |
 | `year` | int | ✅ | 4-digit year (matches a `frameworks.year`). |
 | `start_quarter` | int | ✅ | 1..4. |
 | `end_quarter` | int | ✅ | 1..4, must be `>= start_quarter`. |
@@ -2545,6 +2545,25 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 - **Governor / Coordinator / Deputy Coordinator / System Admin** — `sectors` honoured; empty ⇒ all framework sectors.
 - **Sector Head / Data Admin** — pinned to their own sector regardless of what's sent.
 - **Other roles** — `403 forbidden`.
+
+> **Client note — quarter mapping (mobile).** The mobile client wires this to the
+> comprehensive-report **setup** form (`#31`), reusing `ReportSetupParams`:
+> - `start_quarter`/`end_quarter` — the form picks a **single** period
+>   (Annual or Q1–Q4); the client maps **Annual ⇒ `1..4`** and **Qn ⇒ `n..n`**.
+> - `type` — from the client's `ReportFormat` (`excel`/`pdf`); Word/Print are
+>   not offered for this endpoint.
+
+**Request example**
+
+```json
+{
+  "sectors": ["3", "5"],
+  "year": 2024,
+  "start_quarter": 1,
+  "end_quarter": 4,
+  "type": "excel"
+}
+```
 
 **Success — `200 OK`** (raw object `GeneratedReportModel`):
 

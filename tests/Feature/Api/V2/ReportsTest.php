@@ -145,6 +145,35 @@ class ReportsTest extends TestCase
         ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['year']]);
     }
 
+    public function test_comprehensive_report_accepts_string_sector_ids(): void
+    {
+        [$fw, $sector] = $this->seedSmallHierarchy();
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        // Known id sent as a string passes validation (the failure here is the
+        // pre-existing prod-schema dependency, not the validator) — assert we
+        // got past validation by checking the response is NOT 422 on `sectors`.
+        $res = $this->postJson('/api/v2/reports/comprehensive-report', [
+            'sectors' => [(string) $sector->id],
+            'year' => 2024, 'start_quarter' => 1, 'end_quarter' => 4, 'type' => 'excel',
+        ]);
+        if ($res->status() === 422) {
+            $this->assertArrayNotHasKey('sectors.0', (array) $res->json('fieldErrors'));
+        }
+
+        // Unknown string id ⇒ 422 with fieldErrors on sectors.0
+        $this->postJson('/api/v2/reports/comprehensive-report', [
+            'sectors' => ['999999'],
+            'year' => 2024, 'start_quarter' => 1, 'end_quarter' => 4, 'type' => 'excel',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['sectors.0']]);
+
+        // Non-numeric string id also ⇒ 422 (exists:sectors,id can't match)
+        $this->postJson('/api/v2/reports/comprehensive-report', [
+            'sectors' => ['health'],
+            'year' => 2024, 'start_quarter' => 1, 'end_quarter' => 4, 'type' => 'excel',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['sectors.0']]);
+    }
+
     public function test_reports_require_auth(): void
     {
         $this->getJson('/api/v2/reports/hub')->assertStatus(401);

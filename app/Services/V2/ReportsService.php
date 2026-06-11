@@ -171,6 +171,10 @@ class ReportsService
         $startQuarter = (int) $body['start_quarter'];
         $endQuarter = (int) $body['end_quarter'];
         $type = $body['type'];
+        // The wire contract carries sector ids as strings (matching every other
+        // sector-scoped endpoint — see §11.3, §11.11.1, §11.6.7 …). Cast to int
+        // for the DB query; the validator's `exists:sectors,id` already filtered
+        // non-numeric/unknown values out as 422.
         $requestedIds = array_values(array_map('intval', $body['sectors'] ?? []));
 
         $framework = Framework::where('year', $year)->first();
