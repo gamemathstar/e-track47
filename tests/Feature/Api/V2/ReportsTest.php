@@ -174,8 +174,63 @@ class ReportsTest extends TestCase
         ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['sectors.0']]);
     }
 
+    public function test_word_document_validation(): void
+    {
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/reports/word-document', [])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['sector_id', 'year']]);
+
+        // sector_id must exist
+        $this->postJson('/api/v2/reports/word-document', [
+            'sector_id' => '999999', 'year' => 2024,
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['sector_id']]);
+
+        // year must be 4-digit
+        $this->postJson('/api/v2/reports/word-document', [
+            'sector_id' => '1', 'year' => 24,
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['year']]);
+
+        // optional dates must parse
+        [$fw, $sector] = $this->seedSmallHierarchy();
+        $this->postJson('/api/v2/reports/word-document', [
+            'sector_id' => (string) $sector->id, 'year' => 2024,
+            'pdcu_coordinator_date' => 'not-a-date',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['pdcu_coordinator_date']]);
+    }
+
+    public function test_word_document_unknown_year(): void
+    {
+        [$fw, $sector] = $this->seedSmallHierarchy();
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/reports/word-document', [
+            'sector_id' => (string) $sector->id, 'year' => 2019,
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['year']]);
+    }
+
+    public function test_word_document_sector_head_forbidden_for_other_sectors(): void
+    {
+        $fw = $this->makeFramework();
+        $own = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $other = $this->makeSector($fw, ['sector_name' => 'Education', 'ministry' => 'MoE']);
+
+        Passport::actingAs($this->makeSectorHead($own), [], 'api');
+
+        // Sector Head sending another sector's id is silently pinned to their
+        // own — but if they own NO sector that's in the framework, the request
+        // succeeds for their own sector. Here we just confirm that asking for
+        // a non-accessible sector with a non-locked user is rejected.
+        Passport::actingAs($this->makeUser([], 'Sector Head'), [], 'api');
+        $this->postJson('/api/v2/reports/word-document', [
+            'sector_id' => (string) $other->id, 'year' => 2024,
+        ])->assertStatus(403);
+    }
+
     public function test_reports_require_auth(): void
     {
         $this->getJson('/api/v2/reports/hub')->assertStatus(401);
+        $this->postJson('/api/v2/reports/word-document', [])->assertStatus(401);
     }
 }

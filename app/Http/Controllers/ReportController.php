@@ -3373,6 +3373,64 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * v2 mobile entry point. Builds the SAME Word document that
+     * `generateWordReport` streams, but returns the in-memory PhpWord object
+     * so the v2 layer can write it to disk and return a downloadUrl instead of
+     * streaming inline. Reuses every private helper used by the web flow, so
+     * the .docx content is byte-identical for the same inputs.
+     */
+    public function buildWordReport(
+        Sector $sector,
+        int $year,
+        ?string $observations = null,
+        ?string $recommendations = null,
+        ?string $pdcuSignature = null,
+        ?string $pdcuDate = null,
+        ?string $facilitatorSignature = null,
+        ?string $facilitatorDate = null,
+    ): PhpWord {
+        $performanceData = $this->getSectorPerformanceDataForWord($sector, $year);
+
+        $phpWord = new PhpWord();
+        $phpWord->setDefaultFontName('Tahoma');
+        $phpWord->setDefaultFontSize(11);
+
+        $section = $phpWord->addSection([
+            'marginTop' => 1440,
+            'marginBottom' => 1440,
+            'marginLeft' => 1440,
+            'marginRight' => 1440,
+        ]);
+
+        $this->addWordReportHeader($section, $year);
+        $this->addWordSummaryOverview($section, $sector, $performanceData);
+        $this->addWordRatingLegend($section);
+
+        $commitments = $this->getCommitmentsBreakdownForWord($sector, $year);
+        $this->addWordPerformanceSummary($section, $sector, $year, $commitments, $performanceData);
+
+        $this->addWordObservationsRecommendations($section, $observations, $recommendations);
+        $this->addWordSignatures($section, $pdcuSignature, $pdcuDate, $facilitatorSignature, $facilitatorDate);
+
+        return $phpWord;
+    }
+
+    /**
+     * Filename stem used by both the web stream-download and the v2
+     * download-url paths so the two routes hand back identical filenames.
+     */
+    public static function wordReportFilenameStem(string $sectorName, int $year): string
+    {
+        $safe = preg_replace('/[^A-Za-z0-9_\-]/', '_', $sectorName);
+        $safe = trim(preg_replace('/_+/', '_', (string) $safe), '_');
+        if ($safe === '') {
+            $safe = 'Sector';
+        }
+
+        return "Performance_Report_{$safe}_{$year}";
+    }
+
     private function getSectorPerformanceDataForWord($sector, $year)
     {
         // Get commitments count

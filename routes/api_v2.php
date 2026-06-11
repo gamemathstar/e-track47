@@ -193,6 +193,7 @@ Route::middleware('auth:api')->prefix('reports')->group(function () {
     Route::post('/comprehensive', [ReportsController::class, 'comprehensive']);
     Route::post('/comprehensive-report', [ReportsController::class, 'comprehensiveReport']);
     Route::post('/word', [ReportsController::class, 'word']);
+    Route::post('/word-document', [ReportsController::class, 'wordDocument']);
     Route::get('/print-preview', [ReportsController::class, 'printPreview']);
 });
 

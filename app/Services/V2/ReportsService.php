@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 
 /**
  * Reports hub + setup preview + viewer content + comprehensive/Word generation +
@@ -220,6 +221,75 @@ class ReportsService
         $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape')->output();
 
         return $this->writePdfArtifact($pdf, $year);
+    }
+
+    // --- 11.8.8 word document (single-sector PDCU template) -----------------
+
+    /**
+     * Mobile equivalent of the web's "Generate Word Document" form on
+     * `/reports/word`. Delegates the PhpWord build to ReportController so the
+     * .docx is byte-identical to the web stream-download; here we write the
+     * file to the public disk and return a `downloadUrl`.
+     *
+     * Sector Head / Data Admin are pinned to their own sector regardless of
+     * the requested `sector_id`; all-access roles (Governor / Coordinator /
+     * Deputy Coordinator / System Admin) honour the supplied id.
+     */
+    public function generateWordDocument(User $user, array $body): array
+    {
+        $year = (int) $body['year'];
+        $requestedSectorId = (int) $body['sector_id'];
+
+        $framework = Framework::where('year', $year)->first();
+        if (! $framework) {
+            throw ApiException::unprocessable("No framework found for year {$year}.", ['year' => ["No framework found for year {$year}."]]);
+        }
+
+        $userSector = $user->isSectorHead() ?: $user->isDataAdmin();
+        $sectorId = $userSector ? (int) $userSector->id : $requestedSectorId;
+
+        if (! $this->access->canAccess($user, $sectorId)) {
+            throw ApiException::forbidden();
+        }
+
+        $sector = Sector::find($sectorId);
+        if (! $sector) {
+            throw ApiException::notFound('Sector not found.');
+        }
+
+        $controller = app(ReportController::class);
+        $phpWord = $controller->buildWordReport(
+            $sector,
+            $year,
+            $body['observations'] ?? null,
+            $body['recommendations'] ?? null,
+            $body['pdcu_coordinator_signature'] ?? null,
+            $body['pdcu_coordinator_date'] ?? null,
+            $body['sector_facilitator_signature'] ?? null,
+            $body['sector_facilitator_date'] ?? null,
+        );
+
+        return $this->writeWordArtifact($phpWord, $sector->sector_name, $year);
+    }
+
+    private function writeWordArtifact(\PhpOffice\PhpWord\PhpWord $phpWord, string $sectorName, int $year): array
+    {
+        $id = 'word-'.Str::lower(Str::random(8));
+        $stem = ReportController::wordReportFilenameStem($sectorName, $year);
+        $filename = "{$stem}.docx";
+        $path = 'uploads/reports/'.$id.'.docx';
+
+        $absolute = Storage::disk('public')->path($path);
+        @mkdir(dirname($absolute), 0775, true);
+        WordIOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
+
+        return [
+            'id' => $id,
+            'format' => 'word',
+            'filename' => $filename,
+            'fileSizeLabel' => $this->humanSize((int) (Storage::disk('public')->size($path) ?: 0)),
+            'downloadUrl' => Storage::disk('public')->url($path),
+        ];
     }
 
     private function writeSpreadsheetArtifact(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, int $year): array

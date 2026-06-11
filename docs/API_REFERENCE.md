@@ -2593,6 +2593,76 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 ---
 
+#### 11.8.8 Generate single-sector Word document
+
+| | |
+| --- | --- |
+| **Purpose** | Mobile equivalent of the web's "Generate Word Document" form on `/reports/word`. Generates the **single-sector PDCU Performance Assessment Report** as a `.docx` — header + Section A (Summary Overview), the colour-coded rating legend, Section B (per-commitment performance table), Section C (observations + recommendations), and the signatures block. Document content is byte-identical to the web stream-download for the same inputs. |
+| **Method / Path** | `POST /reports/word-document` |
+| **Auth** | Bearer required |
+| **Body — `WordDocumentRequest`** | |
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `sector_id` | string | ✅ | The same string id `GET /sectors` returns (§11.3.1). Exactly one sector per request. |
+| `year` | int | ✅ | 4-digit year; must match a `frameworks.year`. |
+| `observations` | string | optional | Free-form narrative, max 10 000 chars. Rendered in Section C, "Observations:" cell. Newlines preserved. |
+| `recommendations` | string | optional | Free-form narrative, max 10 000 chars. Rendered in Section C, "Recommendations…" cell. Newlines preserved. |
+| `pdcu_coordinator_signature` | string | optional | Printed inline above the "PDCU Coordinator" signature line. Max 255 chars. |
+| `pdcu_coordinator_date` | date | optional | ISO `YYYY-MM-DD`. Printed inline next to the PDCU Coordinator signature. |
+| `sector_facilitator_signature` | string | optional | Printed above the "Sector / MDA Facilitator" line. Max 255 chars. |
+| `sector_facilitator_date` | date | optional | ISO `YYYY-MM-DD`. |
+
+**Sector scoping**
+
+- **Governor / Coordinator / Deputy Coordinator / System Admin** — `sector_id` honoured.
+- **Sector Head / Data Admin** — pinned to their own sector regardless of `sector_id`. Sending a different `sector_id` is **silently overridden** (no error) so the form can be left enabled for them; the document is always for their sector.
+- A non-pinned user requesting a sector they have no access to ⇒ `403 forbidden`.
+- Unknown `sector_id` ⇒ `422` `fieldErrors.sector_id`.
+
+**Request example**
+
+```json
+{
+  "sector_id": "3",
+  "year": 2024,
+  "observations": "Overall performance was rated good at 66%. This was slightly below the mid-year score of 43% rated Very Good…",
+  "recommendations": "Attention needs to be focused on the five areas assessed with unsatisfactory performance…",
+  "pdcu_coordinator_signature": "Eng. A. M. Yusuf",
+  "pdcu_coordinator_date": "2025-01-12",
+  "sector_facilitator_signature": "Mrs. F. K. Bello",
+  "sector_facilitator_date": "2025-01-14"
+}
+```
+
+**Success — `200 OK`** (raw object `GeneratedReportModel`):
+
+```json
+{
+  "id": "word-7f3a8c9d",
+  "format": "word",
+  "filename": "Performance_Report_State_Investment_Promotion_Agency_2024.docx",
+  "fileSizeLabel": "62 KB",
+  "downloadUrl": "https://api.pdcu.gov.ng/storage/uploads/reports/word-7f3a8c9d.docx"
+}
+```
+
+**Response fields**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | Opaque artifact id. |
+| `format` | string | ✅ | Always `"word"` for this endpoint. |
+| `filename` | string | ✅ | Suggested save filename, shape `Performance_Report_<Sector>_<Year>.docx`. Special chars in the sector name are collapsed to `_`. |
+| `fileSizeLabel` | string | ✅ | Human-readable file size, e.g. `"62 KB"`. |
+| `downloadUrl` | string | ✅ | Public URL — fetch the file separately. No auth header required. |
+
+**Status codes:** `200` · `401` · `403` · `422`.
+
+> ⚠ Generation is synchronous (typically 1–4 s). The `downloadUrl` is a static file — safe to hand to the OS share sheet / Linking.openURL / a download manager.
+
+---
+
 **Enums in this section**
 
 - **Report format** (`format`, request body / `GeneratedReportModel.format`) — `excel`, `word`, `pdf`, `print`.
