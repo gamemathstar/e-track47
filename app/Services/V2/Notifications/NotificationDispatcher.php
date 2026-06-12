@@ -163,13 +163,28 @@ class NotificationDispatcher
         $hasDeepLinkRoute = Schema::hasColumn('notifications', 'deep_link_route');
         $hasDeepLinkParams = Schema::hasColumn('notifications', 'deep_link_params');
 
-        // Entry log — every call to dispatch produces this line, so we can
-        // tell whether the upstream caller actually invoked us. If you see no
-        // `notification.dispatch attempt` for an event, the issue is upstream
-        // of this method (caller early-returned, or wasn't called at all).
-        $recipientCount = 0;
-        foreach ($recipients as $recipient) {
-            $recipientCount++;
+        // Materialize so we can log the count BEFORE the loop runs (readable
+        // top-to-bottom logs) and still iterate it once.
+        $recipientList = $recipients instanceof Collection
+            ? $recipients->all()
+            : (is_array($recipients) ? $recipients : iterator_to_array($recipients));
+
+        Log::info('notification.dispatch attempt', [
+            'kind' => $kind,
+            'recipient_count' => count($recipientList),
+            'model_id' => $modelId,
+        ]);
+
+        if (empty($recipientList)) {
+            Log::warning('notification.dispatch no_recipients', [
+                'kind' => $kind,
+                'model_id' => $modelId,
+                'hint' => 'caller resolved an empty recipient set — verify role assignments',
+            ]);
+            return;
+        }
+
+        foreach ($recipientList as $recipient) {
             try {
                 $this->dispatchOne($recipient, $kind, $title, $body, [
                     'senderId' => $senderId,
@@ -182,22 +197,18 @@ class NotificationDispatcher
                 ]);
             } catch (Throwable $e) {
                 // Never let a notification failure surface as a 5xx on the
-                // originating mutation. Just log + continue with the rest.
+                // originating mutation. Log with structured context including
+                // exception class + message + recipient so the orphan stack
+                // traces from `report()` are now actually interpretable.
+                Log::error('notification.dispatch recipient_failed', [
+                    'kind' => $kind,
+                    'model_id' => $modelId,
+                    'recipient_id' => (int) ($recipient->id ?? 0),
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
                 report($e);
             }
-        }
-
-        Log::info('notification.dispatch attempt', [
-            'kind' => $kind,
-            'recipient_count' => $recipientCount,
-            'model_id' => $modelId,
-        ]);
-        if ($recipientCount === 0) {
-            Log::warning('notification.dispatch no_recipients', [
-                'kind' => $kind,
-                'model_id' => $modelId,
-                'hint' => 'caller resolved an empty recipient set — verify role assignments',
-            ]);
         }
     }
 
