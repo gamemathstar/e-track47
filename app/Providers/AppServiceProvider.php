@@ -16,17 +16,36 @@ class AppServiceProvider extends ServiceProvider
     {
         require_once dirname(__DIR__).'/helpers.php';
 
-        // FCM transport binding. Use the real Kreait transport when a
-        // service-account JSON is configured AND readable; otherwise fall
-        // back to NullFcmTransport so dev / CI / un-provisioned envs don't
-        // crash on a notification dispatch.
+        // FCM transport binding. Use the real Kreait HTTP v1 transport when
+        // Firebase credentials are configured (via FIREBASE_CREDENTIALS file
+        // path OR FIREBASE_CREDENTIALS_JSON inline JSON — see
+        // config/firebase.php); otherwise fall back to NullFcmTransport so
+        // dev / CI / un-provisioned envs don't crash on a notification
+        // dispatch.
         $this->app->singleton(FcmTransport::class, function () {
-            $credentials = (string) config('services.fcm.credentials', '');
-            if ($credentials !== '' && is_file($credentials) && is_readable($credentials)) {
-                return new KreaitFcmTransport();
-            }
-            return new NullFcmTransport();
+            return $this->firebaseCredentialsAvailable()
+                ? new KreaitFcmTransport()
+                : new NullFcmTransport();
         });
+    }
+
+    private function firebaseCredentialsAvailable(): bool
+    {
+        $project = (string) config('firebase.default', 'app');
+        $credentials = config("firebase.projects.{$project}.credentials");
+
+        // Inline JSON (FIREBASE_CREDENTIALS_JSON) — kreait's config resolves
+        // it to a decoded array. Treat any non-empty array as "configured".
+        if (is_array($credentials)) {
+            return ! empty($credentials);
+        }
+
+        // File path (FIREBASE_CREDENTIALS / GOOGLE_APPLICATION_CREDENTIALS).
+        if (is_string($credentials) && $credentials !== '') {
+            return is_file($credentials) && is_readable($credentials);
+        }
+
+        return false;
     }
 
     /**

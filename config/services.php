@@ -32,17 +32,20 @@ return [
     ],
 
     /*
-    | Firebase Cloud Messaging (HTTP v1 API).
+    | Firebase Cloud Messaging (FCM).
     |
-    | `credentials` points to a Google service-account JSON file with the
-    | "Firebase Cloud Messaging API" scope enabled. Mount it outside the repo
-    | and reference it via FIREBASE_CREDENTIALS in .env. When this env var is
-    | unset / file is missing, the FcmTransport falls back to a Null impl
-    | that logs the would-have-sent payload and skips the network call —
-    | useful for local dev and CI.
+    | The HTTP v1 transport credentials live in config/firebase.php (published
+    | from kreait/laravel-firebase). Set FIREBASE_CREDENTIALS or
+    | FIREBASE_CREDENTIALS_JSON in .env — see that config file for details.
+    |
+    | `legacy_server_key` is the pre-2024 FCM Legacy HTTP API server key,
+    | preserved here only because the web's App\Models\Notification still
+    | references it. The endpoint it targets was shut down by Google on
+    | 20 June 2024, so this is effectively a dead path — but we keep the
+    | value out of source so it isn't a committed credential.
     */
     'fcm' => [
-        'credentials' => env('FIREBASE_CREDENTIALS'),
+        'legacy_server_key' => env('FCM_LEGACY_SERVER_KEY'),
     ],
 
 ];

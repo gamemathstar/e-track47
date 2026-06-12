@@ -337,15 +337,30 @@ class Notification extends Model
     }
 
 
+    /**
+     * Legacy FCM push via the pre-2024 "Legacy HTTP API". The endpoint
+     * (fcm.googleapis.com/fcm/send) was shut down by Google on 20 June 2024
+     * and silently returns errors — kept here so existing web call sites
+     * (KpiController, DeliverableController, …) don't break, but no push
+     * actually leaves the wire. New code should use the v2
+     * NotificationDispatcher (HTTP v1 API).
+     *
+     * The legacy server key is read from FCM_LEGACY_SERVER_KEY in .env so it
+     * isn't a committed credential. Returns false (no network call) when the
+     * env var is not set.
+     */
     public static function sendPushNotification($recipient, $title, $body)
     {
+        $serverKey = config('services.fcm.legacy_server_key');
+        if (! $serverKey) {
+            return false;
+        }
+
         if (is_array($recipient)) {
             $firebaseToken = User::whereIn('id', $recipient)->pluck('fcm_token')->all();
         } else {
             $firebaseToken = User::where('id', $recipient->id)->pluck('fcm_token')->all();
         }
-
-        $SERVER_API_KEY = 'AAAA6lmBYck:APA91bHvFS-Ay68e0J1t8nDYGFdXGoDSGh0D6a2CFtp-hLZzefy1i1yui4pLCdMKCYhiYDaC_5-0H7tz1rI4OnK98CGiZjzqByfDA7dmS1SdIG9YujLT3qMX4Ycao71copAmKzaqJKr6';
 
         $data = [
             "registration_ids" => $firebaseToken,
@@ -357,7 +372,7 @@ class Notification extends Model
         $dataString = json_encode($data);
 
         $headers = [
-            'Authorization: key=' . $SERVER_API_KEY,
+            'Authorization: key=' . $serverKey,
             'Content-Type: application/json',
         ];
 
