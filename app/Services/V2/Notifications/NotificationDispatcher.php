@@ -51,6 +51,7 @@ class NotificationDispatcher
     /** Data-entry window stages (used by windowCopy()). */
     public const STAGE_WINDOW_OPENED = 'window_opened';
     public const STAGE_WINDOW_OVERRIDE_GRANTED = 'window_override_granted';
+    public const STAGE_WINDOW_LOCKED = 'window_locked';
 
     /**
      * Single source of truth for inbox + push copy on the approval lifecycle.
@@ -137,6 +138,10 @@ class NotificationDispatcher
                     "Data entry for {$sector} ({$period}) is open via override{$expires}.{$reasonPart} Submit your values now.",
                 ];
             })(),
+            self::STAGE_WINDOW_LOCKED => [
+                'Data entry window closed',
+                "Data entry is now closed for {$sector} ({$period}). The submission window has ended.",
+            ],
             default => ['Notification', 'You have a new update.'],
         };
     }

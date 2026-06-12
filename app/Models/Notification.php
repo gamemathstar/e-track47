@@ -248,6 +248,16 @@ class Notification extends Model
     }
 
     /**
+     * Notify the sector's involved roles that the data-entry window has been
+     * closed. Pass the DataEntryAccess row that was just transitioned to
+     * `closed`. Used by lock/lockAll.
+     */
+    public static function notifySectorParticipantsOnWindowLock($access): void
+    {
+        self::dispatchWindowChange($access, NotificationDispatcher::STAGE_WINDOW_LOCKED);
+    }
+
+    /**
      * Shared dispatch path for window-state changes (called by the two helpers
      * above). Resolves participants via the dispatcher's sectorParticipantsFor,
      * builds copy via NotificationDispatcher::windowCopy().
@@ -282,6 +292,12 @@ class Notification extends Model
             [
                 'senderId' => (int) ($actor?->id ?? 0),
                 'modelId' => (int) $access->id,
+                'deepLinkRoute' => 'dataEntryWindow',
+                'deepLinkParams' => [
+                    'sectorId' => (string) $access->sector_id,
+                    'year' => (string) (int) ($access->year ?? 0),
+                    'quarter' => 'q'.((int) ($access->quarter ?? 0)),
+                ],
             ],
         );
     }

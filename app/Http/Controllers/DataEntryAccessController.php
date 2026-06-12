@@ -265,6 +265,12 @@ class DataEntryAccessController extends Controller
 
             $access->status = 'closed';
             $access->save();
+
+            try {
+                \App\Models\Notification::notifySectorParticipantsOnWindowLock($access->load('sector'));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Notification error in lockAll for sector '.$sectorId.': '.$e->getMessage());
+            }
         }
 
         return response()->json([

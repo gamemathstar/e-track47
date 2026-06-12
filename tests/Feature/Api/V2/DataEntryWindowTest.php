@@ -292,6 +292,102 @@ class DataEntryWindowTest extends TestCase
             'Coordinators are actors, not recipients of window notifications');
     }
 
+    // --- lock notifications --------------------------------------------------
+
+    public function test_locking_window_notifies_sector_participants(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $dataAdmin = $this->makeDataAdmin($sector);
+        DeviceToken::create([
+            'user_id' => $dataAdmin->id,
+            'token' => str_repeat('q', 64),
+            'platform' => 'android',
+        ]);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        // Pre-open the window so lock is a meaningful transition.
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/open")->assertStatus(202);
+        // Clear the opened-notification — use DELETE not TRUNCATE so we stay
+        // inside RefreshDatabase's transaction (TRUNCATE is DDL on MySQL and
+        // implicitly commits, leaking state into subsequent tests).
+        Notification::query()->delete();
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/lock")->assertStatus(202);
+
+        $inbox = Notification::where('user_id', $dataAdmin->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('Data entry window closed', $inbox->title);
+        $this->assertSame('deadline', $inbox->type);
+        $this->assertStringContainsString('Health', $inbox->body);
+        $this->assertStringContainsString('submission window has ended', $inbox->body);
+
+        Bus::assertDispatched(SendFcmJob::class);
+    }
+
+    public function test_lock_all_fans_out_per_sector(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $fw = $this->makeFramework(['year' => 2024]);
+        $sectorA = $this->makeSector($fw, ['sector_name' => 'A']);
+        $sectorB = $this->makeSector($fw, ['sector_name' => 'B']);
+        $daA = $this->makeDataAdmin($sectorA);
+        $daB = $this->makeDataAdmin($sectorB);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/data-entry/windows/lock-all', [
+            'year' => 2024, 'quarter' => 'q1',
+        ])->assertStatus(202);
+
+        $rowA = Notification::where('user_id', $daA->id)->first();
+        $rowB = Notification::where('user_id', $daB->id)->first();
+        $this->assertNotNull($rowA);
+        $this->assertNotNull($rowB);
+        $this->assertSame('Data entry window closed', $rowA->title);
+        $this->assertStringContainsString('A', $rowA->body);
+        $this->assertStringContainsString('B', $rowB->body);
+    }
+
+    public function test_window_copy_lock_stage(): void
+    {
+        [$title, $body] = NotificationDispatcher::windowCopy(
+            NotificationDispatcher::STAGE_WINDOW_LOCKED,
+            ['sectorName' => 'Health', 'quarter' => 4, 'year' => 2024],
+        );
+        $this->assertSame('Data entry window closed', $title);
+        $this->assertStringContainsString('Health (Q4 2024)', $body);
+        $this->assertStringContainsString('submission window has ended', $body);
+    }
+
+    // --- deep link payload ---------------------------------------------------
+
+    public function test_window_notifications_carry_data_entry_deep_link(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $dataAdmin = $this->makeDataAdmin($sector);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        // Open → deep link present on the inbox row.
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/open")->assertStatus(202);
+        $inbox = Notification::where('user_id', $dataAdmin->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('dataEntryWindow', $inbox->deep_link_route);
+
+        $params = is_string($inbox->deep_link_params)
+            ? json_decode($inbox->deep_link_params, true)
+            : $inbox->deep_link_params;
+        $this->assertSame((string) $sector->id, $params['sectorId']);
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $params['year']);
+        $this->assertMatchesRegularExpression('/^q[1-4]$/', $params['quarter']);
+    }
+
     public function test_stats_scopes_to_the_year_framework_not_the_active_one(): void
     {
         // Two frameworks: 2023 (Archived) with one sector, 2024 (Active) with two.

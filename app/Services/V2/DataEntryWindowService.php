@@ -97,6 +97,16 @@ class DataEntryWindowService
         $this->ensureRows($year, $quarter);
         DataEntryAccess::where('year', $year)->where('quarter', $quarter)
             ->update(['status' => 'closed']);
+
+        // Fan-out lock notification per sector so each user sees their own
+        // sector's context (matches the unlockAll fan-out shape).
+        $rows = DataEntryAccess::with('sector')
+            ->where('year', $year)->where('quarter', $quarter)
+            ->whereIn('sector_id', $this->sectorIdsForYear($year))
+            ->get();
+        foreach ($rows as $r) {
+            $this->notifyWindowLocked($r, $user);
+        }
     }
 
     /**
@@ -145,6 +155,8 @@ class DataEntryWindowService
         $row = $this->findOrCreateRow($user, $sectorId);
         $row->status = 'closed';
         $row->save();
+
+        $this->notifyWindowLocked($row, $user);
     }
 
     public function grantOverride(User $user, string $sectorId, array $params): void
@@ -268,6 +280,11 @@ class DataEntryWindowService
         ]);
     }
 
+    private function notifyWindowLocked(DataEntryAccess $row, User $actor): void
+    {
+        $this->dispatchWindowChange($row, $actor, NotificationDispatcher::STAGE_WINDOW_LOCKED);
+    }
+
     private function dispatchWindowChange(DataEntryAccess $row, User $actor, string $stage, array $extraCtx = []): void
     {
         $recipients = $this->notifier->sectorParticipantsFor((int) $row->sector_id);
@@ -291,6 +308,12 @@ class DataEntryWindowService
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $row->id,
+                'deepLinkRoute' => 'dataEntryWindow',
+                'deepLinkParams' => [
+                    'sectorId' => (string) $row->sector_id,
+                    'year' => (string) (int) $row->year,
+                    'quarter' => 'q'.((int) $row->quarter),
+                ],
             ],
         );
     }
