@@ -47,4 +47,33 @@ class NotificationsController extends BaseController
 
         return $this->noContent();
     }
+
+    public function registerDeviceToken(Request $request)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'min:32', 'max:512'],
+            'platform' => ['nullable', 'in:ios,android,web'],
+            'appVersion' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $this->notifications->registerDeviceToken(
+            $request->user(),
+            $validated['token'],
+            $validated['platform'] ?? 'android',
+            $validated['appVersion'] ?? null,
+        );
+
+        return $this->noContent();
+    }
+
+    public function unregisterDeviceToken(Request $request)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'min:32', 'max:512'],
+        ]);
+
+        $this->notifications->unregisterDeviceToken($request->user(), $validated['token']);
+
+        return $this->noContent();
+    }
 }

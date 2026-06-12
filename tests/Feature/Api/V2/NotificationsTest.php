@@ -2,9 +2,16 @@
 
 namespace Tests\Feature\Api\V2;
 
+use App\Jobs\SendFcmJob;
+use App\Models\DeviceToken;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
+use App\Models\UserRole;
+use App\Services\V2\Notifications\FcmTransport;
+use App\Services\V2\Notifications\NotificationDispatcher;
+use App\Services\V2\Notifications\NullFcmTransport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Laravel\Passport\Passport;
 use Tests\Concerns\InteractsWithPdcuAuth;
 use Tests\TestCase;
@@ -141,5 +148,181 @@ class NotificationsTest extends TestCase
     public function test_inbox_requires_auth(): void
     {
         $this->getJson('/api/v2/notifications/inbox?tab=all')->assertStatus(401);
+    }
+
+    // --- §11.14.6 / §11.14.7 device-token register / unregister --------------
+
+    public function test_device_token_register_creates_row(): void
+    {
+        $user = $this->makeUser();
+        Passport::actingAs($user, [], 'api');
+
+        $token = str_repeat('f', 64);
+
+        $this->postJson('/api/v2/notifications/device-token', [
+            'token' => $token,
+            'platform' => 'android',
+            'appVersion' => 'v2.4.0',
+        ])->assertNoContent();
+
+        $row = DeviceToken::where('token', $token)->first();
+        $this->assertNotNull($row);
+        $this->assertSame((int) $user->id, (int) $row->user_id);
+        $this->assertSame('android', $row->platform);
+        $this->assertSame('v2.4.0', $row->app_version);
+    }
+
+    public function test_device_token_register_is_idempotent_and_transfers_owner(): void
+    {
+        $userA = $this->makeUser();
+        $userB = $this->makeUser();
+        $token = str_repeat('a', 64);
+
+        Passport::actingAs($userA, [], 'api');
+        $this->postJson('/api/v2/notifications/device-token', ['token' => $token])->assertNoContent();
+        $this->postJson('/api/v2/notifications/device-token', ['token' => $token])->assertNoContent();
+
+        // Same token re-registered by a different user → ownership transfers.
+        Passport::actingAs($userB, [], 'api');
+        $this->postJson('/api/v2/notifications/device-token', ['token' => $token, 'platform' => 'ios'])->assertNoContent();
+
+        $rows = DeviceToken::where('token', $token)->get();
+        $this->assertCount(1, $rows, 'token must remain unique across the table');
+        $this->assertSame((int) $userB->id, (int) $rows->first()->user_id);
+        $this->assertSame('ios', $rows->first()->platform);
+    }
+
+    public function test_device_token_register_validation(): void
+    {
+        Passport::actingAs($this->makeUser(), [], 'api');
+
+        $this->postJson('/api/v2/notifications/device-token', [])
+            ->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['token']]);
+
+        $this->postJson('/api/v2/notifications/device-token', ['token' => 'short'])
+            ->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['token']]);
+
+        $this->postJson('/api/v2/notifications/device-token', [
+            'token' => str_repeat('x', 64), 'platform' => 'symbian',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['platform']]);
+    }
+
+    public function test_device_token_unregister_only_removes_own_token(): void
+    {
+        $owner = $this->makeUser();
+        $other = $this->makeUser();
+        $token = str_repeat('b', 64);
+        DeviceToken::create(['user_id' => $owner->id, 'token' => $token, 'platform' => 'android']);
+
+        // Other user trying to unregister → silent no-op (row stays).
+        Passport::actingAs($other, [], 'api');
+        $this->deleteJson('/api/v2/notifications/device-token', ['token' => $token])->assertNoContent();
+        $this->assertNotNull(DeviceToken::where('token', $token)->first());
+
+        // Owner unregistering → row gone.
+        Passport::actingAs($owner, [], 'api');
+        $this->deleteJson('/api/v2/notifications/device-token', ['token' => $token])->assertNoContent();
+        $this->assertNull(DeviceToken::where('token', $token)->first());
+    }
+
+    public function test_device_token_endpoints_require_auth(): void
+    {
+        $this->postJson('/api/v2/notifications/device-token', ['token' => str_repeat('c', 64)])->assertStatus(401);
+        $this->deleteJson('/api/v2/notifications/device-token', ['token' => str_repeat('c', 64)])->assertStatus(401);
+    }
+
+    // --- dispatcher fan-out --------------------------------------------------
+
+    public function test_dispatcher_writes_inbox_row_and_enqueues_per_device(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+        $fakeTransport = new NullFcmTransport();
+        app()->instance(FcmTransport::class, $fakeTransport);
+
+        $recipient = $this->makeUser();
+        DeviceToken::create(['user_id' => $recipient->id, 'token' => str_repeat('d', 64), 'platform' => 'android']);
+        DeviceToken::create(['user_id' => $recipient->id, 'token' => str_repeat('e', 64), 'platform' => 'ios']);
+
+        $dispatcher = app(NotificationDispatcher::class);
+        $dispatcher->dispatch(
+            collect([$recipient]),
+            NotificationDispatcher::KIND_APPROVAL,
+            'Test title',
+            'Test body',
+            ['senderId' => 1, 'modelId' => 99, 'deepLinkRoute' => 'kpiDetail', 'deepLinkParams' => ['kpiId' => 'k1']],
+        );
+
+        $inbox = Notification::where('user_id', $recipient->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('Test title', $inbox->title);
+        $this->assertSame('approval', $inbox->type);
+
+        // One job per device token.
+        Bus::assertDispatchedTimes(SendFcmJob::class, 2);
+    }
+
+    public function test_dispatcher_honors_push_off_preference(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $recipient = $this->makeUser();
+        NotificationPreference::create([
+            'user_id' => $recipient->id,
+            'submissions' => true, 'approvals' => true, 'rejections' => true, 'mentions' => true, 'deadlines' => true,
+            'push' => false, // push channel off
+            'email' => true, 'sms' => false,
+        ]);
+        DeviceToken::create(['user_id' => $recipient->id, 'token' => str_repeat('f', 64), 'platform' => 'android']);
+
+        app(NotificationDispatcher::class)->dispatch(
+            collect([$recipient]),
+            NotificationDispatcher::KIND_APPROVAL,
+            'Inbox-only',
+            'No push',
+        );
+
+        // Inbox row still written.
+        $this->assertNotNull(Notification::where('user_id', $recipient->id)->first());
+        // But NO push job enqueued.
+        Bus::assertNotDispatched(SendFcmJob::class);
+    }
+
+    public function test_dispatcher_honors_per_kind_preference(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $recipient = $this->makeUser();
+        NotificationPreference::create([
+            'user_id' => $recipient->id,
+            'submissions' => true, 'approvals' => false, // approvals off
+            'rejections' => true, 'mentions' => true, 'deadlines' => true,
+            'push' => true, 'email' => true, 'sms' => false,
+        ]);
+        DeviceToken::create(['user_id' => $recipient->id, 'token' => str_repeat('g', 64), 'platform' => 'android']);
+
+        app(NotificationDispatcher::class)->dispatch(
+            collect([$recipient]),
+            NotificationDispatcher::KIND_APPROVAL,
+            't', 'b',
+        );
+
+        Bus::assertNotDispatched(SendFcmJob::class);
+    }
+
+    public function test_sector_head_recipient_resolution(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        $sectorHead = $this->makeSectorHead($sector);
+        $commitment = $this->makeCommitment($sector);
+        $deliverable = $this->makeDeliverable($commitment);
+        $kpi = $this->makeKpi($deliverable);
+        $tracking = $this->makeTracking($kpi);
+        $tracking->load('kpi.deliverable.commitment');
+
+        $resolved = app(NotificationDispatcher::class)->sectorHeadsForTracking($tracking);
+
+        $this->assertTrue($resolved->pluck('id')->contains((int) $sectorHead->id),
+            'Sector Head of the sector should be among recipients');
     }
 }

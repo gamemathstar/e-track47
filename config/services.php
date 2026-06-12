@@ -31,4 +31,18 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    | Firebase Cloud Messaging (HTTP v1 API).
+    |
+    | `credentials` points to a Google service-account JSON file with the
+    | "Firebase Cloud Messaging API" scope enabled. Mount it outside the repo
+    | and reference it via FIREBASE_CREDENTIALS in .env. When this env var is
+    | unset / file is missing, the FcmTransport falls back to a Null impl
+    | that logs the would-have-sent payload and skips the network call —
+    | useful for local dev and CI.
+    */
+    'fcm' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
 ];

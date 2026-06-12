@@ -171,6 +171,8 @@ Route::middleware('auth:api')->prefix('notifications')->group(function () {
     Route::put('/preferences', [NotificationsController::class, 'updatePreferences']);
     Route::post('/mark-all-read', [NotificationsController::class, 'markAllRead']);
     Route::post('/{id}/mark-read', [NotificationsController::class, 'markRead']);
+    Route::post('/device-token', [NotificationsController::class, 'registerDeviceToken']);
+    Route::delete('/device-token', [NotificationsController::class, 'unregisterDeviceToken']);
 });
 
 // --- 11.12 Settings / Help / About -------------------------------------------

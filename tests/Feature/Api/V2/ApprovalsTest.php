@@ -787,6 +787,62 @@ class ApprovalsTest extends TestCase
         $this->assertSame($sh->id, (int) $t->sector_head_approved_by);
     }
 
+    public function test_sector_head_accept_notifies_assigned_facilitator(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendFcmJob::class]);
+
+        [$sector, $kpi] = $this->seedKpi();
+        $t = $this->tracking($kpi, 'Pending Sector Head Approval');
+
+        $facilitator = $this->makeFacilitator($sector);
+        // Give the facilitator a device so a push job is enqueued.
+        \App\Models\DeviceToken::create([
+            'user_id' => $facilitator->id,
+            'token' => str_repeat('z', 64),
+            'platform' => 'android',
+        ]);
+
+        $sh = $this->makeSectorHead($sector);
+        Passport::actingAs($sh, [], 'api');
+
+        $this->postJson("/api/v2/approvals/submissions/{$t->id}/review", ['role' => 'sector_head', 'decision' => 'accept'])
+            ->assertStatus(202);
+
+        // Inbox row for the facilitator.
+        $inbox = \App\Models\Notification::where('user_id', $facilitator->id)->first();
+        $this->assertNotNull($inbox, 'facilitator should have an inbox row');
+        $this->assertSame('approval', $inbox->type);
+
+        // FCM push enqueued for the facilitator's device.
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendFcmJob::class);
+    }
+
+    public function test_coordinator_reject_notifies_data_admin(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendFcmJob::class]);
+
+        [$sector, $kpi] = $this->seedKpi();
+        $dataAdmin = $this->makeDataAdmin($sector);
+        \App\Models\DeviceToken::create([
+            'user_id' => $dataAdmin->id,
+            'token' => str_repeat('y', 64),
+            'platform' => 'ios',
+        ]);
+
+        $t = $this->tracking($kpi, 'Pending Coordinator');
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson("/api/v2/approvals/submissions/{$t->id}/review", [
+            'role' => 'coordinator', 'decision' => 'reject', 'rejectionReason' => 'Missing evidence',
+        ])->assertStatus(202);
+
+        $inbox = \App\Models\Notification::where('user_id', $dataAdmin->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('rejection', $inbox->type);
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendFcmJob::class);
+    }
+
     public function test_facilitator_accept_sets_delivery_value_and_advances(): void
     {
         [$sector, $kpi] = $this->seedKpi();

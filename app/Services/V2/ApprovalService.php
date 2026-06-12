@@ -8,6 +8,7 @@ use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\PerformanceTracking;
 use App\Models\User;
+use App\Services\V2\Notifications\NotificationDispatcher;
 use App\Support\V2\Presenters\SectorPresenter;
 use App\Support\V2\WireEnums;
 use Carbon\Carbon;
@@ -23,9 +24,10 @@ use Illuminate\Support\Facades\Storage;
  * maps, so they are returned as raw arrays); mutations advance/return the
  * PerformanceTracking lifecycle and cross-check the caller's role + sector access.
  *
- * NOTE: workflow notifications (FCM/in-app) are intentionally NOT dispatched here
- * yet — they belong to the Notifications feature and the web app still sends them
- * for web-initiated actions. State transitions are complete and contract-correct.
+ * Workflow notifications (FCM + in-app inbox) are dispatched through the
+ * NotificationDispatcher after each successful state transition, so each
+ * accept/reject pings the next role in the chain (sector head ⇒ facilitator
+ * ⇒ coordinator ⇒ data admin on confirm; rejects ping the data admin).
  */
 class ApprovalService
 {
@@ -35,8 +37,10 @@ class ApprovalService
         'coordinator' => 'Pending Coordinator',
     ];
 
-    public function __construct(private readonly SectorAccessService $access)
-    {
+    public function __construct(
+        private readonly SectorAccessService $access,
+        private readonly NotificationDispatcher $notifier,
+    ) {
     }
 
     // --- queues (return arrays) ---------------------------------------------
@@ -293,6 +297,10 @@ class ApprovalService
             : $this->applyReject($t, $role, $user, $params);
 
         $t->save();
+
+        $params['decision'] === 'accept'
+            ? $this->notifyAccept($t, $role, $user)
+            : $this->notifyReject($t, $role, $user);
     }
 
     /**
@@ -342,6 +350,10 @@ class ApprovalService
                 $t->save();
             }
         });
+
+        foreach ($tracks as $t) {
+            $this->notifyAccept($t, $role, $user);
+        }
     }
 
     // --- transition helpers --------------------------------------------------
@@ -862,5 +874,88 @@ class ApprovalService
     private function approver(PerformanceTracking $t): ?User
     {
         return $t->sector_head_approved_by ? User::find($t->sector_head_approved_by) : null;
+    }
+
+    // --- notification fan-out ------------------------------------------------
+
+    /**
+     * Notify the **next** role in the chain after a successful accept:
+     *  sector_head  → facilitators of the sector  (kind: approval)
+     *  facilitator  → coordinators                (kind: approval)
+     *  coordinator  → data admin(s) of the sector (kind: approval — final confirmation)
+     */
+    private function notifyAccept(PerformanceTracking $t, string $role, User $actor): void
+    {
+        $kpiTitle = (string) (optional($t->kpi)->kpi ?: 'a KPI');
+        $sectorName = (string) (optional($this->sectorOf($t))->sector_name ?: 'the sector');
+
+        [$recipients, $title, $body] = match ($role) {
+            'sector_head' => [
+                $this->notifier->facilitatorsForTracking($t),
+                'Submission ready for verification',
+                "Sector Head of {$sectorName} approved the submission for \"{$kpiTitle}\". It's awaiting your verification.",
+            ],
+            'facilitator' => [
+                $this->notifier->coordinators(),
+                'Submission ready for final approval',
+                "Facilitator verified the submission for \"{$kpiTitle}\" from {$sectorName}. It's awaiting your final approval.",
+            ],
+            'coordinator' => [
+                $this->notifier->dataAdminsForTracking($t),
+                'Submission confirmed',
+                "Your submission for \"{$kpiTitle}\" has been finalised by the Coordinator.",
+            ],
+            default => [collect(), '', ''],
+        };
+
+        if ($recipients->isEmpty() || $title === '') {
+            return;
+        }
+
+        $this->notifier->dispatch(
+            $recipients,
+            NotificationDispatcher::KIND_APPROVAL,
+            $title,
+            $body,
+            [
+                'senderId' => (int) $actor->id,
+                'modelId' => (int) $t->id,
+                'deepLinkRoute' => 'kpiDetail',
+                'deepLinkParams' => ['kpiId' => (string) (optional($t->kpi)->id ?: '')],
+            ],
+        );
+    }
+
+    /**
+     * Notify the data admin(s) of the sector when any reviewer rejects, so
+     * they can adjust and resubmit.
+     */
+    private function notifyReject(PerformanceTracking $t, string $role, User $actor): void
+    {
+        $kpiTitle = (string) (optional($t->kpi)->kpi ?: 'a KPI');
+        $roleLabel = match ($role) {
+            'sector_head' => 'Sector Head',
+            'facilitator' => 'Facilitator',
+            'coordinator' => 'Coordinator',
+            default => 'Reviewer',
+        };
+
+        $recipients = $this->notifier->dataAdminsForTracking($t);
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $this->notifier->dispatch(
+            $recipients,
+            NotificationDispatcher::KIND_REJECTION,
+            'Submission needs your attention',
+            "{$roleLabel} rejected your submission for \"{$kpiTitle}\". Please review and resubmit.",
+            [
+                'senderId' => (int) $actor->id,
+                'modelId' => (int) $t->id,
+                'deepLinkRoute' => 'kpiDetail',
+                'deepLinkParams' => ['kpiId' => (string) (optional($t->kpi)->id ?: '')],
+            ],
+        );
     }
 }

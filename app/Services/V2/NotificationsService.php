@@ -3,6 +3,7 @@
 namespace App\Services\V2;
 
 use App\Exceptions\V2\ApiException;
+use App\Models\DeviceToken;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
 use App\Models\User;
@@ -99,6 +100,36 @@ class NotificationsService
 
         $n->status = 'Read';
         $n->save();
+    }
+
+    /**
+     * Upsert a device token for the user. Multiple devices per user are
+     * fine — uniqueness is on the token itself, so the same handset re-
+     * registering simply touches `last_seen_at` (and ownership moves to the
+     * latest user if the handset was re-paired).
+     */
+    public function registerDeviceToken(User $user, string $token, string $platform = 'android', ?string $appVersion = null): void
+    {
+        DeviceToken::updateOrCreate(
+            ['token' => $token],
+            [
+                'user_id' => $user->id,
+                'platform' => $platform,
+                'app_version' => $appVersion,
+                'last_seen_at' => Carbon::now(),
+            ],
+        );
+    }
+
+    /**
+     * Remove a device token. Idempotent — silent no-op if the token isn't
+     * registered (or belongs to a different user). Used on logout.
+     */
+    public function unregisterDeviceToken(User $user, string $token): void
+    {
+        DeviceToken::where('token', $token)
+            ->where('user_id', $user->id)
+            ->delete();
     }
 
     // --- helpers -------------------------------------------------------------

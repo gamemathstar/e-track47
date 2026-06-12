@@ -4249,6 +4249,69 @@ semantics). Nested `quietFrom`/`quietTo` are sent as `{ "hour", "minute" }`.
 
 **Status codes:** `204` success · `401` · `404` (unknown id).
 
+#### 11.14.6 Register a device for push
+
+| | |
+| --- | --- |
+| **Purpose** | Register the device's current FCM token so the server can target push notifications at this handset. Call **after a successful login** and on **every FCM token rotation** (FCM rotates the token periodically; the SDK exposes a callback). Multiple devices per user are supported — each handset has its own token row. |
+| **Method / Path** | `POST /notifications/device-token` |
+| **Auth** | Bearer required |
+| **Content-Type** | `application/json` |
+
+**Request body**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `token` | string | ✅ | The FCM registration token. 32–512 chars. |
+| `platform` | string | ❌ | One of `ios`, `android`, `web`. Defaults server-side to `android`. |
+| `appVersion` | string | ❌ | Free-form display version, e.g. `"v2.4.0 (Build 2024.11.08)"`. Max 32 chars. |
+
+```json
+{
+  "token": "f9pZ_x…the-FCM-token…",
+  "platform": "android",
+  "appVersion": "v2.4.0 (Build 2024.11.08)"
+}
+```
+
+**Success:** `204 No Content` (body ignored). Idempotent — re-registering the same token is a no-op (just refreshes `last_seen_at`). If the handset was re-paired with a different user, ownership transfers to the calling user.
+
+**Status codes:** `204` · `400`/`422` (missing/short token) · `401`.
+
+#### 11.14.7 Unregister this device
+
+| | |
+| --- | --- |
+| **Purpose** | Remove the device's FCM token so push notifications stop. Call on **explicit logout**. (On uninstall, FCM eventually surfaces `UNREGISTERED` to the server and the row is pruned automatically.) |
+| **Method / Path** | `DELETE /notifications/device-token` |
+| **Auth** | Bearer required |
+| **Content-Type** | `application/json` |
+
+**Request body**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `token` | string | ✅ | The FCM registration token. |
+
+```json
+{ "token": "f9pZ_x…the-FCM-token…" }
+```
+
+**Success:** `204 No Content`. Silent no-op if the token isn't registered or belongs to a different user.
+
+**Status codes:** `204` · `400`/`422` · `401`.
+
+---
+
+> **Lifecycle hooks (server-side, for reference).** Push + in-app inbox notifications are dispatched on these v2 transitions, gated by `NotificationPreference` and quiet hours:
+> - **Data Admin submits performance** (§11.4.3) → Sector Head(s) — kind `submission`
+> - **Sector Head accepts** (§11.6.7) → Facilitators of the sector — kind `approval`
+> - **Facilitator accepts** (§11.6.7) → Coordinators — kind `approval`
+> - **Coordinator accepts → Confirmed** (§11.6.7 / §11.6.8 bulk) → Original Data Admin(s) — kind `approval`
+> - **Any reject** (§11.6.7) → Data Admin(s) of the sector — kind `rejection`
+>
+> The push payload's `data` block carries `notificationId`, `kind`, `deepLinkRoute`, `deepLinkParams` (JSON-stringified) so the client can route a tap into the right screen.
+
 **Enums in this section**
 
 <a name="notif-enums"></a>
@@ -4258,6 +4321,7 @@ semantics). Nested `quietFrom`/`quietTo` are sent as `{ "hour", "minute" }`.
 | `NotificationTab` (`?tab=`, 11.14.1) | `all`, `unread`, `mentions` |
 | `NotificationKind` (`kind`) | `submission`, `approval`, `rejection`, `discussion`, `deadline`, `mention`, `system` |
 | `NotificationAccent` (`accent`) | `primary`, `secondary`, `tertiary`, `error` |
+| `DevicePlatform` (`platform`, 11.14.6) | `ios`, `android`, `web` |
 
 Unknown `kind`/`tab`/`accent` wire values fall back to `system`/`all`/`primary`
 respectively (the client never throws on an unrecognized enum string). `iconKey`

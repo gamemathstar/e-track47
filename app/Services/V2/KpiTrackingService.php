@@ -9,6 +9,7 @@ use App\Models\Kpi;
 use App\Models\KpiTarget;
 use App\Models\PerformanceTracking;
 use App\Models\User;
+use App\Services\V2\Notifications\NotificationDispatcher;
 use App\Support\V2\WireEnums;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -35,8 +36,10 @@ class KpiTrackingService
         'Not Confirmed' => 'NOT CONFIRMED',
     ];
 
-    public function __construct(private readonly SectorAccessService $access)
-    {
+    public function __construct(
+        private readonly SectorAccessService $access,
+        private readonly NotificationDispatcher $notifier,
+    ) {
     }
 
     // --- reads ---------------------------------------------------------------
@@ -108,6 +111,38 @@ class KpiTrackingService
         $tracking->save();
 
         $this->attachEvidence($tracking, $params['evidenceDocumentIds'] ?? [], $user);
+
+        $this->notifySubmission($tracking, $kpi, $user);
+    }
+
+    /**
+     * Notify the sector head(s) of the sector that owns this KPI that there's
+     * a new submission awaiting their approval. Best-effort — failures here
+     * never affect the originating submit.
+     */
+    private function notifySubmission(PerformanceTracking $tracking, Kpi $kpi, User $actor): void
+    {
+        $recipients = $this->notifier->sectorHeadsForTracking($tracking->load('kpi.deliverable.commitment'));
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $kpiTitle = (string) ($kpi->kpi ?: 'a KPI');
+        $sector = optional(optional(optional($kpi->deliverable)->commitment)->sector);
+        $sectorName = (string) ($sector->sector_name ?? 'a sector');
+
+        $this->notifier->dispatch(
+            $recipients,
+            NotificationDispatcher::KIND_SUBMISSION,
+            'New submission awaiting your approval',
+            "Data Admin of {$sectorName} submitted performance for \"{$kpiTitle}\". Please review.",
+            [
+                'senderId' => (int) $actor->id,
+                'modelId' => (int) $tracking->id,
+                'deepLinkRoute' => 'kpiDetail',
+                'deepLinkParams' => ['kpiId' => (string) $kpi->id],
+            ],
+        );
     }
 
     /**
