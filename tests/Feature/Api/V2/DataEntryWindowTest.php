@@ -206,6 +206,14 @@ class DataEntryWindowTest extends TestCase
         $fw = $this->makeFramework();
         $sector = $this->makeSector($fw, ['sector_name' => 'Education']);
         $dataAdmin = $this->makeDataAdmin($sector);
+        // Register a device for the recipient so the FCM dispatch path
+        // is exercised — without this the test would silently skip the
+        // push side and pass even if FCM was broken.
+        DeviceToken::create([
+            'user_id' => $dataAdmin->id,
+            'token' => str_repeat('o', 64),
+            'platform' => 'android',
+        ]);
 
         Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
 
@@ -220,6 +228,11 @@ class DataEntryWindowTest extends TestCase
         $this->assertStringContainsString('Education', $inbox->body);
         $this->assertStringContainsString('Late submission approved by coordinator', $inbox->body);
         $this->assertStringContainsString('31 Dec 2024', $inbox->body);
+
+        // The actual bug repro: this assert should pass — if the inbox row
+        // was written but no FCM job got queued for a recipient with a
+        // registered device, the dispatch chain is broken.
+        Bus::assertDispatched(SendFcmJob::class);
     }
 
     public function test_unlock_all_fans_out_per_sector(): void

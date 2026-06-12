@@ -24,10 +24,15 @@ class KreaitFcmTransport implements FcmTransport
                 ->withData($this->coerceDataPayload($data));
 
             Firebase::messaging()->send($message);
+            Log::info('notification.fcm sent', [
+                'token_prefix' => substr($token, 0, 8),
+                'title' => $title,
+            ]);
             return self::STATUS_SENT;
         } catch (NotFound $e) {
             // Token unregistered or unknown — the dispatcher should delete the
             // device_tokens row so it doesn't keep getting tried.
+            Log::info('notification.fcm unregistered', ['token_prefix' => substr($token, 0, 8)]);
             return self::STATUS_UNREGISTERED;
         } catch (MessagingException $e) {
             // 400-class invalid argument vs. 5xx / 429 transient — kreait
@@ -35,12 +40,13 @@ class KreaitFcmTransport implements FcmTransport
             // response tells them apart.
             $code = method_exists($e, 'code') ? $e->code() : 0;
             if ($code >= 500 || $code === 429) {
+                Log::warning('notification.fcm retryable', ['code' => $code, 'message' => $e->getMessage()]);
                 return self::STATUS_RETRYABLE;
             }
-            Log::warning('FCM send rejected', ['code' => $code, 'message' => $e->getMessage()]);
+            Log::warning('notification.fcm rejected', ['code' => $code, 'message' => $e->getMessage()]);
             return self::STATUS_INVALID;
         } catch (Throwable $e) {
-            Log::warning('FCM send failed (unexpected)', ['message' => $e->getMessage()]);
+            Log::warning('notification.fcm failed (unexpected)', ['message' => $e->getMessage()]);
             return self::STATUS_RETRYABLE;
         }
     }

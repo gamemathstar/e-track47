@@ -22,7 +22,7 @@ class NullFcmTransport implements FcmTransport
     {
         $this->sends[] = compact('token', 'title', 'body', 'data');
 
-        Log::info('FCM transport not configured — push send skipped', [
+        Log::info('notification.fcm skipped (null transport — no FIREBASE_CREDENTIALS configured)', [
             'token_prefix' => substr($token, 0, 8),
             'title' => $title,
         ]);

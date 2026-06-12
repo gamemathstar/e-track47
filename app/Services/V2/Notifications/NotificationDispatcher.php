@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserRole;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -202,12 +203,29 @@ class NotificationDispatcher
         }
         $n->save();
 
-        if (! $this->pushAllowed($recipient, $kind)) {
+        // Trace block — every push decision now emits a single structured
+        // log line so prod operators can grep `notification.push` and see
+        // exactly why a given recipient did / didn't get pushed.
+        // grep -i "notification.push" storage/logs/laravel.log
+        $logCtx = [
+            'recipient_id' => (int) $recipient->id,
+            'kind' => $kind,
+            'notification_id' => (int) $n->id,
+        ];
+
+        $skipReason = $this->pushSkipReason($recipient, $kind);
+        if ($skipReason !== null) {
+            Log::info('notification.push skipped', $logCtx + ['reason' => $skipReason]);
+            return;
+        }
+
+        $tokens = $this->deviceTokensFor($recipient);
+        if ($tokens->isEmpty()) {
+            Log::info('notification.push skipped', $logCtx + ['reason' => 'no_device_tokens']);
             return;
         }
 
         $delay = $this->quietHoursDelay($recipient);
-        $tokens = $this->deviceTokensFor($recipient);
 
         foreach ($tokens as $deviceToken) {
             $job = SendFcmJob::dispatch(
@@ -221,22 +239,29 @@ class NotificationDispatcher
                 $job->delay($delay);
             }
         }
+
+        Log::info('notification.push enqueued', $logCtx + [
+            'device_count' => $tokens->count(),
+            'delayed_until' => $delay ? $delay->toIso8601String() : null,
+        ]);
     }
 
     /**
-     * Whether the recipient's NotificationPreference allows a push for this
-     * kind. Defaults to **allow** when no preference row exists yet.
+     * Returns null if the push is allowed, or a short-string reason code
+     * explaining why it's being skipped. Reasons:
+     *   - `pref_push_off` — user disabled the push channel globally
+     *   - `pref_kind_off` — user disabled this notification kind
      */
-    private function pushAllowed(User $recipient, string $kind): bool
+    private function pushSkipReason(User $recipient, string $kind): ?string
     {
         $prefs = NotificationPreference::where('user_id', $recipient->id)->first();
         if (! $prefs) {
-            return true;
+            return null;
         }
         if (! $prefs->push) {
-            return false;
+            return 'pref_push_off';
         }
-        return match ($kind) {
+        $kindAllowed = match ($kind) {
             self::KIND_SUBMISSION => (bool) $prefs->submissions,
             self::KIND_APPROVAL => (bool) $prefs->approvals,
             self::KIND_REJECTION => (bool) $prefs->rejections,
@@ -244,6 +269,7 @@ class NotificationDispatcher
             self::KIND_DEADLINE => (bool) $prefs->deadlines,
             default => true, // system: never gated
         };
+        return $kindAllowed ? null : 'pref_kind_off';
     }
 
     /**
