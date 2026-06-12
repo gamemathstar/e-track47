@@ -325,4 +325,120 @@ class NotificationsTest extends TestCase
         $this->assertTrue($resolved->pluck('id')->contains((int) $sectorHead->id),
             'Sector Head of the sector should be among recipients');
     }
+
+    // --- unified approvalCopy() across v2 + web --------------------------
+
+    public function test_approval_copy_produces_unified_stage_specific_wording(): void
+    {
+        $ctx = ['kpiTitle' => 'Maternal Mortality', 'sectorName' => 'Health'];
+
+        [$t1, $b1] = NotificationDispatcher::approvalCopy(NotificationDispatcher::STAGE_SUBMITTED, $ctx);
+        $this->assertSame('Submission awaiting your approval', $t1);
+        $this->assertStringContainsString('Data Admin submitted "Maternal Mortality" (Health)', $b1);
+
+        [$t2, $b2] = NotificationDispatcher::approvalCopy(NotificationDispatcher::STAGE_SECTOR_HEAD_ACCEPTED, $ctx);
+        $this->assertSame('Submission awaiting your verification', $t2);
+        $this->assertStringContainsString('Sector Head approved "Maternal Mortality" (Health)', $b2);
+
+        [$t3, $b3] = NotificationDispatcher::approvalCopy(NotificationDispatcher::STAGE_FACILITATOR_ACCEPTED, $ctx);
+        $this->assertSame('Submission awaiting final approval', $t3);
+        $this->assertStringContainsString('Facilitator verified "Maternal Mortality" (Health)', $b3);
+
+        [$t4, $b4] = NotificationDispatcher::approvalCopy(NotificationDispatcher::STAGE_COORDINATOR_ACCEPTED, $ctx);
+        $this->assertSame('Submission confirmed', $t4);
+        $this->assertStringContainsString('Coordinator finalised "Maternal Mortality" (Health)', $b4);
+
+        [$t5, $b5] = NotificationDispatcher::approvalCopy(
+            NotificationDispatcher::STAGE_REJECTED,
+            array_merge($ctx, ['rejectingRole' => 'Sector Head', 'rejectionReason' => 'Missing supporting data']),
+        );
+        $this->assertSame('Submission needs revision', $t5);
+        $this->assertStringContainsString('Sector Head rejected "Maternal Mortality" (Health): Missing supporting data', $b5);
+        $this->assertStringContainsString('Review and resubmit', $b5);
+    }
+
+    public function test_approval_copy_rejection_omits_reason_when_blank(): void
+    {
+        [, $body] = NotificationDispatcher::approvalCopy(
+            NotificationDispatcher::STAGE_REJECTED,
+            ['kpiTitle' => 'X', 'sectorName' => 'Y', 'rejectingRole' => 'Facilitator'],
+        );
+
+        $this->assertStringNotContainsString(': ', $body); // no colon separator when no reason
+        $this->assertStringContainsString('Facilitator rejected "X" (Y). Review and resubmit.', $body);
+    }
+
+    public function test_approval_copy_rejection_truncates_long_reason(): void
+    {
+        $longReason = str_repeat('really long rejection reason ', 20); // ~580 chars
+
+        [, $body] = NotificationDispatcher::approvalCopy(
+            NotificationDispatcher::STAGE_REJECTED,
+            ['kpiTitle' => 'X', 'sectorName' => 'Y', 'rejectingRole' => 'Coordinator', 'rejectionReason' => $longReason],
+        );
+
+        $this->assertStringContainsString('…', $body, 'overlong reason should be truncated with an ellipsis');
+        $this->assertLessThan(280, mb_strlen($body), 'rejected body should stay under push-friendly length');
+    }
+
+    // --- web-flow delegation: legacy helpers route through the dispatcher ---
+
+    public function test_legacy_notify_sector_head_for_approval_writes_inbox_via_dispatcher(): void
+    {
+        Bus::fake([\App\Jobs\SendFcmJob::class]);
+
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        $sectorHead = $this->makeSectorHead($sector);
+        DeviceToken::create([
+            'user_id' => $sectorHead->id,
+            'token' => str_repeat('h', 64),
+            'platform' => 'android',
+        ]);
+
+        $kpi = $this->makeKpi($this->makeDeliverable($this->makeCommitment($sector)));
+        $tracking = $this->makeTracking($kpi);
+        $tracking->load('kpi.deliverable.commitment');
+
+        // Simulate web context — Auth::user() is the Data Admin submitting.
+        $dataAdmin = $this->makeDataAdmin($sector);
+        $this->actingAs($dataAdmin);
+
+        \App\Models\Notification::notifySectorHeadForApproval($tracking);
+
+        // Inbox row written with the unified title from approvalCopy().
+        $inbox = \App\Models\Notification::where('user_id', $sectorHead->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('Submission awaiting your approval', $inbox->title);
+        $this->assertSame('submission', $inbox->type);
+
+        // FCM push enqueued for the SH device — the legacy helper now reaches
+        // the live HTTP v1 transport via the dispatcher.
+        Bus::assertDispatched(\App\Jobs\SendFcmJob::class);
+    }
+
+    public function test_legacy_helpers_no_longer_write_self_confirmation_rows(): void
+    {
+        // Previously each helper wrote two rows: one for the next-role
+        // recipient + one back to the actor ("Your submission was sent to …").
+        // The actor row is gone in the unified flow.
+        Bus::fake([\App\Jobs\SendFcmJob::class]);
+
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        $sectorHead = $this->makeSectorHead($sector);
+        $dataAdmin = $this->makeDataAdmin($sector);
+
+        $kpi = $this->makeKpi($this->makeDeliverable($this->makeCommitment($sector)));
+        $tracking = $this->makeTracking($kpi);
+        $tracking->load('kpi.deliverable.commitment');
+
+        $this->actingAs($dataAdmin);
+        \App\Models\Notification::notifySectorHeadForApproval($tracking);
+
+        // Sector head gets the inbox row…
+        $this->assertSame(1, \App\Models\Notification::where('user_id', $sectorHead->id)->count());
+        // …but the actor (Data Admin) gets NO self-confirmation row.
+        $this->assertSame(0, \App\Models\Notification::where('user_id', $dataAdmin->id)->count());
+    }
 }

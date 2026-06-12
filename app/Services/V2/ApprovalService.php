@@ -300,7 +300,7 @@ class ApprovalService
 
         $params['decision'] === 'accept'
             ? $this->notifyAccept($t, $role, $user)
-            : $this->notifyReject($t, $role, $user);
+            : $this->notifyReject($t, $role, $user, $params);
     }
 
     /**
@@ -886,31 +886,23 @@ class ApprovalService
      */
     private function notifyAccept(PerformanceTracking $t, string $role, User $actor): void
     {
-        $kpiTitle = (string) (optional($t->kpi)->kpi ?: 'a KPI');
-        $sectorName = (string) (optional($this->sectorOf($t))->sector_name ?: 'the sector');
+        $copyCtx = [
+            'kpiTitle' => (string) (optional($t->kpi)->kpi ?: 'a KPI'),
+            'sectorName' => (string) (optional($this->sectorOf($t))->sector_name ?: 'the sector'),
+        ];
 
-        [$recipients, $title, $body] = match ($role) {
-            'sector_head' => [
-                $this->notifier->facilitatorsForTracking($t),
-                'Submission ready for verification',
-                "Sector Head of {$sectorName} approved the submission for \"{$kpiTitle}\". It's awaiting your verification.",
-            ],
-            'facilitator' => [
-                $this->notifier->coordinators(),
-                'Submission ready for final approval',
-                "Facilitator verified the submission for \"{$kpiTitle}\" from {$sectorName}. It's awaiting your final approval.",
-            ],
-            'coordinator' => [
-                $this->notifier->dataAdminsForTracking($t),
-                'Submission confirmed',
-                "Your submission for \"{$kpiTitle}\" has been finalised by the Coordinator.",
-            ],
-            default => [collect(), '', ''],
+        [$recipients, $stage] = match ($role) {
+            'sector_head' => [$this->notifier->facilitatorsForTracking($t), NotificationDispatcher::STAGE_SECTOR_HEAD_ACCEPTED],
+            'facilitator' => [$this->notifier->coordinators(), NotificationDispatcher::STAGE_FACILITATOR_ACCEPTED],
+            'coordinator' => [$this->notifier->dataAdminsForTracking($t), NotificationDispatcher::STAGE_COORDINATOR_ACCEPTED],
+            default => [collect(), null],
         };
 
-        if ($recipients->isEmpty() || $title === '') {
+        if ($stage === null || $recipients->isEmpty()) {
             return;
         }
+
+        [$title, $body] = NotificationDispatcher::approvalCopy($stage, $copyCtx);
 
         $this->notifier->dispatch(
             $recipients,
@@ -928,28 +920,36 @@ class ApprovalService
 
     /**
      * Notify the data admin(s) of the sector when any reviewer rejects, so
-     * they can adjust and resubmit.
+     * they can adjust and resubmit. Rejection reason from the review params is
+     * surfaced inline in the body.
      */
-    private function notifyReject(PerformanceTracking $t, string $role, User $actor): void
+    private function notifyReject(PerformanceTracking $t, string $role, User $actor, array $params = []): void
     {
-        $kpiTitle = (string) (optional($t->kpi)->kpi ?: 'a KPI');
-        $roleLabel = match ($role) {
-            'sector_head' => 'Sector Head',
-            'facilitator' => 'Facilitator',
-            'coordinator' => 'Coordinator',
-            default => 'Reviewer',
-        };
-
         $recipients = $this->notifier->dataAdminsForTracking($t);
         if ($recipients->isEmpty()) {
             return;
         }
 
+        [$title, $body] = NotificationDispatcher::approvalCopy(
+            NotificationDispatcher::STAGE_REJECTED,
+            [
+                'kpiTitle' => (string) (optional($t->kpi)->kpi ?: 'a KPI'),
+                'sectorName' => (string) (optional($this->sectorOf($t))->sector_name ?: 'the sector'),
+                'rejectingRole' => match ($role) {
+                    'sector_head' => 'Sector Head',
+                    'facilitator' => 'Facilitator',
+                    'coordinator' => 'Coordinator',
+                    default => 'Reviewer',
+                },
+                'rejectionReason' => $params['rejectionReason'] ?? null,
+            ],
+        );
+
         $this->notifier->dispatch(
             $recipients,
             NotificationDispatcher::KIND_REJECTION,
-            'Submission needs your attention',
-            "{$roleLabel} rejected your submission for \"{$kpiTitle}\". Please review and resubmit.",
+            $title,
+            $body,
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $t->id,

@@ -131,11 +131,16 @@ class KpiTrackingService
         $sector = optional(optional(optional($kpi->deliverable)->commitment)->sector);
         $sectorName = (string) ($sector->sector_name ?? 'a sector');
 
+        [$title, $body] = NotificationDispatcher::approvalCopy(
+            NotificationDispatcher::STAGE_SUBMITTED,
+            ['kpiTitle' => $kpiTitle, 'sectorName' => $sectorName],
+        );
+
         $this->notifier->dispatch(
             $recipients,
             NotificationDispatcher::KIND_SUBMISSION,
-            'New submission awaiting your approval',
-            "Data Admin of {$sectorName} submitted performance for \"{$kpiTitle}\". Please review.",
+            $title,
+            $body,
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $tracking->id,

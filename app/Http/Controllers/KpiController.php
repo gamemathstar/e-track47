@@ -825,7 +825,9 @@ class KpiController extends Controller
         $tracking->save();
 
         try {
-            if ($validated['coordinator_decision'] === 'Reject') {
+            if ($validated['coordinator_decision'] === 'Accept') {
+                Notification::notifyDataAdminAfterCoordinatorConfirmation($tracking);
+            } else {
                 Notification::notifyDataAdminAfterCoordinatorRejection($tracking);
             }
         } catch (\Exception $e) {

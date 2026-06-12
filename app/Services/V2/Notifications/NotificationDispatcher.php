@@ -41,6 +41,64 @@ class NotificationDispatcher
     public const KIND_MENTION = 'mention';
     public const KIND_SYSTEM = 'system';
 
+    /** Approval-lifecycle stages (used by approvalCopy()). */
+    public const STAGE_SUBMITTED = 'submitted';
+    public const STAGE_SECTOR_HEAD_ACCEPTED = 'sector_head_accepted';
+    public const STAGE_FACILITATOR_ACCEPTED = 'facilitator_accepted';
+    public const STAGE_COORDINATOR_ACCEPTED = 'coordinator_accepted';
+    public const STAGE_REJECTED = 'rejected';
+
+    /**
+     * Single source of truth for inbox + push copy on the approval lifecycle.
+     * Both the v2 service path and the web's legacy Notification::* helpers
+     * call this so the same wording lands in the inbox regardless of which
+     * surface triggered the transition.
+     *
+     * Stages keep their copy intentionally short and parallel — title is a
+     * 3–5-word imperative, body is "{Actor} {verb} \"{kpi}\" ({sector}).
+     * {Next action}." A reject also gets the (trimmed) reason inline.
+     *
+     * @param  array{kpiTitle?:string,sectorName?:string,rejectingRole?:string,rejectionReason?:?string}  $ctx
+     * @return array{0:string,1:string} [title, body]
+     */
+    public static function approvalCopy(string $stage, array $ctx = []): array
+    {
+        $kpi = (string) ($ctx['kpiTitle'] ?? 'KPI');
+        $sector = (string) ($ctx['sectorName'] ?? 'sector');
+
+        return match ($stage) {
+            self::STAGE_SUBMITTED => [
+                'Submission awaiting your approval',
+                "Data Admin submitted \"{$kpi}\" ({$sector}). Review and approve.",
+            ],
+            self::STAGE_SECTOR_HEAD_ACCEPTED => [
+                'Submission awaiting your verification',
+                "Sector Head approved \"{$kpi}\" ({$sector}). Verify and confirm.",
+            ],
+            self::STAGE_FACILITATOR_ACCEPTED => [
+                'Submission awaiting final approval',
+                "Facilitator verified \"{$kpi}\" ({$sector}). Approve to finalise.",
+            ],
+            self::STAGE_COORDINATOR_ACCEPTED => [
+                'Submission confirmed',
+                "Coordinator finalised \"{$kpi}\" ({$sector}).",
+            ],
+            self::STAGE_REJECTED => (function () use ($kpi, $sector, $ctx) {
+                $role = (string) ($ctx['rejectingRole'] ?? 'Reviewer');
+                $reason = trim((string) ($ctx['rejectionReason'] ?? ''));
+                if ($reason !== '' && mb_strlen($reason) > 160) {
+                    $reason = mb_substr($reason, 0, 157).'…';
+                }
+                $reasonPart = $reason !== '' ? ": {$reason}" : '';
+                return [
+                    'Submission needs revision',
+                    "{$role} rejected \"{$kpi}\" ({$sector}){$reasonPart}. Review and resubmit.",
+                ];
+            })(),
+            default => ['Notification', 'You have a new update.'],
+        };
+    }
+
     /**
      * Fan one notification out to a set of recipients.
      *
