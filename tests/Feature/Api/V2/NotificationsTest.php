@@ -249,7 +249,7 @@ class NotificationsTest extends TestCase
             NotificationDispatcher::KIND_APPROVAL,
             'Test title',
             'Test body',
-            ['senderId' => 1, 'modelId' => 99, 'deepLinkRoute' => 'kpiDetail', 'deepLinkParams' => ['kpiId' => 'k1']],
+            ['senderId' => 1, 'modelId' => 99, 'deepLinkRoute' => 'kpiTrackingDetail', 'deepLinkParams' => ['kpiId' => 'k1']],
         );
 
         $inbox = Notification::where('user_id', $recipient->id)->first();
