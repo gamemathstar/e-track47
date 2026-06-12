@@ -8,6 +8,7 @@ use App\Models\Framework;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use App\Models\User;
+use App\Services\V2\Notifications\NotificationDispatcher;
 use App\Support\V2\Presenters\SectorPresenter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,10 @@ use Illuminate\Support\Facades\DB;
  */
 class DataEntryWindowService
 {
+    public function __construct(private readonly NotificationDispatcher $notifier)
+    {
+    }
+
     public function listWindows(User $user, ?int $year, ?string $quarterWire): array
     {
         $this->assert($user);
@@ -115,6 +120,15 @@ class DataEntryWindowService
                 'granted_by' => $user->id,
                 'granted_at' => now(),
             ]);
+
+        // Fan out override-granted notification to each sector's participants.
+        $rows = DataEntryAccess::with('sector')
+            ->where('year', $year)->where('quarter', $quarter)
+            ->whereIn('sector_id', $this->sectorIdsForYear($year))
+            ->get();
+        foreach ($rows as $r) {
+            $this->notifyOverrideGranted($r, $user);
+        }
     }
 
     public function open(User $user, string $sectorId): void
@@ -122,6 +136,8 @@ class DataEntryWindowService
         $row = $this->findOrCreateRow($user, $sectorId);
         $row->status = 'open';
         $row->save();
+
+        $this->notifyWindowOpened($row, $user);
     }
 
     public function lock(User $user, string $sectorId): void
@@ -142,6 +158,8 @@ class DataEntryWindowService
         $row->granted_by = $user->id;
         $row->granted_at = now();
         $row->save();
+
+        $this->notifyOverrideGranted($row, $user);
     }
 
     // --- helpers -------------------------------------------------------------
@@ -233,6 +251,48 @@ class DataEntryWindowService
             'quarterLabel' => 'Q'.$quarter.' '.$year,
             'deadlineLabel' => $deadline ? 'Due '.Carbon::parse($deadline)->format('j M') : '—',
         ];
+    }
+
+    // --- notification fan-out -----------------------------------------------
+
+    private function notifyWindowOpened(DataEntryAccess $row, User $actor): void
+    {
+        $this->dispatchWindowChange($row, $actor, NotificationDispatcher::STAGE_WINDOW_OPENED);
+    }
+
+    private function notifyOverrideGranted(DataEntryAccess $row, User $actor): void
+    {
+        $this->dispatchWindowChange($row, $actor, NotificationDispatcher::STAGE_WINDOW_OVERRIDE_GRANTED, [
+            'reason' => $row->override_reason,
+            'expiresAt' => $row->override_deadline ? Carbon::parse($row->override_deadline)->toIso8601String() : null,
+        ]);
+    }
+
+    private function dispatchWindowChange(DataEntryAccess $row, User $actor, string $stage, array $extraCtx = []): void
+    {
+        $recipients = $this->notifier->sectorParticipantsFor((int) $row->sector_id);
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $sectorName = (string) (optional($row->sector ?: Sector::find($row->sector_id))->sector_name ?: 'a sector');
+
+        [$title, $body] = NotificationDispatcher::windowCopy($stage, array_merge([
+            'sectorName' => $sectorName,
+            'quarter' => (int) $row->quarter,
+            'year' => (int) $row->year,
+        ], $extraCtx));
+
+        $this->notifier->dispatch(
+            $recipients,
+            NotificationDispatcher::KIND_DEADLINE,
+            $title,
+            $body,
+            [
+                'senderId' => (int) $actor->id,
+                'modelId' => (int) $row->id,
+            ],
+        );
     }
 
     private function submissionRate(int $year, int $quarter, $sectorIds = null): int

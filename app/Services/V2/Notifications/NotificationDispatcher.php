@@ -48,6 +48,10 @@ class NotificationDispatcher
     public const STAGE_COORDINATOR_ACCEPTED = 'coordinator_accepted';
     public const STAGE_REJECTED = 'rejected';
 
+    /** Data-entry window stages (used by windowCopy()). */
+    public const STAGE_WINDOW_OPENED = 'window_opened';
+    public const STAGE_WINDOW_OVERRIDE_GRANTED = 'window_override_granted';
+
     /**
      * Single source of truth for inbox + push copy on the approval lifecycle.
      * Both the v2 service path and the web's legacy Notification::* helpers
@@ -93,6 +97,44 @@ class NotificationDispatcher
                 return [
                     'Submission needs revision',
                     "{$role} rejected \"{$kpi}\" ({$sector}){$reasonPart}. Review and resubmit.",
+                ];
+            })(),
+            default => ['Notification', 'You have a new update.'],
+        };
+    }
+
+    /**
+     * Inbox + push copy for data-entry window changes (§11.7). Sent to all
+     * involved roles in the sector when the window opens or an override is
+     * granted — i.e. the moments where someone can now act on data entry.
+     *
+     * @param  array{sectorName?:string,quarter?:int,year?:int,reason?:?string,expiresAt?:?string}  $ctx
+     * @return array{0:string,1:string} [title, body]
+     */
+    public static function windowCopy(string $stage, array $ctx = []): array
+    {
+        $sector = (string) ($ctx['sectorName'] ?? 'the sector');
+        $quarter = (int) ($ctx['quarter'] ?? 0);
+        $year = (int) ($ctx['year'] ?? 0);
+        $period = $quarter && $year ? "Q{$quarter} {$year}" : ($quarter ? "Q{$quarter}" : ($year ? (string) $year : 'this period'));
+
+        return match ($stage) {
+            self::STAGE_WINDOW_OPENED => [
+                'Data entry window opened',
+                "Data entry is now open for {$sector} ({$period}). Submit your performance values before the window closes.",
+            ],
+            self::STAGE_WINDOW_OVERRIDE_GRANTED => (function () use ($sector, $period, $ctx) {
+                $expires = ! empty($ctx['expiresAt'])
+                    ? ' until '.\Carbon\Carbon::parse((string) $ctx['expiresAt'])->format('j M Y')
+                    : '';
+                $reason = trim((string) ($ctx['reason'] ?? ''));
+                if ($reason !== '' && mb_strlen($reason) > 140) {
+                    $reason = mb_substr($reason, 0, 137).'…';
+                }
+                $reasonPart = $reason !== '' ? " Reason: {$reason}." : '';
+                return [
+                    'Data entry override granted',
+                    "Data entry for {$sector} ({$period}) is open via override{$expires}.{$reasonPart} Submit your values now.",
                 ];
             })(),
             default => ['Notification', 'You have a new update.'],
@@ -328,5 +370,40 @@ class NotificationDispatcher
             $userIds[] = (int) $tracking->submitted_by;
         }
         return User::whereIn('id', array_unique($userIds))->get();
+    }
+
+    /**
+     * All "involved" users for a sector — Data Admin(s) + Sector Head +
+     * Facilitator(s) assigned to it. Coordinators are excluded; they are the
+     * actors who trigger window changes, not recipients of them.
+     *
+     * Each user appears at most once even if they wear two role hats for the
+     * same sector (rare but happens with deprecated/legacy rows).
+     *
+     * @return Collection<int, User>
+     */
+    public function sectorParticipantsFor(int|string $sectorId): Collection
+    {
+        $sectorId = (int) $sectorId;
+        if ($sectorId <= 0) {
+            return new Collection();
+        }
+
+        // Data Admins + Sector Head: direct entity_id match on user_roles.
+        $directIds = UserRole::whereIn('role', [UserRole::ROLE_DATA_ADMIN, UserRole::ROLE_SECTOR_HEAD])
+            ->where('entity_id', $sectorId)
+            ->where('role_status', 'Active')
+            ->pluck('user_id')->all();
+
+        // Facilitators: indirect via facilitator_sectors pivot.
+        $facRoleIds = FacilitatorSector::where('sector_id', $sectorId)
+            ->whereHas('userRole', fn ($q) => $q
+                ->where('role', UserRole::ROLE_FACILITATOR)
+                ->where('role_status', 'Active'))
+            ->pluck('user_role_id')->all();
+        $facIds = UserRole::whereIn('id', $facRoleIds)->pluck('user_id')->all();
+
+        $allIds = array_values(array_unique(array_merge($directIds, $facIds)));
+        return User::whereIn('id', $allIds)->get();
     }
 }

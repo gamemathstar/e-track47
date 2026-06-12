@@ -216,6 +216,76 @@ class Notification extends Model
         );
     }
 
+    // ------------------------------------------------------------------------
+    // Data-entry window helpers (§11.7). Web entry points for the same fan-out
+    // the v2 DataEntryWindowService does — same recipients, same copy, same
+    // dispatch path.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Notify the sector's involved roles (Data Admin + Sector Head +
+     * Facilitator(s)) that the data-entry window has been opened. Pass the
+     * DataEntryAccess row that was just transitioned to `open`.
+     */
+    public static function notifySectorParticipantsOnWindowOpen($access): void
+    {
+        self::dispatchWindowChange($access, NotificationDispatcher::STAGE_WINDOW_OPENED);
+    }
+
+    /**
+     * Notify the sector's involved roles that an override has been granted.
+     * Pass the DataEntryAccess row carrying the override metadata (reason +
+     * optional deadline).
+     */
+    public static function notifySectorParticipantsOnOverrideGranted($access): void
+    {
+        self::dispatchWindowChange($access, NotificationDispatcher::STAGE_WINDOW_OVERRIDE_GRANTED, [
+            'reason' => $access->override_reason ?? null,
+            'expiresAt' => $access->override_deadline
+                ? \Illuminate\Support\Carbon::parse($access->override_deadline)->toIso8601String()
+                : null,
+        ]);
+    }
+
+    /**
+     * Shared dispatch path for window-state changes (called by the two helpers
+     * above). Resolves participants via the dispatcher's sectorParticipantsFor,
+     * builds copy via NotificationDispatcher::windowCopy().
+     */
+    private static function dispatchWindowChange($access, string $stage, array $extraCtx = []): void
+    {
+        if (! $access || ! $access->sector_id) {
+            return;
+        }
+
+        $dispatcher = app(NotificationDispatcher::class);
+        $recipients = $dispatcher->sectorParticipantsFor((int) $access->sector_id);
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $sector = $access->sector ?? \App\Models\Sector::find($access->sector_id);
+        $sectorName = (string) ($sector?->sector_name ?: 'a sector');
+
+        [$title, $body] = NotificationDispatcher::windowCopy($stage, array_merge([
+            'sectorName' => $sectorName,
+            'quarter' => (int) ($access->quarter ?? 0),
+            'year' => (int) ($access->year ?? 0),
+        ], $extraCtx));
+
+        $actor = Auth::user();
+        $dispatcher->dispatch(
+            $recipients,
+            NotificationDispatcher::KIND_DEADLINE,
+            $title,
+            $body,
+            [
+                'senderId' => (int) ($actor?->id ?? 0),
+                'modelId' => (int) $access->id,
+            ],
+        );
+    }
+
     /**
      * Shared plumbing for every approval-lifecycle notify helper. Resolves
      * recipients via the supplied closure, builds the unified copy from

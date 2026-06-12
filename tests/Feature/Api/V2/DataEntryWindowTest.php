@@ -2,8 +2,13 @@
 
 namespace Tests\Feature\Api\V2;
 
+use App\Jobs\SendFcmJob;
 use App\Models\DataEntryAccess;
+use App\Models\DeviceToken;
+use App\Models\Notification;
+use App\Services\V2\Notifications\NotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Laravel\Passport\Passport;
 use Tests\Concerns\InteractsWithPdcuAuth;
 use Tests\TestCase;
@@ -150,6 +155,141 @@ class DataEntryWindowTest extends TestCase
     public function test_requires_auth(): void
     {
         $this->getJson('/api/v2/data-entry/windows')->assertStatus(401);
+    }
+
+    // --- window-change notifications -----------------------------------------
+
+    public function test_opening_window_notifies_sector_participants(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Health']);
+        $dataAdmin = $this->makeDataAdmin($sector);
+        $sectorHead = $this->makeSectorHead($sector);
+        $facilitator = $this->makeFacilitator($sector);
+
+        // Give each participant a device token so push jobs queue.
+        foreach ([$dataAdmin, $sectorHead, $facilitator] as $i => $u) {
+            DeviceToken::create([
+                'user_id' => $u->id,
+                'token' => str_repeat(chr(97 + $i), 64),
+                'platform' => 'android',
+            ]);
+        }
+
+        $coordinator = $this->makeUser([], 'Coordinator');
+        Passport::actingAs($coordinator, [], 'api');
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/open")->assertStatus(202);
+
+        // Each participant gets an inbox row.
+        foreach ([$dataAdmin, $sectorHead, $facilitator] as $u) {
+            $inbox = Notification::where('user_id', $u->id)->first();
+            $this->assertNotNull($inbox, "user {$u->id} should have an inbox row");
+            $this->assertSame('Data entry window opened', $inbox->title);
+            $this->assertSame('deadline', $inbox->type);
+            $this->assertStringContainsString('Health', $inbox->body);
+        }
+
+        // Coordinator (the actor) gets NO row — they triggered the action.
+        $this->assertSame(0, Notification::where('user_id', $coordinator->id)->count());
+
+        // One FCM job per device token (3).
+        Bus::assertDispatchedTimes(SendFcmJob::class, 3);
+    }
+
+    public function test_override_grant_notification_includes_reason_and_expiry(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw, ['sector_name' => 'Education']);
+        $dataAdmin = $this->makeDataAdmin($sector);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson("/api/v2/data-entry/windows/{$sector->id}/override", [
+            'reason' => 'Late submission approved by coordinator',
+            'expiresAt' => '2024-12-31T23:59:59.000',
+        ])->assertStatus(202);
+
+        $inbox = Notification::where('user_id', $dataAdmin->id)->first();
+        $this->assertNotNull($inbox);
+        $this->assertSame('Data entry override granted', $inbox->title);
+        $this->assertStringContainsString('Education', $inbox->body);
+        $this->assertStringContainsString('Late submission approved by coordinator', $inbox->body);
+        $this->assertStringContainsString('31 Dec 2024', $inbox->body);
+    }
+
+    public function test_unlock_all_fans_out_per_sector(): void
+    {
+        Bus::fake([SendFcmJob::class]);
+
+        $fw = $this->makeFramework(['year' => 2024]);
+        $sectorA = $this->makeSector($fw, ['sector_name' => 'A']);
+        $sectorB = $this->makeSector($fw, ['sector_name' => 'B']);
+        $daA = $this->makeDataAdmin($sectorA);
+        $daB = $this->makeDataAdmin($sectorB);
+
+        Passport::actingAs($this->makeUser([], 'Coordinator'), [], 'api');
+
+        $this->postJson('/api/v2/data-entry/windows/unlock-all', [
+            'reason' => 'Bulk reopen',
+            'year' => 2024, 'quarter' => 'q1',
+        ])->assertStatus(202);
+
+        // Each sector's data admin gets an inbox row mentioning their sector.
+        $rowA = Notification::where('user_id', $daA->id)->first();
+        $rowB = Notification::where('user_id', $daB->id)->first();
+        $this->assertNotNull($rowA);
+        $this->assertNotNull($rowB);
+        $this->assertStringContainsString('A', $rowA->body);
+        $this->assertStringContainsString('B', $rowB->body);
+        $this->assertSame('Data entry override granted', $rowA->title);
+    }
+
+    public function test_window_copy_produces_expected_strings(): void
+    {
+        [$t1, $b1] = NotificationDispatcher::windowCopy(
+            NotificationDispatcher::STAGE_WINDOW_OPENED,
+            ['sectorName' => 'Health', 'quarter' => 3, 'year' => 2024],
+        );
+        $this->assertSame('Data entry window opened', $t1);
+        $this->assertStringContainsString('Health (Q3 2024)', $b1);
+        $this->assertStringContainsString('Submit your performance values', $b1);
+
+        [$t2, $b2] = NotificationDispatcher::windowCopy(
+            NotificationDispatcher::STAGE_WINDOW_OVERRIDE_GRANTED,
+            [
+                'sectorName' => 'Health',
+                'quarter' => 3, 'year' => 2024,
+                'reason' => 'Late approval',
+                'expiresAt' => '2024-12-31T23:59:59Z',
+            ],
+        );
+        $this->assertSame('Data entry override granted', $t2);
+        $this->assertStringContainsString('open via override until 31 Dec 2024', $b2);
+        $this->assertStringContainsString('Reason: Late approval.', $b2);
+    }
+
+    public function test_sector_participants_excludes_coordinators(): void
+    {
+        $fw = $this->makeFramework();
+        $sector = $this->makeSector($fw);
+        $da = $this->makeDataAdmin($sector);
+        $sh = $this->makeSectorHead($sector);
+        $fac = $this->makeFacilitator($sector);
+        $coordinator = $this->makeUser([], 'Coordinator');
+
+        $resolved = app(NotificationDispatcher::class)->sectorParticipantsFor($sector->id);
+        $ids = $resolved->pluck('id')->all();
+
+        $this->assertContains((int) $da->id, $ids);
+        $this->assertContains((int) $sh->id, $ids);
+        $this->assertContains((int) $fac->id, $ids);
+        $this->assertNotContains((int) $coordinator->id, $ids,
+            'Coordinators are actors, not recipients of window notifications');
     }
 
     public function test_stats_scopes_to_the_year_framework_not_the_active_one(): void
