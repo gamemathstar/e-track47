@@ -122,10 +122,19 @@ class KpiTrackingService
      */
     private function notifySubmission(PerformanceTracking $tracking, Kpi $kpi, User $actor): void
     {
+        $sectorId = (int) (optional(optional($kpi->deliverable)->commitment)->sector_id ?? 0);
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'v2.kpi.submit',
+            'stage' => 'submitted',
+            'kpi_id' => (int) $kpi->id,
+            'sector_id' => $sectorId,
+            'tracking_id' => (int) $tracking->id,
+        ]);
+
+        // Don't short-circuit on empty recipients — let dispatch() log so we
+        // can see the no-recipients case in prod logs (it indicates an
+        // un-assigned sector head, not a bug in the dispatcher).
         $recipients = $this->notifier->sectorHeadsForTracking($tracking->load('kpi.deliverable.commitment'));
-        if ($recipients->isEmpty()) {
-            return;
-        }
 
         $kpiTitle = (string) ($kpi->kpi ?: 'a KPI');
         $sector = optional(optional(optional($kpi->deliverable)->commitment)->sector);

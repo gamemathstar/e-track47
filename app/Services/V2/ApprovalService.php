@@ -886,6 +886,14 @@ class ApprovalService
      */
     private function notifyAccept(PerformanceTracking $t, string $role, User $actor): void
     {
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'v2.approval.accept',
+            'role' => $role,
+            'tracking_id' => (int) $t->id,
+            'kpi_id' => (int) (optional($t->kpi)->id ?? 0),
+            'sector_id' => (int) (optional($this->sectorOf($t))->id ?? 0),
+        ]);
+
         $copyCtx = [
             'kpiTitle' => (string) (optional($t->kpi)->kpi ?: 'a KPI'),
             'sectorName' => (string) (optional($this->sectorOf($t))->sector_name ?: 'the sector'),
@@ -898,10 +906,16 @@ class ApprovalService
             default => [collect(), null],
         };
 
-        if ($stage === null || $recipients->isEmpty()) {
+        if ($stage === null) {
+            \Illuminate\Support\Facades\Log::warning('notification.attempt unknown_role', [
+                'source' => 'v2.approval.accept',
+                'role' => $role,
+            ]);
             return;
         }
 
+        // Don't short-circuit on empty recipients — dispatch() will log so we
+        // can see the no-recipients case directly in prod.
         [$title, $body] = NotificationDispatcher::approvalCopy($stage, $copyCtx);
 
         $this->notifier->dispatch(
@@ -925,10 +939,15 @@ class ApprovalService
      */
     private function notifyReject(PerformanceTracking $t, string $role, User $actor, array $params = []): void
     {
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'v2.approval.reject',
+            'role' => $role,
+            'tracking_id' => (int) $t->id,
+            'kpi_id' => (int) (optional($t->kpi)->id ?? 0),
+            'sector_id' => (int) (optional($this->sectorOf($t))->id ?? 0),
+        ]);
+
         $recipients = $this->notifier->dataAdminsForTracking($t);
-        if ($recipients->isEmpty()) {
-            return;
-        }
 
         [$title, $body] = NotificationDispatcher::approvalCopy(
             NotificationDispatcher::STAGE_REJECTED,

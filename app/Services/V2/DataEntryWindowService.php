@@ -287,10 +287,16 @@ class DataEntryWindowService
 
     private function dispatchWindowChange(DataEntryAccess $row, User $actor, string $stage, array $extraCtx = []): void
     {
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'v2.window.'.$stage,
+            'stage' => $stage,
+            'sector_id' => (int) $row->sector_id,
+            'access_id' => (int) $row->id,
+            'year' => (int) $row->year,
+            'quarter' => (int) $row->quarter,
+        ]);
+
         $recipients = $this->notifier->sectorParticipantsFor((int) $row->sector_id);
-        if ($recipients->isEmpty()) {
-            return;
-        }
 
         $sectorName = (string) (optional($row->sector ?: Sector::find($row->sector_id))->sector_name ?: 'a sector');
 

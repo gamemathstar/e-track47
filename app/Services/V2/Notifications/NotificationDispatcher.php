@@ -163,7 +163,13 @@ class NotificationDispatcher
         $hasDeepLinkRoute = Schema::hasColumn('notifications', 'deep_link_route');
         $hasDeepLinkParams = Schema::hasColumn('notifications', 'deep_link_params');
 
+        // Entry log — every call to dispatch produces this line, so we can
+        // tell whether the upstream caller actually invoked us. If you see no
+        // `notification.dispatch attempt` for an event, the issue is upstream
+        // of this method (caller early-returned, or wasn't called at all).
+        $recipientCount = 0;
         foreach ($recipients as $recipient) {
+            $recipientCount++;
             try {
                 $this->dispatchOne($recipient, $kind, $title, $body, [
                     'senderId' => $senderId,
@@ -179,6 +185,19 @@ class NotificationDispatcher
                 // originating mutation. Just log + continue with the rest.
                 report($e);
             }
+        }
+
+        Log::info('notification.dispatch attempt', [
+            'kind' => $kind,
+            'recipient_count' => $recipientCount,
+            'model_id' => $modelId,
+        ]);
+        if ($recipientCount === 0) {
+            Log::warning('notification.dispatch no_recipients', [
+                'kind' => $kind,
+                'model_id' => $modelId,
+                'hint' => 'caller resolved an empty recipient set — verify role assignments',
+            ]);
         }
     }
 

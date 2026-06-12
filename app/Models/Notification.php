@@ -264,15 +264,23 @@ class Notification extends Model
      */
     private static function dispatchWindowChange($access, string $stage, array $extraCtx = []): void
     {
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'web.window.'.$stage,
+            'stage' => $stage,
+            'access_id' => (int) ($access->id ?? 0),
+            'sector_id' => (int) ($access->sector_id ?? 0),
+        ]);
+
         if (! $access || ! $access->sector_id) {
+            \Illuminate\Support\Facades\Log::warning('notification.attempt aborted', [
+                'source' => 'web.window.'.$stage,
+                'reason' => 'missing_access_or_sector',
+            ]);
             return;
         }
 
         $dispatcher = app(NotificationDispatcher::class);
         $recipients = $dispatcher->sectorParticipantsFor((int) $access->sector_id);
-        if ($recipients->isEmpty()) {
-            return;
-        }
 
         $sector = $access->sector ?? \App\Models\Sector::find($access->sector_id);
         $sectorName = (string) ($sector?->sector_name ?: 'a sector');
@@ -312,19 +320,34 @@ class Notification extends Model
      */
     private static function dispatchApprovalLifecycle($tracking, string $stage, string $kind, callable $recipientResolver, array $extraCopyCtx = []): void
     {
+        \Illuminate\Support\Facades\Log::info('notification.attempt', [
+            'source' => 'web.approval.'.$stage,
+            'stage' => $stage,
+            'kind' => $kind,
+            'tracking_id' => (int) ($tracking->id ?? 0),
+            'kpi_id' => (int) ($tracking->kpi->id ?? 0),
+        ]);
+
         if (! $tracking->kpi || ! $tracking->kpi->deliverable || ! $tracking->kpi->deliverable->commitment) {
+            \Illuminate\Support\Facades\Log::warning('notification.attempt aborted', [
+                'source' => 'web.approval.'.$stage,
+                'reason' => 'kpi_or_deliverable_or_commitment_missing',
+                'tracking_id' => (int) ($tracking->id ?? 0),
+            ]);
             return;
         }
         $sector = $tracking->kpi->deliverable->commitment->sector;
         if (! $sector) {
+            \Illuminate\Support\Facades\Log::warning('notification.attempt aborted', [
+                'source' => 'web.approval.'.$stage,
+                'reason' => 'sector_missing',
+                'tracking_id' => (int) ($tracking->id ?? 0),
+            ]);
             return;
         }
 
         $dispatcher = app(NotificationDispatcher::class);
         $recipients = $recipientResolver($dispatcher);
-        if (empty($recipients) || (is_object($recipients) && method_exists($recipients, 'isEmpty') && $recipients->isEmpty())) {
-            return;
-        }
 
         $copyCtx = array_merge([
             'kpiTitle' => (string) ($tracking->kpi->kpi ?: 'a KPI'),
