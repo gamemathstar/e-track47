@@ -926,7 +926,7 @@ class ApprovalService
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $t->id,
-                'deepLinkRoute' => 'kpiTrackingDetail',
+                'deepLinkRoute' => NotificationDispatcher::approvalDeepLinkRoute($stage),
                 'deepLinkParams' => ['kpiId' => (string) (optional($t->kpi)->id ?: '')],
             ],
         );
@@ -972,7 +972,7 @@ class ApprovalService
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $t->id,
-                'deepLinkRoute' => 'kpiTrackingDetail',
+                'deepLinkRoute' => NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_REJECTED),
                 'deepLinkParams' => ['kpiId' => (string) (optional($t->kpi)->id ?: '')],
             ],
         );

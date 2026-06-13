@@ -153,7 +153,7 @@ class KpiTrackingService
             [
                 'senderId' => (int) $actor->id,
                 'modelId' => (int) $tracking->id,
-                'deepLinkRoute' => 'kpiTrackingDetail',
+                'deepLinkRoute' => NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_SUBMITTED),
                 'deepLinkParams' => ['kpiId' => (string) $kpi->id],
             ],
         );

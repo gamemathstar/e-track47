@@ -813,6 +813,15 @@ class ApprovalsTest extends TestCase
         $this->assertNotNull($inbox, 'facilitator should have an inbox row');
         $this->assertSame('approval', $inbox->type);
 
+        // Action-required push: deep-links to the review sheet, not the
+        // tracking detail. Recipient's next action is Accept/Reject.
+        $this->assertSame('kpiReviewSheet', $inbox->deep_link_route);
+        $params = is_string($inbox->deep_link_params)
+            ? json_decode($inbox->deep_link_params, true)
+            : $inbox->deep_link_params;
+        $this->assertArrayHasKey('kpiId', $params);
+        $this->assertArrayNotHasKey('year', $params, 'sheet defaults year — backend must not include it');
+
         // FCM push enqueued for the facilitator's device.
         \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendFcmJob::class);
     }
@@ -839,6 +848,10 @@ class ApprovalsTest extends TestCase
         $inbox = \App\Models\Notification::where('user_id', $dataAdmin->id)->first();
         $this->assertNotNull($inbox);
         $this->assertSame('rejection', $inbox->type);
+
+        // FYI push for the Data Admin — keep on tracking detail, not review sheet.
+        // (They revise from there; they don't Accept/Reject their own submission.)
+        $this->assertSame('kpiTrackingDetail', $inbox->deep_link_route);
 
         \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendFcmJob::class);
     }

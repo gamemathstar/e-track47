@@ -365,7 +365,7 @@ class Notification extends Model
             [
                 'senderId' => (int) ($actor?->id ?? 0),
                 'modelId' => (int) $tracking->id,
-                'deepLinkRoute' => 'kpiTrackingDetail',
+                'deepLinkRoute' => NotificationDispatcher::approvalDeepLinkRoute($stage),
                 'deepLinkParams' => ['kpiId' => (string) ($tracking->kpi->id ?? '')],
             ],
         );

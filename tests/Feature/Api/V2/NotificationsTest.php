@@ -328,6 +328,27 @@ class NotificationsTest extends TestCase
 
     // --- unified approvalCopy() across v2 + web --------------------------
 
+    public function test_approval_deep_link_route_per_stage(): void
+    {
+        // Action-required stages (next reviewer needs to Accept/Reject).
+        $this->assertSame('kpiReviewSheet',
+            NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_SUBMITTED));
+        $this->assertSame('kpiReviewSheet',
+            NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_SECTOR_HEAD_ACCEPTED));
+        $this->assertSame('kpiReviewSheet',
+            NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_FACILITATOR_ACCEPTED));
+
+        // FYI stages (recipient is the Data Admin getting an outcome).
+        $this->assertSame('kpiTrackingDetail',
+            NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_COORDINATOR_ACCEPTED));
+        $this->assertSame('kpiTrackingDetail',
+            NotificationDispatcher::approvalDeepLinkRoute(NotificationDispatcher::STAGE_REJECTED));
+
+        // Unknown stage falls back safely to the tracking detail.
+        $this->assertSame('kpiTrackingDetail',
+            NotificationDispatcher::approvalDeepLinkRoute('bogus_stage'));
+    }
+
     public function test_approval_copy_produces_unified_stage_specific_wording(): void
     {
         $ctx = ['kpiTitle' => 'Maternal Mortality', 'sectorName' => 'Health'];

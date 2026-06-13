@@ -55,6 +55,34 @@ class NotificationDispatcher
     public const STAGE_WINDOW_LOCKED = 'window_locked';
 
     /**
+     * Deep-link route name for an approval-lifecycle push, given the stage.
+     *
+     * Stages where the recipient's NEXT action is an Accept/Reject decision
+     * (i.e. they're the next reviewer in the chain) land on the review sheet:
+     *
+     *   submitted               → Sector Head reviews
+     *   sector_head_accepted    → Facilitator verifies
+     *   facilitator_accepted    → Coordinator finalises
+     *
+     * Stages where the push is purely informational for the recipient
+     * (the Data Admin learning the outcome) land on the tracking detail:
+     *
+     *   coordinator_accepted    → "your submission was confirmed"
+     *   rejected                → "your submission needs revision"
+     */
+    public static function approvalDeepLinkRoute(string $stage): string
+    {
+        return match ($stage) {
+            self::STAGE_SUBMITTED,
+            self::STAGE_SECTOR_HEAD_ACCEPTED,
+            self::STAGE_FACILITATOR_ACCEPTED => 'kpiReviewSheet',
+            self::STAGE_COORDINATOR_ACCEPTED,
+            self::STAGE_REJECTED => 'kpiTrackingDetail',
+            default => 'kpiTrackingDetail',
+        };
+    }
+
+    /**
      * Single source of truth for inbox + push copy on the approval lifecycle.
      * Both the v2 service path and the web's legacy Notification::* helpers
      * call this so the same wording lands in the inbox regardless of which
