@@ -42,18 +42,25 @@
              the per-item icons inside the dropdown. --}}
         @php($topbarNotifications = $topbarNotifications ?? ['unreadCount' => 0, 'unreadLabel' => '0', 'recent' => [], 'indexUrl' => route('notifications.index'), 'markAllReadUrl' => route('notifications.mark-all-read')])
         <div class="intro-x dropdown mr-4 sm:mr-6 relative">
-            <div class="dropdown-toggle notification {{ $topbarNotifications['unreadCount'] > 0 ? 'notification--bullet' : '' }} cursor-pointer relative inline-flex items-center justify-center w-9 h-9 rounded-full" role="button" aria-expanded="false" data-tw-toggle="dropdown" aria-label="Notifications">
-                {{-- Lucide "bell" path inlined --}}
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+            <div class="dropdown-toggle cursor-pointer relative inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                 role="button" aria-expanded="false" data-tw-toggle="dropdown" aria-label="Notifications"
+                 style="color: #ffffff;">
+                {{-- Lucide "bell" inlined. stroke="currentColor" inherits from the
+                     wrapper above (text-white + inline style fallback) so the
+                     icon stays bright-white on any topbar background colour. --}}
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     class="notification__icon text-slate-600 dark:text-slate-300" aria-hidden="true">
+                     aria-hidden="true">
                     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
                     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
                 </svg>
                 @if ($topbarNotifications['unreadCount'] > 0)
-                    {{-- Explicit unread badge — fallback for the .notification--bullet
-                         class in case the host page's CSS purged it. --}}
-                    <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center text-[10px] font-bold leading-none text-white bg-danger rounded-full border-2 border-white">
+                    {{-- Numeric unread badge. Inline style on background +
+                         text colour for hard guarantee — Tailwind utility
+                         classes can be purged by an injected CDN config
+                         (the dashboard does this), inline style cannot. --}}
+                    <span class="absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] px-1.5 inline-flex items-center justify-center text-[11px] font-bold leading-none rounded-full border-2"
+                          style="background-color: #ef4444; color: #ffffff; border-color: #ffffff;">
                         {{ $topbarNotifications['unreadLabel'] }}
                     </span>
                     <span class="sr-only">{{ $topbarNotifications['unreadCount'] }} unread</span>
