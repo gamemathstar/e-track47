@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Services\V2\Notifications\FcmTransport;
 use App\Services\V2\Notifications\KreaitFcmTransport;
 use App\Services\V2\Notifications\NullFcmTransport;
+use App\View\Composers\TopbarNotificationsComposer;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -53,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Make the topbar notification bell data available on every render
+        // of the topbar partial — no controller boilerplate needed.
+        View::composer('commons.menu.topbar', TopbarNotificationsComposer::class);
     }
 }

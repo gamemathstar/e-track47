@@ -47,6 +47,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/statistics', [DashboardController::class, 'statistics'])->name('dashboard.statistics');
     Route::get('/home', [AuthLoginController::class, 'logout'])->name('lg');
 
+    // Notifications (web admin inbox — symmetric with mobile §11.14)
+    Route::get('notifications', [\App\Http\Controllers\NotificationsController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/{id}/follow', [\App\Http\Controllers\NotificationsController::class, 'follow'])->name('notifications.follow');
+    Route::post('notifications/mark-all-read', [\App\Http\Controllers\NotificationsController::class, 'markAllRead'])->name('notifications.mark-all-read');
+
 // User Resource
     Route::get('users', [UserController::class, 'index'])->name("users.index");
     Route::get('delivery/tracking/awaiting/', [UserController::class, 'awaitingVerification'])->name("delivery.awaiting.verification");

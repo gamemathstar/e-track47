@@ -90,6 +90,17 @@ class NotificationsService
 
     public function markRead(User $user, string $id): void
     {
+        $this->markReadAndReturn($user, $id);
+    }
+
+    /**
+     * Same as markRead() but returns the (now-Read) Notification model so
+     * the caller can inspect attached metadata (e.g. `deep_link_route`,
+     * `deep_link_params`) without a second DB roundtrip. Used by the web
+     * tap-through handler.
+     */
+    public function markReadAndReturn(User $user, string $id): Notification
+    {
         $n = Notification::find($id);
         if (! $n) {
             throw ApiException::notFound('Notification not found.');
@@ -100,6 +111,8 @@ class NotificationsService
 
         $n->status = 'Read';
         $n->save();
+
+        return $n;
     }
 
     /**
