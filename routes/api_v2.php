@@ -157,10 +157,17 @@ Route::middleware('auth:api')->group(function () {
 });
 
 // --- 11.13 Gallery -----------------------------------------------------------
-Route::middleware('auth:api')->prefix('gallery')->group(function () {
-    Route::get('/management', [GalleryController::class, 'management']);
+// Public-capable reads: /public and item detail are accessible to signed-out
+// callers (no Authorization header required). When a bearer IS sent, the
+// auth.optional middleware still populates the user — so list/detail can
+// surface a "you liked this" badge or similar without a separate endpoint.
+// Management list + upload remain auth-required.
+Route::middleware('auth.optional')->prefix('gallery')->group(function () {
     Route::get('/public', [GalleryController::class, 'publicList']);
     Route::get('/items/{id}', [GalleryController::class, 'show']);
+});
+Route::middleware('auth:api')->prefix('gallery')->group(function () {
+    Route::get('/management', [GalleryController::class, 'management']);
     Route::post('/items', [GalleryController::class, 'upload']);
 });
 

@@ -32,7 +32,10 @@ class GalleryController extends BaseController
 
     public function show(Request $request, string $id): array
     {
-        return $this->gallery->detail($id);
+        // $request->user() is null for anonymous callers (auth.optional
+        // middleware on this route — see routes/api_v2.php §11.13). The
+        // service uses that to gate non-public items to System Admin only.
+        return $this->gallery->detail($id, $request->user());
     }
 
     public function upload(UploadGalleryRequest $request)

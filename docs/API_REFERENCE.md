@@ -3879,7 +3879,7 @@ The client filters by `tab` server-side; an empty array is valid.
 | --- | --- |
 | **Purpose** | Read-only public gallery tiles, scoped by filter chip. |
 | **Method / Path** | `GET /gallery/public` |
-| **Auth** | Bearer required |
+| **Auth** | **Optional** — sent **with or without** an `Authorization: Bearer` header. Signed-out callers are accepted (no `401`); signed-in callers are accepted too. Server response is identical either way — only items where `status = 'active'` and `is_public = true` are returned. |
 | **Path params** | none |
 | **Query params** | `filter` — required; one of `all` \| `roads` \| `healthcare` \| `education` (the [`PublicGalleryFilter`](#gallery-enums) wire value; always sent) |
 
@@ -3893,7 +3893,7 @@ The client filters by `tab` server-side; an empty array is valid.
 ]
 ```
 
-**Status codes:** `200` · `401` · `403`.
+**Status codes:** `200`.
 
 <a name="gallery-item"></a>**`GalleryItemModel`** (shared by both list endpoints)
 
@@ -3919,7 +3919,7 @@ and correctly typed, or the whole list item fails to parse.
 | --- | --- |
 | **Purpose** | Full detail page for one gallery item (hero + stat grid + read-only comments). |
 | **Method / Path** | `GET /gallery/items/{id}` |
-| **Auth** | Bearer required |
+| **Auth** | **Optional** — same rules as §11.13.2. Anonymous callers receive `200` for items where `status = 'active'` and `is_public = true`. Items that don't match (private, archived, or non-existent) return **`404 not_found`** — uniform response so the existence of private items isn't leaked. System Admins receive `200` for any item regardless of public/active flags (so the management list's detail links keep working for archived/unpublished entries). |
 | **Path params** | `id` — gallery item id |
 | **Query params** | none |
 
@@ -3982,7 +3982,7 @@ and correctly typed, or the whole list item fails to parse.
 | `timeLabel` | string | ✅ | pre-formatted |
 | `body` | string | ✅ | |
 
-**Status codes:** `200` · `401` · `404` (unknown id).
+**Status codes:** `200` · `404` (unknown id, OR private/archived for anonymous callers — see Auth row above).
 
 #### 11.13.4 Upload item (multipart)
 

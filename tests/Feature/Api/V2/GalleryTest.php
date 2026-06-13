@@ -122,4 +122,65 @@ class GalleryTest extends TestCase
 
         $this->getJson('/api/v2/gallery/items/999999')->assertStatus(404)->assertJsonPath('code', 'not_found');
     }
+
+    // --- public-capable access (no Authorization header) -------------------
+
+    public function test_public_list_works_without_authorization_header(): void
+    {
+        $this->seedItem(['title' => 'Road', 'category' => 'infrastructure']);
+        $this->seedItem(['title' => 'Hidden', 'category' => 'infrastructure', 'is_public' => false]);
+
+        // No Passport::actingAs — signed-out caller, no bearer.
+        $this->getJson('/api/v2/gallery/public?filter=roads')
+            ->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.title', 'Road');
+    }
+
+    public function test_public_detail_works_without_authorization_header(): void
+    {
+        $g = $this->seedItem(['title' => 'Public Bridge', 'is_public' => true]);
+
+        $this->getJson("/api/v2/gallery/items/{$g->id}")
+            ->assertOk()
+            ->assertJsonPath('title', 'Public Bridge');
+    }
+
+    public function test_private_item_returns_404_to_anonymous(): void
+    {
+        $private = $this->seedItem(['title' => 'Internal Only', 'is_public' => false]);
+
+        // No existence leak — 404, not 403.
+        $this->getJson("/api/v2/gallery/items/{$private->id}")
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_archived_item_returns_404_to_anonymous_even_if_marked_public(): void
+    {
+        $archived = $this->seedItem(['title' => 'Old', 'status' => 'inactive', 'is_public' => true]);
+
+        $this->getJson("/api/v2/gallery/items/{$archived->id}")
+            ->assertStatus(404)->assertJsonPath('code', 'not_found');
+    }
+
+    public function test_system_admin_can_view_private_or_archived_item(): void
+    {
+        $private = $this->seedItem(['title' => 'Internal Only', 'is_public' => false]);
+        $archived = $this->seedItem(['title' => 'Old', 'status' => 'inactive', 'is_public' => true]);
+
+        Passport::actingAs($this->makeUser(['target_entity' => 'System'], 'System Admin'), [], 'api');
+
+        $this->getJson("/api/v2/gallery/items/{$private->id}")->assertOk()->assertJsonPath('title', 'Internal Only');
+        $this->getJson("/api/v2/gallery/items/{$archived->id}")->assertOk()->assertJsonPath('title', 'Old');
+    }
+
+    public function test_management_still_requires_bearer(): void
+    {
+        // Auth-required endpoints stay 401 for anonymous — only public reads
+        // were opened up.
+        $this->getJson('/api/v2/gallery/management?tab=all')->assertStatus(401);
+        $this->postJson('/api/v2/gallery/items', [
+            'title' => 'X', 'description' => 'X', 'category' => 'health',
+            'displayOrder' => 0, 'isPublic' => true,
+        ])->assertStatus(401);
+    }
 }

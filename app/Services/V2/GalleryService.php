@@ -57,11 +57,27 @@ class GalleryService
         return $query->get()->map(fn (Gallery $g) => $this->item($g))->all();
     }
 
-    public function detail(string $id): array
+    /**
+     * Item detail. Anonymous (or non-admin) callers may only fetch items that
+     * are both published (`is_public = true`) and active. Non-matching ids
+     * return 404 rather than 403 so the existence of private items isn't
+     * leaked. System Admins always see any item (so the management list's
+     * detail-link works for archived / unpublished entries too).
+     */
+    public function detail(string $id, ?User $user = null): array
     {
         $g = Gallery::find($id);
         if (! $g) {
             throw ApiException::notFound('Gallery item not found.');
+        }
+
+        $isAdmin = $user && $user->isSystemAdmin();
+        if (! $isAdmin) {
+            $isActive = (string) ($g->status ?? '') === 'active';
+            $isPublic = ! $this->hasIsPublicColumn() || (bool) ($g->is_public ?? false);
+            if (! $isActive || ! $isPublic) {
+                throw ApiException::notFound('Gallery item not found.');
+            }
         }
 
         $comments = GalleryComment::where('gallery_id', $g->id)->orderByDesc('created_at')->limit(10)->get();
