@@ -33,12 +33,29 @@
 
         </div>
         <!-- END: Search -->
-        <!-- BEGIN: Notifications -->
+        {{-- BEGIN: Notifications --
+             Icons are inlined as SVG (not `data-lucide`) so the bell ALWAYS
+             renders regardless of whether Lucide's JS has finished initialising
+             on the host page — which was the root cause of the bell being
+             invisible on some pages (any page with a JS error before
+             lucide.createIcons() ran left the <i> empty). Same fix applied to
+             the per-item icons inside the dropdown. --}}
         @php($topbarNotifications = $topbarNotifications ?? ['unreadCount' => 0, 'unreadLabel' => '0', 'recent' => [], 'indexUrl' => route('notifications.index'), 'markAllReadUrl' => route('notifications.mark-all-read')])
-        <div class="intro-x dropdown mr-4 sm:mr-6">
-            <div class="dropdown-toggle notification {{ $topbarNotifications['unreadCount'] > 0 ? 'notification--bullet' : '' }} cursor-pointer" role="button" aria-expanded="false" data-tw-toggle="dropdown" aria-label="Notifications">
-                <i data-lucide="bell" class="notification__icon dark:text-slate-500"></i>
+        <div class="intro-x dropdown mr-4 sm:mr-6 relative">
+            <div class="dropdown-toggle notification {{ $topbarNotifications['unreadCount'] > 0 ? 'notification--bullet' : '' }} cursor-pointer relative inline-flex items-center justify-center w-9 h-9 rounded-full" role="button" aria-expanded="false" data-tw-toggle="dropdown" aria-label="Notifications">
+                {{-- Lucide "bell" path inlined --}}
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="notification__icon text-slate-600 dark:text-slate-300" aria-hidden="true">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
+                </svg>
                 @if ($topbarNotifications['unreadCount'] > 0)
+                    {{-- Explicit unread badge — fallback for the .notification--bullet
+                         class in case the host page's CSS purged it. --}}
+                    <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center text-[10px] font-bold leading-none text-white bg-danger rounded-full border-2 border-white">
+                        {{ $topbarNotifications['unreadLabel'] }}
+                    </span>
                     <span class="sr-only">{{ $topbarNotifications['unreadCount'] }} unread</span>
                 @endif
             </div>
@@ -56,8 +73,9 @@
 
                     @forelse ($topbarNotifications['recent'] as $item)
                         <a href="{{ $item['followUrl'] }}" class="cursor-pointer relative flex items-start mt-3 first:mt-0 group">
-                            <div class="w-10 h-10 flex-none flex items-center justify-center rounded-full bg-slate-100 dark:bg-darkmode-400 mr-2">
-                                <i data-lucide="{{ $item['iconKey'] }}" class="w-5 h-5 {{ $item['isUnread'] ? 'text-primary' : 'text-slate-500' }}"></i>
+                            <div class="w-10 h-10 flex-none flex items-center justify-center rounded-full bg-slate-100 dark:bg-darkmode-400 mr-2 relative">
+                                {{-- Inline SVG per kind. Falls back to the bell silhouette for unknown kinds. --}}
+                                @include('commons.menu.partials.notification-kind-icon', ['kind' => $item['kind'], 'isUnread' => $item['isUnread']])
                                 @if ($item['isUnread'])
                                     <div class="w-2.5 h-2.5 bg-primary absolute right-0 top-0 rounded-full border-2 border-white"></div>
                                 @endif
