@@ -80,7 +80,14 @@ class GalleryService
             }
         }
 
-        $comments = GalleryComment::where('gallery_id', $g->id)->orderByDesc('created_at')->limit(10)->get();
+        // Only surface approved comments on the public detail. The `status`
+        // column landed in the v2-public-submit migration; on DBs that ran
+        // before it, all rows are implicitly approved.
+        $commentsQuery = GalleryComment::where('gallery_id', $g->id);
+        if (Schema::hasColumn('gallery_comments', 'status')) {
+            $commentsQuery->where('status', 'approved');
+        }
+        $comments = $commentsQuery->orderByDesc('created_at')->limit(10)->get();
 
         return [
             'id' => (string) $g->id,
@@ -128,6 +135,37 @@ class GalleryService
         }
         $g->image_path = $path;
         $g->save();
+    }
+
+    /**
+     * Unauthenticated public submit of a comment. Stored with `status =
+     * pending` so it doesn't surface on the public detail view until a
+     * moderator promotes it to `approved`. Anonymous callers — no
+     * IP/email/phone/user trail is required by the mobile contract.
+     *
+     * Existence-check rule mirrors `detail()`: the comment can only be
+     * submitted on items that the anonymous caller would be allowed to see
+     * (active + public). Hitting a private/archived/missing id returns 404,
+     * not a different error, so the existence of private items isn't leaked.
+     */
+    public function submitComment(string $galleryId, array $body): void
+    {
+        $g = Gallery::find($galleryId);
+        $isPublic = $g
+            && (string) ($g->status ?? '') === 'active'
+            && (! $this->hasIsPublicColumn() || (bool) ($g->is_public ?? false));
+        if (! $isPublic) {
+            throw ApiException::notFound('Gallery item not found.');
+        }
+
+        $c = new GalleryComment();
+        $c->gallery_id = $g->id;
+        $c->commenter_name = (string) $body['authorName'];
+        $c->comment = (string) $body['body'];
+        if (Schema::hasColumn('gallery_comments', 'status')) {
+            $c->status = 'pending';
+        }
+        $c->save();
     }
 
     // --- helpers -------------------------------------------------------------

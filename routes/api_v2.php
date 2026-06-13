@@ -165,6 +165,11 @@ Route::middleware('auth:api')->group(function () {
 Route::middleware('auth.optional')->prefix('gallery')->group(function () {
     Route::get('/public', [GalleryController::class, 'publicList']);
     Route::get('/items/{id}', [GalleryController::class, 'show']);
+    // Public comment submission — held for moderation, never echoed.
+    // Throttled per-IP since unauthenticated. 10/min is enough for a real
+    // user but cuts off scripted spam quickly.
+    Route::post('/items/{id}/comments', [GalleryController::class, 'submitComment'])
+        ->middleware('throttle:10,1');
 });
 Route::middleware('auth:api')->prefix('gallery')->group(function () {
     Route::get('/management', [GalleryController::class, 'management']);

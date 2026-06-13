@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V2;
 
 use App\Models\Gallery;
+use App\Models\GalleryComment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -182,5 +183,97 @@ class GalleryTest extends TestCase
             'title' => 'X', 'description' => 'X', 'category' => 'health',
             'displayOrder' => 0, 'isPublic' => true,
         ])->assertStatus(401);
+    }
+
+    // --- §11.13.5 unauthenticated public comment submit -----------------------
+
+    public function test_public_comment_submit_returns_204_and_holds_for_moderation(): void
+    {
+        $g = $this->seedItem(['is_public' => true, 'status' => 'active']);
+
+        // No Passport::actingAs — anonymous caller.
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => 'Aminu Danladi',
+            'body' => 'Glad to see this is moving forward — phase 2 timeline?',
+        ])->assertNoContent();   // 204 (or 202, both acceptable per contract)
+
+        $row = GalleryComment::where('gallery_id', $g->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('Aminu Danladi', $row->commenter_name);
+        $this->assertSame('Glad to see this is moving forward — phase 2 timeline?', $row->comment);
+        $this->assertSame('pending', $row->status);
+        // phone_number / email left blank — the v2 contract doesn't carry them.
+        $this->assertNull($row->phone_number);
+        $this->assertNull($row->email);
+    }
+
+    public function test_public_comment_does_not_echo_the_created_row(): void
+    {
+        $g = $this->seedItem(['is_public' => true]);
+
+        // 204 No Content — explicitly empty body.
+        $response = $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => 'Bola', 'body' => 'Nice.',
+        ])->assertNoContent();
+
+        $this->assertSame('', $response->getContent(), 'created row must not be echoed');
+    }
+
+    public function test_pending_comment_is_NOT_visible_on_public_detail(): void
+    {
+        $g = $this->seedItem(['is_public' => true]);
+        // Pre-create an approved comment so the comments[] array has shape.
+        GalleryComment::create([
+            'gallery_id' => $g->id, 'commenter_name' => 'Approved A',
+            'comment' => 'Earlier approved comment.', 'status' => 'approved',
+        ]);
+
+        // Anonymous user submits — held for moderation.
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => 'Pending P', 'body' => 'New unapproved comment.',
+        ])->assertNoContent();
+
+        $res = $this->getJson("/api/v2/gallery/items/{$g->id}")->assertOk();
+        $names = collect($res->json('comments'))->pluck('authorName')->all();
+
+        $this->assertContains('Approved A', $names);
+        $this->assertNotContains('Pending P', $names,
+            'pending comments must not surface on the public detail');
+    }
+
+    public function test_public_comment_submit_validation(): void
+    {
+        $g = $this->seedItem(['is_public' => true]);
+
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [])
+            ->assertStatus(422)
+            ->assertJsonStructure(['fieldErrors' => ['authorName', 'body']]);
+
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => '', 'body' => 'hi',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['authorName']]);
+
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => str_repeat('a', 121), 'body' => 'hi',
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['authorName']]);
+
+        $this->postJson("/api/v2/gallery/items/{$g->id}/comments", [
+            'authorName' => 'X', 'body' => str_repeat('z', 2001),
+        ])->assertStatus(422)->assertJsonStructure(['fieldErrors' => ['body']]);
+    }
+
+    public function test_cannot_submit_comment_on_private_or_archived_or_missing_item(): void
+    {
+        $private = $this->seedItem(['is_public' => false]);
+        $archived = $this->seedItem(['is_public' => true, 'status' => 'inactive']);
+
+        // 404 — uniform with the detail-read existence-check (no info leak).
+        foreach ([$private->id, $archived->id, 999999] as $id) {
+            $this->postJson("/api/v2/gallery/items/{$id}/comments", [
+                'authorName' => 'X', 'body' => 'y',
+            ])->assertStatus(404)->assertJsonPath('code', 'not_found');
+
+            $this->assertSame(0, GalleryComment::where('gallery_id', $id)->count());
+        }
     }
 }

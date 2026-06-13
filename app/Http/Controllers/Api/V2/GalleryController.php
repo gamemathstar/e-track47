@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2;
 
+use App\Http\Requests\V2\Gallery\SubmitGalleryCommentRequest;
 use App\Http\Requests\V2\Gallery\UploadGalleryRequest;
 use App\Services\V2\GalleryService;
 use Illuminate\Http\Request;
@@ -43,5 +44,17 @@ class GalleryController extends BaseController
         $this->gallery->upload($request->user(), $request->validated(), $request->file('asset'));
 
         return $this->accepted();
+    }
+
+    /**
+     * Unauthenticated public comment submission. Body: { authorName, body }.
+     * Stored as `status = pending` (moderation queue). Response is `204` —
+     * we never echo the created row.
+     */
+    public function submitComment(SubmitGalleryCommentRequest $request, string $id)
+    {
+        $this->gallery->submitComment($id, $request->validated());
+
+        return $this->noContent();
     }
 }
