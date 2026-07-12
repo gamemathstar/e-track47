@@ -2,11 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Commitment;
-use App\Models\Deliverable;
-use App\Models\Framework;
-use App\Models\Gallery;
-use App\Models\Kpi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,25 +17,7 @@ class AuthLoginController extends Controller
 
     public function index()
     {
-        // Fetch the latest 3 active gallery items for the welcome page
-        $galleries = Gallery::active()
-            ->ordered()
-            ->limit(3)
-            ->get();
-
-        // Count commitments, deliverables and KPIs for the active framework
-        $commitmentsCount = 0;
-        $deliverablesCount = 0;
-        $kpisCount = 0;
-        $activeFramework = Framework::where('status', 'Active')->first();
-
-        if ($activeFramework) {
-            $commitmentsCount = Commitment::where('framework_id', $activeFramework->id)->count();
-            $deliverablesCount = Deliverable::where('framework_id', $activeFramework->id)->count();
-            $kpisCount = Kpi::where('framework_id', $activeFramework->id)->count();
-        }
-
-        return view('welcome', compact('galleries', 'commitmentsCount', 'deliverablesCount', 'kpisCount'));
+        return view('demo-expired');
     }
 
     public function showLoginForm()
