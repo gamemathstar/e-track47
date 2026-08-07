@@ -335,10 +335,16 @@
                         By submitting this data, you confirm that all commitments, deliverables, KPIs, annual targets, and quarterly milestones have been reviewed for this sector and fiscal year.
                     @endif
                 </p>
-                <form method="POST" action="{{ route('bulk-upload.submit') }}" class="w-full flex flex-col items-center">
+                @if(($uploadMode ?? 'structure') === 'actuals' && ($summary['actual_updates'] ?? 0) === 0)
+                    <p class="text-sm text-on-surface-variant mb-6 max-w-2xl">
+                        Submission is disabled because no quarterly actual values are ready to update. Resolve validation warnings and upload again.
+                    </p>
+                @endif
+                <form method="POST" action="{{ route('bulk-upload.submit') }}" id="bulkUploadSubmitForm" class="w-full flex flex-col items-center">
                     @csrf
                     <label class="flex items-center gap-3 cursor-pointer mb-6 p-4 rounded-lg border border-transparent hover:border-primary/10 transition-colors">
-                        <input type="checkbox" class="w-5 h-5 rounded border-2 border-primary/40 text-primary focus:ring-primary cursor-pointer"/>
+                        <input type="checkbox" id="bulkUploadConfirmCheckbox"
+                               class="w-5 h-5 rounded border-2 border-primary/40 text-primary focus:ring-primary cursor-pointer"/>
                         <span class="text-sm font-medium text-on-background select-none">I confirm that the reviewed data is accurate and ready for final submission.</span>
                     </label>
                     <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -346,8 +352,9 @@
                            class="bu-btn-outline px-6 py-3 rounded-lg font-medium text-center">
                             Back to Upload
                         </a>
-                        <button type="submit"
-                                class="bu-btn-primary px-6 py-3 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2">
+                        <button type="submit" id="bulkUploadSubmitBtn"
+                                @if(($uploadMode ?? 'structure') === 'actuals' && ($summary['actual_updates'] ?? 0) === 0) disabled @endif
+                                class="bu-btn-primary px-6 py-3 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                             <span class="material-symbols-outlined text-[20px]">send</span>
                             Submit Performance Data
                         </button>
@@ -385,6 +392,32 @@
                     });
                 });
             });
+
+            const confirmCheckbox = document.getElementById('bulkUploadConfirmCheckbox');
+            const submitBtn = document.getElementById('bulkUploadSubmitBtn');
+            const submitForm = document.getElementById('bulkUploadSubmitForm');
+
+            function updateSubmitState() {
+                if (!submitBtn || submitBtn.disabled) {
+                    return;
+                }
+
+                submitBtn.disabled = !confirmCheckbox || !confirmCheckbox.checked;
+            }
+
+            if (confirmCheckbox) {
+                confirmCheckbox.addEventListener('change', updateSubmitState);
+                updateSubmitState();
+            }
+
+            if (submitForm) {
+                submitForm.addEventListener('submit', function (event) {
+                    if (!confirmCheckbox || !confirmCheckbox.checked) {
+                        event.preventDefault();
+                        alert('Please confirm the reviewed data before submitting.');
+                    }
+                });
+            }
         })();
     </script>
 @endsection

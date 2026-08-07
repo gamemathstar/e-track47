@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\BulkUploadActualsEnricher;
 use App\Services\BulkUploadActualsImporter;
 use App\Services\BulkUploadActualsTemplateExporter;
+use App\Services\BulkUploadEntryAccess;
 use App\Services\BulkUploadImporter;
 use App\Services\BulkUploadParser;
 use App\Services\BulkUploadReportBuilder;
@@ -81,34 +82,63 @@ class BulkUploadController extends Controller
         $entryYear = DataEntryAccess::getCurrentYear();
         $entryQuarter = DataEntryAccess::getCurrentQuarter();
 
-        $sectorEntryAccess = $sectors->mapWithKeys(function ($sector) use ($entryYear, $entryQuarter, $canAccessAllSectors) {
+        $sectorQuarterEntryAccess = BulkUploadEntryAccess::sectorQuarterAccessMap(
+            $sectors,
+            $frameworks,
+            $canAccessAllSectors,
+        );
+
+        $sectorEntryAccess = $sectors->mapWithKeys(function ($sector) use ($entryYear, $entryQuarter, $canAccessAllSectors, $uploadMode, $sectorQuarterEntryAccess, $frameworks) {
+            if ($uploadMode === 'actuals') {
+                $frameworkYear = (int) ($frameworks->firstWhere('id', $sector->framework_id)?->year ?? $entryYear);
+
+                return [
+                    $sector->id => collect(range(1, 4))
+                        ->contains(fn (int $quarter) => $sectorQuarterEntryAccess[$sector->id][$frameworkYear][$quarter] ?? false),
+                ];
+            }
+
             return [
                 $sector->id => $canAccessAllSectors || DataEntryAccess::isDataEntryAllowed($sector->id, $entryYear, $entryQuarter),
             ];
         })->toArray();
 
+        $defaultReportingQuarter = $uploadMode === 'actuals' ? $entryQuarter : null;
+
         $uploadAllowed = $canAccessAllSectors;
 
         if (!$uploadAllowed && $defaultSectorId) {
-            $uploadAllowed = $sectorEntryAccess[$defaultSectorId] ?? false;
+            if ($uploadMode === 'actuals') {
+                $frameworkYear = (int) ($frameworks->firstWhere('id', $sectors->firstWhere('id', $defaultSectorId)?->framework_id)?->year ?? $entryYear);
+                $uploadAllowed = $sectorQuarterEntryAccess[$defaultSectorId][$frameworkYear][$defaultReportingQuarter] ?? false;
+            } else {
+                $uploadAllowed = $sectorEntryAccess[$defaultSectorId] ?? false;
+            }
         }
 
-        if (!$uploadAllowed && !empty($assignedSectorIds)) {
+        if (!$uploadAllowed && !empty($assignedSectorIds) && $uploadMode !== 'actuals') {
             $uploadAllowed = collect($assignedSectorIds)
                 ->contains(fn (int $sectorId) => $sectorEntryAccess[$sectorId] ?? false);
         }
 
         $entryDeadline = null;
         if ($defaultSectorId && !$uploadAllowed) {
+            $deadlineYear = $uploadMode === 'actuals'
+                ? (int) ($frameworks->firstWhere('id', $sectors->firstWhere('id', $defaultSectorId)?->framework_id)?->year ?? $entryYear)
+                : $entryYear;
+            $deadlineQuarter = $uploadMode === 'actuals' ? $defaultReportingQuarter : $entryQuarter;
+
             $accessRecord = DataEntryAccess::where('sector_id', $defaultSectorId)
-                ->where('year', $entryYear)
-                ->where('quarter', $entryQuarter)
+                ->where('year', $deadlineYear)
+                ->where('quarter', $deadlineQuarter)
                 ->first();
 
             $entryDeadline = $accessRecord
                 ? ($accessRecord->override_deadline ?? $accessRecord->deadline_date)
-                : DataEntryAccess::calculateDeadline($entryYear, $entryQuarter);
+                : DataEntryAccess::calculateDeadline($deadlineYear, $deadlineQuarter);
         }
+
+        $frameworkYears = $frameworks->pluck('year', 'id')->toArray();
 
         return view('pages.bulk-upload.index', compact(
             'frameworks',
@@ -119,10 +149,13 @@ class BulkUploadController extends Controller
             'sectorSelectionLocked',
             'uploadAllowed',
             'sectorEntryAccess',
+            'sectorQuarterEntryAccess',
+            'frameworkYears',
             'entryYear',
             'entryQuarter',
             'entryDeadline',
             'uploadMode',
+            'defaultReportingQuarter',
         ));
     }
 
@@ -143,7 +176,7 @@ class BulkUploadController extends Controller
             'framework_id' => ['required', 'exists:frameworks,id'],
             'sector_id' => ['required', 'exists:sectors,id'],
             'upload_file' => ['required', 'file', 'mimes:xlsx,csv', 'max:51200'],
-            'reporting_quarter' => ['nullable', 'integer', 'in:1,2,3,4'],
+            'reporting_quarter' => [$uploadMode === 'actuals' ? 'required' : 'nullable', 'integer', 'in:1,2,3,4'],
         ]);
 
         $framework = Framework::findOrFail($validated['framework_id']);
@@ -161,7 +194,21 @@ class BulkUploadController extends Controller
                 ->with('failure', 'You can only upload data for your assigned sector(s).');
         }
 
-        if (!$this->isDataEntryAllowed($sector->id)) {
+        if ($uploadMode === 'actuals') {
+            $entryError = BulkUploadEntryAccess::validateActualsEntry(
+                (int) $sector->id,
+                (int) $framework->year,
+                isset($validated['reporting_quarter']) ? (int) $validated['reporting_quarter'] : null,
+                [],
+                $canAccessAllSectors,
+            );
+
+            if ($entryError) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', $entryError);
+            }
+        } elseif (!$this->isDataEntryAllowed($sector->id)) {
             return redirect()
                 ->route('bulk-upload.index')
                 ->with('failure', 'The data entry window is closed for this sector. Please contact the PDCU Coordinator to request an extension.');
@@ -197,6 +244,26 @@ class BulkUploadController extends Controller
 
         if ($uploadMode === 'actuals') {
             $preview = app(BulkUploadActualsEnricher::class)->enrich($preview, $meta);
+
+            $entryError = BulkUploadEntryAccess::validateActualsEntry(
+                (int) $sector->id,
+                (int) $framework->year,
+                isset($meta['reporting_quarter']) ? (int) $meta['reporting_quarter'] : null,
+                $preview,
+                $canAccessAllSectors,
+            );
+
+            if ($entryError) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', $entryError);
+            }
+
+            if (($preview['summary']['actual_updates'] ?? 0) === 0) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', 'No quarterly actual values are ready to submit. Review validation warnings and confirm the selected reporting quarter.');
+            }
         }
 
         session([
@@ -237,7 +304,28 @@ class BulkUploadController extends Controller
                 ->with('failure', 'Your upload session has expired. Please upload the file again.');
         }
 
-        if (!$this->isDataEntryAllowed($meta['sector_id'])) {
+        if ($uploadMode === 'actuals') {
+            $framework = Framework::findOrFail($meta['framework_id']);
+            $entryError = BulkUploadEntryAccess::validateActualsEntry(
+                (int) $meta['sector_id'],
+                (int) $framework->year,
+                isset($meta['reporting_quarter']) ? (int) $meta['reporting_quarter'] : null,
+                $preview,
+                $access['canAccessAllSectors'],
+            );
+
+            if ($entryError) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', $entryError);
+            }
+
+            if (($preview['summary']['actual_updates'] ?? 0) === 0) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', 'No quarterly actual values are ready to submit. Please upload the file again.');
+            }
+        } elseif (!$this->isDataEntryAllowed($meta['sector_id'])) {
             return redirect()
                 ->route('bulk-upload.index')
                 ->with('failure', 'The data entry window is closed for this sector.');

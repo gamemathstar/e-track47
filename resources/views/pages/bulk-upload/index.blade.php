@@ -222,13 +222,12 @@
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-1"
                                            for="reportingQuarter">
-                                        Reporting Quarter
+                                        Reporting Quarter <span class="text-error">*</span>
                                     </label>
-                                    <select id="reportingQuarter" name="reporting_quarter"
+                                    <select id="reportingQuarter" name="reporting_quarter" required
                                             class="bulk-upload-field w-full border border-primary/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
-                                        <option value="">All quarters with values</option>
                                         @foreach([1,2,3,4] as $quarter)
-                                            <option value="{{ $quarter }}" {{ (string) old('reporting_quarter', $entryQuarter) === (string) $quarter ? 'selected' : '' }}>
+                                            <option value="{{ $quarter }}" {{ (string) old('reporting_quarter', $defaultReportingQuarter ?? $entryQuarter) === (string) $quarter ? 'selected' : '' }}>
                                                 Q{{ $quarter }}
                                             </option>
                                         @endforeach
@@ -279,7 +278,12 @@
                         </div>
                         <h3 class="text-lg font-semibold text-on-background mb-2">Upload Temporarily Unavailable</h3>
                         <p class="text-on-surface-variant max-w-lg mb-2">
-                            The data entry window for Q{{ $entryQuarter }} {{ $entryYear }} is currently closed
+                            @if(($uploadMode ?? 'structure') === 'actuals')
+                                The data entry window for
+                                <strong class="text-on-background" id="bulkUploadClosedQuarterLabel">Q{{ $defaultReportingQuarter ?? $entryQuarter }}</strong>
+                            @else
+                                The data entry window for Q{{ $entryQuarter }} {{ $entryYear }} is currently closed
+                            @endif
                             @if($entryDeadline)
                                 (deadline was {{ $entryDeadline->format('M d, Y') }})
                             @endif
@@ -357,6 +361,10 @@
             const uploadMode = @json($uploadMode ?? 'structure');
             const templateBaseUrl = @json(route('bulk-upload.template'));
             const sectorEntryAccess = @json($sectorEntryAccess);
+            const sectorQuarterEntryAccess = @json($sectorQuarterEntryAccess ?? []);
+            const frameworkYears = @json($frameworkYears ?? []);
+            const reportingQuarterSelect = document.getElementById('reportingQuarter');
+            const closedQuarterLabel = document.getElementById('bulkUploadClosedQuarterLabel');
             const initialSectorId = @json(old('sector_id', $defaultSectorId));
             const closedMessage = document.getElementById('bulkUploadClosedMessage');
             const activeArea = document.getElementById('bulkUploadActiveArea');
@@ -372,12 +380,52 @@
             const fileNameEl = document.getElementById('bulkUploadFileName');
             const fileMetaEl = document.getElementById('bulkUploadFileMeta');
 
+            function getFrameworkYear() {
+                const frameworkId = fiscalYearSelect.value;
+                return frameworkYears[String(frameworkId)] || frameworkYears[frameworkId] || null;
+            }
+
+            function getReportingQuarter() {
+                if (uploadMode !== 'actuals' || !reportingQuarterSelect) {
+                    return null;
+                }
+
+                return parseInt(reportingQuarterSelect.value, 10) || null;
+            }
+
             function isUploadAllowedForSector(sectorId) {
                 if (!sectorId) {
                     return false;
                 }
 
+                if (uploadMode === 'actuals') {
+                    const frameworkYear = getFrameworkYear();
+                    const quarter = getReportingQuarter();
+
+                    if (!frameworkYear || !quarter) {
+                        return false;
+                    }
+
+                    const sectorAccess = sectorQuarterEntryAccess[String(sectorId)] || sectorQuarterEntryAccess[sectorId] || {};
+                    const yearAccess = sectorAccess[String(frameworkYear)] || sectorAccess[frameworkYear] || {};
+
+                    return yearAccess[String(quarter)] === true || yearAccess[quarter] === true;
+                }
+
                 return sectorEntryAccess[String(sectorId)] === true;
+            }
+
+            function updateClosedQuarterLabel() {
+                if (!closedQuarterLabel) {
+                    return;
+                }
+
+                const quarter = getReportingQuarter();
+                const frameworkYear = getFrameworkYear();
+
+                if (quarter && frameworkYear) {
+                    closedQuarterLabel.textContent = 'Q' + quarter + ' ' + frameworkYear;
+                }
             }
 
             function updateTemplateUrl() {
@@ -401,6 +449,7 @@
 
             function updateUploadAvailability(sectorId) {
                 const allowed = isUploadAllowedForSector(sectorId);
+                updateClosedQuarterLabel();
 
                 if (closedMessage && activeArea) {
                     closedMessage.classList.toggle('hidden', allowed);
@@ -494,6 +543,12 @@
                 updateTemplateUrl();
             });
 
+            if (reportingQuarterSelect) {
+                reportingQuarterSelect.addEventListener('change', function () {
+                    updateUploadAvailability(sectorSelect.value || initialSectorId);
+                });
+            }
+
             browseBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 fileInput.click();
@@ -542,7 +597,17 @@
 
                     if (!isUploadAllowedForSector(sectorId)) {
                         event.preventDefault();
-                        alert('Upload is not available while the data entry window is closed.');
+                        if (uploadMode === 'actuals') {
+                            alert('Upload is not available while the selected reporting quarter entry window is closed.');
+                        } else {
+                            alert('Upload is not available while the data entry window is closed.');
+                        }
+                        return;
+                    }
+
+                    if (uploadMode === 'actuals' && reportingQuarterSelect && !reportingQuarterSelect.value) {
+                        event.preventDefault();
+                        alert('Please select a reporting quarter.');
                         return;
                     }
 

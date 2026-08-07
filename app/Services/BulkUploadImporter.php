@@ -121,14 +121,14 @@ class BulkUploadImporter
 
     private function resolveCommitment(int $sectorId, int $frameworkId, string $name): array
     {
-        $cacheKey = $sectorId . ':' . $frameworkId . ':' . $this->commitmentMatchKey($name);
+        $cacheKey = $sectorId . ':' . $frameworkId . ':' . BulkUploadLabelMatcher::normalizeKey($name);
 
         if (isset($this->commitmentCache[$cacheKey])) {
             return ['model' => $this->commitmentCache[$cacheKey], 'created' => false];
         }
 
         $existing = $this->sectorCommitments($sectorId, $frameworkId)
-            ->first(fn (Commitment $commitment) => $this->labelsAreEquivalent($commitment->name, $name));
+            ->first(fn (Commitment $commitment) => BulkUploadLabelMatcher::labelsAreEquivalent($commitment->name, $name));
 
         if ($existing) {
             $this->commitmentCache[$cacheKey] = $existing;
@@ -177,16 +177,16 @@ class BulkUploadImporter
 
     private function resolveDeliverable(Commitment $commitment, int $frameworkId, int $year, string $name): array
     {
-        $cacheKey = $commitment->id . ':' . $this->normalizeKey($name);
+        $cacheKey = $commitment->id . ':' . BulkUploadLabelMatcher::normalizeKey($name);
 
         if (isset($this->deliverableCache[$cacheKey])) {
             return ['model' => $this->deliverableCache[$cacheKey], 'created' => false];
         }
 
-        $normalized = $this->normalizeKey($name);
+        $normalized = BulkUploadLabelMatcher::normalizeKey($name);
 
         $existing = $this->deliverablesForCommitment($commitment->id, $frameworkId)
-            ->first(fn (Deliverable $deliverable) => $this->labelsAreEquivalent($deliverable->deliverable, $name));
+            ->first(fn (Deliverable $deliverable) => BulkUploadLabelMatcher::labelsAreEquivalent($deliverable->deliverable, $name));
 
         if ($existing) {
             $this->deliverableCache[$cacheKey] = $existing;
@@ -213,7 +213,7 @@ class BulkUploadImporter
     private function resolveKpi(Deliverable $deliverable, int $frameworkId, int $year, array $row): array
     {
         $kpiName = trim($row['kpi'] ?? '');
-        $cacheKey = $deliverable->id . ':' . $year . ':' . $this->normalizeKey($kpiName);
+        $cacheKey = $deliverable->id . ':' . $year . ':' . BulkUploadLabelMatcher::normalizeKey($kpiName);
 
         if (isset($this->kpiCache[$cacheKey])) {
             return ['model' => $this->kpiCache[$cacheKey], 'created' => false];
@@ -224,7 +224,7 @@ class BulkUploadImporter
             ->where('framework_id', $frameworkId)
             ->where('year', $year)
             ->get()
-            ->first(fn (Kpi $kpi) => $this->labelsAreEquivalent($kpi->kpi, $kpiName));
+            ->first(fn (Kpi $kpi) => BulkUploadLabelMatcher::labelsAreEquivalent($kpi->kpi, $kpiName));
 
         if ($existing) {
             $updates = [];
@@ -333,40 +333,6 @@ class BulkUploadImporter
             3 => $this->parseNumeric($row['q3_target'] ?? ''),
             4 => $this->parseNumeric($row['q4_target'] ?? ''),
         ];
-    }
-
-    private function normalizeKey(string $value): string
-    {
-        $value = preg_replace('/^commitment\s+\d+\s*:\s*/i', '', trim($value)) ?? trim($value);
-
-        return preg_replace('/\s+/', ' ', strtolower($value)) ?? '';
-    }
-
-    private function commitmentMatchKey(string $name): string
-    {
-        return $this->normalizeKey($name);
-    }
-
-    private function labelsAreEquivalent(string $left, string $right): bool
-    {
-        $leftKey = $this->normalizeKey($left);
-        $rightKey = $this->normalizeKey($right);
-
-        if ($leftKey === '' || $rightKey === '') {
-            return false;
-        }
-
-        if ($leftKey === $rightKey) {
-            return true;
-        }
-
-        if (str_contains($leftKey, $rightKey) || str_contains($rightKey, $leftKey)) {
-            return true;
-        }
-
-        similar_text($leftKey, $rightKey, $percent);
-
-        return $percent >= 88;
     }
 
     private function parseNumeric(string $value): ?float
