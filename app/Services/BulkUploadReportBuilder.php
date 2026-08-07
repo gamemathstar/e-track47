@@ -29,6 +29,7 @@ class BulkUploadReportBuilder
             'submitted_by' => $user->name ?? $user->email,
             'submitted_at' => $submittedAt,
             'quarterly_averages' => $quarterlyAverages,
+            'rows' => $rows,
             'kpis' => $preview['kpis'] ?? [],
             'deliverables' => $preview['deliverables'] ?? [],
             'commitments' => $preview['commitments'] ?? [],

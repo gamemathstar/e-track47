@@ -350,11 +350,17 @@
                         <span class="material-symbols-outlined text-sm">upload_file</span>
                         New Upload
                     </a>
-                    <button type="button" disabled
-                            class="bu-btn-primary w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm opacity-60 cursor-not-allowed">
+                    <a href="{{ route('bulk-upload.report.data') }}"
+                       class="bu-btn-outline w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-sm">table</span>
+                        Download Data
+                    </a>
+                    <a href="{{ route('bulk-upload.report.print', ['print' => 1]) }}"
+                       target="_blank" rel="noopener"
+                       class="bu-btn-primary w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm">
                         <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
                         Download Report
-                    </button>
+                    </a>
                 </div>
             </footer>
         </main>

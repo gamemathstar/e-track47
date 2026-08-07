@@ -142,6 +142,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('bulk-upload/preview', [BulkUploadController::class, 'preview'])->name('bulk-upload.preview');
     Route::post('bulk-upload/submit', [BulkUploadController::class, 'submit'])->name('bulk-upload.submit');
     Route::get('bulk-upload/report', [BulkUploadController::class, 'report'])->name('bulk-upload.report');
+    Route::get('bulk-upload/report/data', [BulkUploadController::class, 'downloadReportData'])->name('bulk-upload.report.data');
+    Route::get('bulk-upload/report/print', [BulkUploadController::class, 'printReport'])->name('bulk-upload.report.print');
 
     // Data Entry Access Management (PDCU Coordinators only)
     Route::prefix('data-entry')->name('data-entry.')->group(function () {

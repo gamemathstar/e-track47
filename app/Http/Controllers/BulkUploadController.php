@@ -13,6 +13,7 @@ use App\Services\BulkUploadEntryAccess;
 use App\Services\BulkUploadImporter;
 use App\Services\BulkUploadParser;
 use App\Services\BulkUploadReportBuilder;
+use App\Services\BulkUploadReportExporter;
 use App\Traits\ChecksDataEntryAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -364,17 +365,9 @@ class BulkUploadController extends Controller
     public function report()
     {
         $user = Auth::user();
-        $access = $this->authorizeBulkUploadUser($user);
-        if ($access instanceof \Illuminate\Http\RedirectResponse) {
-            return $access;
-        }
-
-        $report = session('bulk_upload_report');
-
-        if (!$report) {
-            return redirect()
-                ->route('bulk-upload.index')
-                ->with('failure', 'No submission report is available. Please complete an upload first.');
+        $report = $this->resolveSessionReport();
+        if ($report instanceof \Illuminate\Http\RedirectResponse) {
+            return $report;
         }
 
         $report['submitted_at'] = Carbon::parse($report['submitted_at']);
@@ -391,6 +384,41 @@ class BulkUploadController extends Controller
             : route('dashboard');
 
         return view('pages.bulk-upload.report', compact('report', 'dashboardRoute'));
+    }
+
+    /**
+     * Download submitted records as Excel.
+     */
+    public function downloadReportData(BulkUploadReportExporter $exporter)
+    {
+        $report = $this->resolveSessionReport();
+        if ($report instanceof \Illuminate\Http\RedirectResponse) {
+            return $report;
+        }
+
+        return $exporter->downloadData($report);
+    }
+
+    /**
+     * Open a print-friendly submission report (save as PDF via browser).
+     */
+    public function printReport()
+    {
+        $report = $this->resolveSessionReport();
+        if ($report instanceof \Illuminate\Http\RedirectResponse) {
+            return $report;
+        }
+
+        $submittedAt = Carbon::parse($report['submitted_at']);
+        $report['audit_trail'] = collect($report['audit_trail'] ?? [])
+            ->map(function ($event) {
+                $event['timestamp'] = Carbon::parse($event['timestamp']);
+
+                return $event;
+            })
+            ->all();
+
+        return view('pages.bulk-upload.report-print', compact('report', 'submittedAt'));
     }
 
     /**
@@ -441,6 +469,25 @@ class BulkUploadController extends Controller
             'bulk-performance-upload-template.xlsx',
             ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
         );
+    }
+
+    private function resolveSessionReport(): array|\Illuminate\Http\RedirectResponse
+    {
+        $user = Auth::user();
+        $access = $this->authorizeBulkUploadUser($user);
+        if ($access instanceof \Illuminate\Http\RedirectResponse) {
+            return $access;
+        }
+
+        $report = session('bulk_upload_report');
+
+        if (!$report) {
+            return redirect()
+                ->route('bulk-upload.index')
+                ->with('failure', 'No submission report is available. Please complete an upload first.');
+        }
+
+        return $report;
     }
 
     private function authorizeBulkUploadUser(?User $user): array|\Illuminate\Http\RedirectResponse
