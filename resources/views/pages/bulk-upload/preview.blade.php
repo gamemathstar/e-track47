@@ -92,6 +92,13 @@
                             <span class="material-symbols-outlined text-[18px]">description</span>
                             <span>File: <strong class="text-on-background">{{ $meta['file_name'] }}</strong></span>
                         </div>
+                        @if(($uploadMode ?? 'structure') === 'actuals' && !empty($meta['reporting_quarter']))
+                            <span class="w-1 h-1 rounded-full bg-primary/30"></span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[18px]">event</span>
+                                <span>Quarter: <strong class="text-on-background">Q{{ $meta['reporting_quarter'] }}</strong></span>
+                            </div>
+                        @endif
                     </div>
                 </div>
                 <a href="{{ route('bulk-upload.index') }}"
@@ -109,20 +116,37 @@
                     <p class="text-on-surface-variant text-sm mb-1">Total Records</p>
                     <p class="text-2xl font-semibold text-on-background">{{ $summary['total_records'] }}</p>
                 </div>
-                <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
-                    <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
-                        <span class="material-symbols-outlined">handshake</span>
+                @if(($uploadMode ?? 'structure') === 'actuals')
+                    <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(16,185,129,0.1); color: var(--bu-success);">
+                            <span class="material-symbols-outlined">edit_note</span>
+                        </div>
+                        <p class="text-on-surface-variant text-sm mb-1">Ready to Update</p>
+                        <p class="text-2xl font-semibold text-on-background">{{ $summary['actual_updates'] ?? 0 }}</p>
                     </div>
-                    <p class="text-on-surface-variant text-sm mb-1">Commitments</p>
-                    <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
-                </div>
-                <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
-                    <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(16,185,129,0.1); color: var(--bu-success);">
-                        <span class="material-symbols-outlined">inventory_2</span>
+                    <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
+                            <span class="material-symbols-outlined">handshake</span>
+                        </div>
+                        <p class="text-on-surface-variant text-sm mb-1">Commitments</p>
+                        <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
                     </div>
-                    <p class="text-on-surface-variant text-sm mb-1">Deliverables</p>
-                    <p class="text-2xl font-semibold text-on-background">{{ $summary['deliverables'] }}</p>
-                </div>
+                @else
+                    <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
+                            <span class="material-symbols-outlined">handshake</span>
+                        </div>
+                        <p class="text-on-surface-variant text-sm mb-1">Commitments</p>
+                        <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
+                    </div>
+                    <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(16,185,129,0.1); color: var(--bu-success);">
+                            <span class="material-symbols-outlined">inventory_2</span>
+                        </div>
+                        <p class="text-on-surface-variant text-sm mb-1">Deliverables</p>
+                        <p class="text-2xl font-semibold text-on-background">{{ $summary['deliverables'] }}</p>
+                    </div>
+                @endif
                 <div class="bu-card--warning border border-warning/20 rounded-xl p-5 shadow-sm relative overflow-hidden">
                     <div class="flex items-start justify-between mb-4">
                         <div class="p-2 rounded-lg inline-flex" style="background: rgba(245,158,11,0.2); color: var(--bu-warning);">
@@ -291,7 +315,11 @@
                             <h4 class="font-semibold mb-1" style="color: #92400e;">Validation Alert</h4>
                             <p class="text-sm text-on-surface-variant">
                                 {{ $summary['warnings'] }} {{ \Illuminate\Support\Str::plural('record', $summary['warnings']) }} require attention before final submission.
-                                These include missing KPI descriptions and incomplete target or milestone values.
+                                @if(($uploadMode ?? 'structure') === 'actuals')
+                                    These include unmatched KPIs, missing milestones, or locked records that cannot be updated.
+                                @else
+                                    These include missing KPI descriptions and incomplete target or milestone values.
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -301,7 +329,11 @@
             <div class="bu-card border border-primary/10 rounded-xl p-6 md:p-8 flex flex-col items-center text-center" style="background: #eaefe8;">
                 <h3 class="text-xl font-semibold text-on-background mb-2">Ready to Submit?</h3>
                 <p class="text-on-surface-variant max-w-2xl mb-6">
-                    By submitting this data, you confirm that all commitments, deliverables, KPIs, annual targets, and quarterly milestones have been reviewed for this sector and fiscal year.
+                    @if(($uploadMode ?? 'structure') === 'actuals')
+                        By submitting, you confirm the quarterly actual values are accurate and ready for Sector Head approval.
+                    @else
+                        By submitting this data, you confirm that all commitments, deliverables, KPIs, annual targets, and quarterly milestones have been reviewed for this sector and fiscal year.
+                    @endif
                 </p>
                 <form method="POST" action="{{ route('bulk-upload.submit') }}" class="w-full flex flex-col items-center">
                     @csrf

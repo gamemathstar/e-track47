@@ -6,6 +6,9 @@ use App\Models\DataEntryAccess;
 use App\Models\Framework;
 use App\Models\Sector;
 use App\Models\User;
+use App\Services\BulkUploadActualsEnricher;
+use App\Services\BulkUploadActualsImporter;
+use App\Services\BulkUploadActualsTemplateExporter;
 use App\Services\BulkUploadImporter;
 use App\Services\BulkUploadParser;
 use App\Services\BulkUploadReportBuilder;
@@ -35,7 +38,7 @@ class BulkUploadController extends Controller
             return $access;
         }
 
-        ['canAccessAllSectors' => $canAccessAllSectors, 'assignedSectorIds' => $assignedSectorIds] = $access;
+        ['canAccessAllSectors' => $canAccessAllSectors, 'assignedSectorIds' => $assignedSectorIds, 'uploadMode' => $uploadMode] = $access;
 
         $frameworks = Framework::query()
             ->orderByDesc('year')
@@ -119,6 +122,7 @@ class BulkUploadController extends Controller
             'entryYear',
             'entryQuarter',
             'entryDeadline',
+            'uploadMode',
         ));
     }
 
@@ -133,12 +137,13 @@ class BulkUploadController extends Controller
             return $access;
         }
 
-        ['canAccessAllSectors' => $canAccessAllSectors, 'assignedSectorIds' => $assignedSectorIds] = $access;
+        ['canAccessAllSectors' => $canAccessAllSectors, 'assignedSectorIds' => $assignedSectorIds, 'uploadMode' => $uploadMode] = $access;
 
         $validated = $request->validate([
             'framework_id' => ['required', 'exists:frameworks,id'],
             'sector_id' => ['required', 'exists:sectors,id'],
             'upload_file' => ['required', 'file', 'mimes:xlsx,csv', 'max:51200'],
+            'reporting_quarter' => ['nullable', 'integer', 'in:1,2,3,4'],
         ]);
 
         $framework = Framework::findOrFail($validated['framework_id']);
@@ -162,8 +167,10 @@ class BulkUploadController extends Controller
                 ->with('failure', 'The data entry window is closed for this sector. Please contact the PDCU Coordinator to request an extension.');
         }
 
+        $forPdcu = $uploadMode === 'structure';
+
         try {
-            $preview = $parser->parse($request->file('upload_file'), true);
+            $preview = $parser->parse($request->file('upload_file'), $forPdcu);
         } catch (\Throwable $exception) {
             Log::error('Bulk upload preview failed', ['message' => $exception->getMessage()]);
 
@@ -184,7 +191,13 @@ class BulkUploadController extends Controller
             'sector_id' => $sector->id,
             'sector_name' => $sector->sector_name,
             'file_name' => $request->file('upload_file')->getClientOriginalName(),
+            'upload_mode' => $uploadMode,
+            'reporting_quarter' => $validated['reporting_quarter'] ?? null,
         ];
+
+        if ($uploadMode === 'actuals') {
+            $preview = app(BulkUploadActualsEnricher::class)->enrich($preview, $meta);
+        }
 
         session([
             'bulk_upload_preview' => $preview,
@@ -195,19 +208,25 @@ class BulkUploadController extends Controller
             'preview' => $preview,
             'meta' => $meta,
             'canAccessAllSectors' => $canAccessAllSectors,
+            'uploadMode' => $uploadMode,
         ]);
     }
 
     /**
      * Persist reviewed framework structure from the uploaded template.
      */
-    public function submit(Request $request, BulkUploadImporter $importer)
-    {
+    public function submit(
+        Request $request,
+        BulkUploadImporter $structureImporter,
+        BulkUploadActualsImporter $actualsImporter,
+    ) {
         $user = Auth::user();
         $access = $this->authorizeBulkUploadUser($user);
         if ($access instanceof \Illuminate\Http\RedirectResponse) {
             return $access;
         }
+
+        $uploadMode = $access['uploadMode'];
 
         $preview = session('bulk_upload_preview');
         $meta = session('bulk_upload_meta');
@@ -225,7 +244,9 @@ class BulkUploadController extends Controller
         }
 
         try {
-            $importStats = $importer->import($preview, $meta);
+            $importStats = $uploadMode === 'actuals'
+                ? $actualsImporter->import($preview, $meta)
+                : $structureImporter->import($preview, $meta);
         } catch (\Throwable $exception) {
             Log::error('Bulk upload import failed', [
                 'message' => $exception->getMessage(),
@@ -238,7 +259,7 @@ class BulkUploadController extends Controller
                 ->with('failure', 'Unable to save the uploaded records. Please try again or contact support if the problem persists.');
         }
 
-        $report = BulkUploadReportBuilder::build($preview, $meta, $user, $importStats);
+        $report = BulkUploadReportBuilder::build($preview, $meta, $user, $importStats, $uploadMode);
 
         session([
             'bulk_upload_report' => $report,
@@ -287,12 +308,36 @@ class BulkUploadController extends Controller
     /**
      * Download the bulk performance upload Excel template.
      */
-    public function downloadTemplate()
+    public function downloadTemplate(Request $request, BulkUploadActualsTemplateExporter $actualsExporter)
     {
         $user = Auth::user();
         $access = $this->authorizeBulkUploadUser($user);
         if ($access instanceof \Illuminate\Http\RedirectResponse) {
             return $access;
+        }
+
+        if ($access['uploadMode'] === 'actuals') {
+            $validated = $request->validate([
+                'framework_id' => ['required', 'exists:frameworks,id'],
+                'sector_id' => ['required', 'exists:sectors,id'],
+            ]);
+
+            $framework = Framework::findOrFail($validated['framework_id']);
+            $sector = Sector::findOrFail($validated['sector_id']);
+
+            if ((int) $sector->framework_id !== (int) $framework->id) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', 'The selected sector does not belong to the chosen fiscal year.');
+            }
+
+            if (!in_array((int) $sector->id, $access['assignedSectorIds'], true)) {
+                return redirect()
+                    ->route('bulk-upload.index')
+                    ->with('failure', 'You can only download templates for your assigned sector.');
+            }
+
+            return $actualsExporter->download($sector, $framework);
         }
 
         $templatePath = resource_path('templates/bulk-performance-upload-template.xlsx');
@@ -312,13 +357,20 @@ class BulkUploadController extends Controller
 
     private function authorizeBulkUploadUser(?User $user): array|\Illuminate\Http\RedirectResponse
     {
-        if (!$user || !$user->isDeliveryUnit()) {
+        if (!$user || (!$user->isDeliveryUnit() && !$user->isDataAdmin())) {
             return redirect()->route('dashboard')->with('failure', 'You do not have permission to access this page.');
         }
 
+        $assignedSector = $user->isDataAdmin();
+        $assignedSectorIds = $assignedSector
+            ? [(int) $assignedSector->id]
+            : $user->getAssignedSectorIds();
+
         return [
+            'uploadMode' => $assignedSector ? 'actuals' : 'structure',
+            'isDataAdmin' => (bool) $assignedSector,
             'canAccessAllSectors' => $user->canAccessAllSectors(),
-            'assignedSectorIds' => $user->getAssignedSectorIds(),
+            'assignedSectorIds' => $assignedSectorIds,
         ];
     }
 }

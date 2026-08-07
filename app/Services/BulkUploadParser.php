@@ -240,13 +240,6 @@ class BulkUploadParser
             return $warnings;
         }
 
-        if ($target !== '' && $q1Actual === '') {
-            $warnings[] = [
-                'row' => $sn,
-                'message' => 'Missing Q1 actual value for a record with an annual target.',
-            ];
-        }
-
         return $warnings;
     }
 

@@ -70,6 +70,8 @@
 @section('content')
     @php
         $meta = $report['meta'];
+        $uploadMode = $report['upload_mode'] ?? 'structure';
+        $isActualsUpload = $uploadMode === 'actuals';
         $submittedAt = $report['submitted_at'];
         $toneColors = [
             'primary' => ['text' => 'text-[#00693e]', 'bar' => 'bg-[#00693e]', 'track' => 'bg-[#00693e]/10', 'border' => 'hover:border-[#00693e]/20'],
@@ -133,14 +135,24 @@
                     </div>
                     <div class="mt-8 pt-4 border-t border-primary/10 flex items-center gap-2" style="color: var(--bu-success);">
                         <span class="material-symbols-outlined text-sm">verified_user</span>
-                        <span class="text-sm font-medium">Records saved to sector framework</span>
+                        <span class="text-sm font-medium">
+                            @if($isActualsUpload)
+                                Quarterly actuals saved and pending Sector Head approval
+                            @else
+                                Records saved to sector framework
+                            @endif
+                        </span>
                     </div>
                 </div>
 
                 <div class="lg:col-span-7 bu-card border border-primary/10 rounded-xl p-6 md:p-8 shadow-sm">
                     <h2 class="text-xl font-semibold text-on-background mb-6 flex items-center gap-2">
                         <span class="material-symbols-outlined" style="color: var(--bu-primary);">bar_chart</span>
-                        Quarterly Target Distribution
+                        @if($isActualsUpload)
+                            Quarterly Performance
+                        @else
+                            Quarterly Target Distribution
+                        @endif
                     </h2>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4">
                         @foreach($report['quarterly_averages'] as $quarter)
@@ -164,28 +176,55 @@
                         Import Summary
                     </h2>
                     @php $stats = $report['import_stats']; @endphp
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
-                            <p class="text-on-surface-variant mb-1">Commitments</p>
-                            <p class="font-semibold text-on-background">{{ $stats['commitments_created'] }} new / {{ $stats['commitments_matched'] }} matched</p>
+                    @if($isActualsUpload)
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Rows Processed</p>
+                                <p class="font-semibold text-on-background">{{ $stats['rows_processed'] ?? 0 }}</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Actuals Updated</p>
+                                <p class="font-semibold text-on-background">{{ $stats['actuals_updated'] ?? 0 }}</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">New Submissions</p>
+                                <p class="font-semibold text-on-background">{{ $stats['actuals_submitted'] ?? 0 }}</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Skipped (Locked)</p>
+                                <p class="font-semibold text-on-background">{{ $stats['skipped_locked'] ?? 0 }}</p>
+                            </div>
                         </div>
-                        <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
-                            <p class="text-on-surface-variant mb-1">Deliverables</p>
-                            <p class="font-semibold text-on-background">{{ $stats['deliverables_created'] }} new / {{ $stats['deliverables_matched'] }} matched</p>
+                        @if(($stats['skipped_no_kpi'] ?? 0) > 0 || ($stats['skipped_no_milestone'] ?? 0) > 0)
+                            <p class="text-sm text-on-surface-variant mt-4">
+                                {{ ($stats['skipped_no_kpi'] ?? 0) + ($stats['skipped_no_milestone'] ?? 0) }}
+                                record(s) could not be matched to an existing KPI or quarterly milestone.
+                            </p>
+                        @endif
+                    @else
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Commitments</p>
+                                <p class="font-semibold text-on-background">{{ $stats['commitments_created'] }} new / {{ $stats['commitments_matched'] }} matched</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Deliverables</p>
+                                <p class="font-semibold text-on-background">{{ $stats['deliverables_created'] }} new / {{ $stats['deliverables_matched'] }} matched</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">KPIs</p>
+                                <p class="font-semibold text-on-background">{{ $stats['kpis_created'] }} new / {{ $stats['kpis_matched'] }} matched</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Milestones</p>
+                                <p class="font-semibold text-on-background">{{ $stats['milestones_created'] }} new / {{ $stats['milestones_updated'] }} updated</p>
+                            </div>
                         </div>
-                        <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
-                            <p class="text-on-surface-variant mb-1">KPIs</p>
-                            <p class="font-semibold text-on-background">{{ $stats['kpis_created'] }} new / {{ $stats['kpis_matched'] }} matched</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
-                            <p class="text-on-surface-variant mb-1">Milestones</p>
-                            <p class="font-semibold text-on-background">{{ $stats['milestones_created'] }} new / {{ $stats['milestones_updated'] }} updated</p>
-                        </div>
-                    </div>
-                    @if(($stats['milestones_skipped'] ?? 0) > 0)
-                        <p class="text-sm text-on-surface-variant mt-4">
-                            {{ $stats['milestones_skipped'] }} quarterly milestone(s) were skipped because Data Admins have already entered actual values.
-                        </p>
+                        @if(($stats['milestones_skipped'] ?? 0) > 0)
+                            <p class="text-sm text-on-surface-variant mt-4">
+                                {{ $stats['milestones_skipped'] }} quarterly milestone(s) were skipped because Data Admins have already entered actual values.
+                            </p>
+                        @endif
                     @endif
                 </section>
             @endif

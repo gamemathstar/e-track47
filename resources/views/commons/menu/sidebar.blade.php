@@ -172,6 +172,15 @@
                         </div>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ route('bulk-upload.index') }}"
+                       class="side-menu {{ Request::is('bulk-upload*') ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="upload"></i></div>
+                        <div class="side-menu__title">
+                            Bulk Actuals Upload
+                        </div>
+                    </a>
+                </li>
             @endif
             {{--        <li>--}}
             {{--            <a href="javascript:;" class="side-menu">--}}

@@ -164,11 +164,19 @@
                     <span class="font-semibold text-primary">Bulk Upload</span>
                 </nav>
                 <h1 class="text-2xl md:text-[32px] font-bold tracking-tight text-on-background leading-tight">
-                    Bulk Framework Structure Upload
+                    @if(($uploadMode ?? 'structure') === 'actuals')
+                        Bulk Actuals Upload
+                    @else
+                        Bulk Framework Structure Upload
+                    @endif
                 </h1>
                 <p class="text-on-surface-variant mt-2 max-w-3xl">
-                    Upload commitments, deliverables, KPIs, annual targets, and quarterly milestones for a sector in bulk.
-                    Quarterly actual values are entered later by Data Admins through the standard performance tracking workflow.
+                    @if(($uploadMode ?? 'structure') === 'actuals')
+                        Download your sector template, enter quarterly actual values and remarks, then upload to submit performance data for Sector Head approval.
+                    @else
+                        Upload commitments, deliverables, KPIs, annual targets, and quarterly milestones for a sector in bulk.
+                        Quarterly actual values are entered later by Data Admins through the standard performance tracking workflow.
+                    @endif
                 </p>
             </div>
 
@@ -210,11 +218,32 @@
                                     <input type="hidden" name="sector_id" value="{{ $defaultSectorId }}">
                                 @endif
                             </div>
+                            @if(($uploadMode ?? 'structure') === 'actuals')
+                                <div>
+                                    <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-1"
+                                           for="reportingQuarter">
+                                        Reporting Quarter
+                                    </label>
+                                    <select id="reportingQuarter" name="reporting_quarter"
+                                            class="bulk-upload-field w-full border border-primary/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
+                                        <option value="">All quarters with values</option>
+                                        @foreach([1,2,3,4] as $quarter)
+                                            <option value="{{ $quarter }}" {{ (string) old('reporting_quarter', $entryQuarter) === (string) $quarter ? 'selected' : '' }}>
+                                                Q{{ $quarter }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
                             <div class="pt-4 border-t border-primary/10">
                                 <a href="{{ route('bulk-upload.template') }}" id="bulkUploadTemplateBtn"
                                    class="bu-btn-outline w-full py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all text-sm {{ !$uploadAllowed ? 'pointer-events-none opacity-50' : '' }}">
                                     <span class="material-symbols-outlined text-base">download</span>
-                                    Download Excel Template
+                                    @if(($uploadMode ?? 'structure') === 'actuals')
+                                        Download Sector Template
+                                    @else
+                                        Download Excel Template
+                                    @endif
                                 </a>
                             </div>
                         </div>
@@ -228,7 +257,12 @@
                                 <strong class="block text-on-background mb-1">Data Schema Rules</strong>
                                 <ul class="list-disc pl-4 text-on-surface-variant space-y-1">
                                     <li>Do not modify template headers.</li>
-                                    <li>Ensure all mandatory fields (marked with *) are complete.</li>
+                                    @if(($uploadMode ?? 'structure') === 'actuals')
+                                        <li>Only edit quarterly Actual columns and Remarks.</li>
+                                        <li>Targets and milestones are pre-filled by PDCU and must not be changed.</li>
+                                    @else
+                                        <li>Ensure all mandatory target and milestone fields are complete.</li>
+                                    @endif
                                     <li>Maximum file size is 50MB.</li>
                                 </ul>
                             </div>
@@ -320,6 +354,8 @@
             const fiscalYearSelect = document.getElementById('fiscalYear');
             const sectorSelect = document.getElementById('sector');
             const sectorSelectionLocked = @json($sectorSelectionLocked);
+            const uploadMode = @json($uploadMode ?? 'structure');
+            const templateBaseUrl = @json(route('bulk-upload.template'));
             const sectorEntryAccess = @json($sectorEntryAccess);
             const initialSectorId = @json(old('sector_id', $defaultSectorId));
             const closedMessage = document.getElementById('bulkUploadClosedMessage');
@@ -342,6 +378,25 @@
                 }
 
                 return sectorEntryAccess[String(sectorId)] === true;
+            }
+
+            function updateTemplateUrl() {
+                if (!templateBtn || uploadMode !== 'actuals') {
+                    return;
+                }
+
+                const frameworkId = fiscalYearSelect.value;
+                const sectorId = sectorSelect.value || initialSectorId;
+                if (!frameworkId || !sectorId) {
+                    templateBtn.href = templateBaseUrl;
+                    return;
+                }
+
+                const params = new URLSearchParams({
+                    framework_id: frameworkId,
+                    sector_id: sectorId,
+                });
+                templateBtn.href = templateBaseUrl + '?' + params.toString();
             }
 
             function updateUploadAvailability(sectorId) {
@@ -387,10 +442,12 @@
                 }
 
                 updateUploadAvailability(sectorSelect.value || selectedSectorId);
+                updateTemplateUrl();
             }
 
             fiscalYearSelect.addEventListener('change', function () {
                 populateSectors(this.value);
+                updateTemplateUrl();
             });
 
             if (fiscalYearSelect.value) {
@@ -398,6 +455,8 @@
             } else {
                 updateUploadAvailability(initialSectorId);
             }
+
+            updateTemplateUrl();
 
             function formatFileSize(bytes) {
                 if (bytes < 1024) return bytes + ' B';
@@ -432,6 +491,7 @@
 
             sectorSelect.addEventListener('change', function () {
                 updateUploadAvailability(this.value);
+                updateTemplateUrl();
             });
 
             browseBtn.addEventListener('click', function (e) {
