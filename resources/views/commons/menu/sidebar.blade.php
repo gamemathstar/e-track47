@@ -108,6 +108,17 @@
                     </a>
                 </li>
             @endif
+            @if($user->isDeliveryUnit())
+                <li>
+                    <a href="{{ route('bulk-upload.index') }}"
+                       class="side-menu {{ Request::is('bulk-upload*') ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="upload"></i></div>
+                        <div class="side-menu__title">
+                            Bulk Upload
+                        </div>
+                    </a>
+                </li>
+            @endif
             @if($user->isCoordinator())
                 <li>
                     <a href="{{route('frameworks.index')}}"

@@ -13,10 +13,8 @@ class Kpi extends Model
         'deliverable_id',
         'framework_id',
         'kpi',
-        'description',
         'target_value',
         'unit_of_measurement',
-        'status',
         'year',
     ];
 

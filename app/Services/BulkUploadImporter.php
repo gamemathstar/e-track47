@@ -1,0 +1,396 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Commitment;
+use App\Models\Deliverable;
+use App\Models\Framework;
+use App\Models\Kpi;
+use App\Models\KpiTarget;
+use App\Models\PerformanceTracking;
+use App\Models\Sector;
+use Illuminate\Support\Facades\DB;
+use Throwable;
+
+class BulkUploadImporter
+{
+    /** @var array<string, Commitment> */
+    private array $commitmentCache = [];
+
+    /** @var array<string, Deliverable> */
+    private array $deliverableCache = [];
+
+    /** @var array<string, Kpi> */
+    private array $kpiCache = [];
+
+    /** @var \Illuminate\Support\Collection<int, Commitment>|null */
+    private $sectorCommitments = null;
+
+    /** @var array<int, \Illuminate\Support\Collection<int, Deliverable>> */
+    private array $commitmentDeliverables = [];
+
+    /**
+     * Import all rows atomically — any failure rolls back every DB change.
+     *
+     * @throws Throwable
+     */
+    public function import(array $preview, array $meta): array
+    {
+        $this->commitmentCache = [];
+        $this->deliverableCache = [];
+        $this->kpiCache = [];
+        $this->sectorCommitments = null;
+        $this->commitmentDeliverables = [];
+
+        return DB::transaction(function () use ($preview, $meta) {
+            $sector = Sector::query()->lockForUpdate()->findOrFail($meta['sector_id']);
+            $framework = Framework::query()->findOrFail($meta['framework_id']);
+            $year = (int) $framework->year;
+
+            $stats = [
+                'commitments_created' => 0,
+                'commitments_matched' => 0,
+                'deliverables_created' => 0,
+                'deliverables_matched' => 0,
+                'kpis_created' => 0,
+                'kpis_matched' => 0,
+                'targets_created' => 0,
+                'targets_updated' => 0,
+                'milestones_created' => 0,
+                'milestones_updated' => 0,
+                'milestones_skipped' => 0,
+                'rows_processed' => 0,
+            ];
+
+            foreach ($preview['rows'] ?? [] as $row) {
+                if (trim($row['deliverable'] ?? '') === '' && trim($row['kpi'] ?? '') === '') {
+                    continue;
+                }
+
+                $stats['rows_processed']++;
+
+                $commitmentResult = $this->resolveCommitment(
+                    $sector->id,
+                    $framework->id,
+                    $row['commitment'] ?? ''
+                );
+                $stats[$commitmentResult['created'] ? 'commitments_created' : 'commitments_matched']++;
+
+                $deliverableResult = $this->resolveDeliverable(
+                    $commitmentResult['model'],
+                    $framework->id,
+                    $year,
+                    $row['deliverable'] ?? ''
+                );
+                $stats[$deliverableResult['created'] ? 'deliverables_created' : 'deliverables_matched']++;
+
+                $kpiResult = $this->resolveKpi(
+                    $deliverableResult['model'],
+                    $framework->id,
+                    $year,
+                    $row
+                );
+                $stats[$kpiResult['created'] ? 'kpis_created' : 'kpis_matched']++;
+
+                $annualTarget = $this->resolveAnnualTargetValue($row);
+                if ($annualTarget !== null) {
+                    $targetResult = $this->upsertKpiTarget($kpiResult['model'], $year, $annualTarget);
+                    $stats[$targetResult['created'] ? 'targets_created' : 'targets_updated']++;
+                }
+
+                foreach ($this->quarterMilestones($row) as $quarter => $milestone) {
+                    if ($milestone === null) {
+                        continue;
+                    }
+
+                    $milestoneResult = $this->upsertMilestone(
+                        $kpiResult['model'],
+                        $framework->id,
+                        $year,
+                        $quarter,
+                        $milestone
+                    );
+
+                    $stats[$milestoneResult['stat']]++;
+                }
+            }
+
+            return $stats;
+        });
+    }
+
+    private function resolveCommitment(int $sectorId, int $frameworkId, string $name): array
+    {
+        $cacheKey = $sectorId . ':' . $frameworkId . ':' . $this->commitmentMatchKey($name);
+
+        if (isset($this->commitmentCache[$cacheKey])) {
+            return ['model' => $this->commitmentCache[$cacheKey], 'created' => false];
+        }
+
+        $existing = $this->sectorCommitments($sectorId, $frameworkId)
+            ->first(fn (Commitment $commitment) => $this->labelsAreEquivalent($commitment->name, $name));
+
+        if ($existing) {
+            $this->commitmentCache[$cacheKey] = $existing;
+
+            return ['model' => $existing, 'created' => false];
+        }
+
+        $commitment = Commitment::create([
+            'sector_id' => $sectorId,
+            'framework_id' => $frameworkId,
+            'name' => trim($name),
+            'type' => 'Result Framework',
+            'description' => trim($name),
+            'status' => 'In Progress',
+        ]);
+
+        $this->sectorCommitments($sectorId, $frameworkId)->push($commitment);
+        $this->commitmentCache[$cacheKey] = $commitment;
+
+        return ['model' => $commitment, 'created' => true];
+    }
+
+    private function sectorCommitments(int $sectorId, int $frameworkId)
+    {
+        if ($this->sectorCommitments === null) {
+            $this->sectorCommitments = Commitment::query()
+                ->where('sector_id', $sectorId)
+                ->where('framework_id', $frameworkId)
+                ->get();
+        }
+
+        return $this->sectorCommitments;
+    }
+
+    private function deliverablesForCommitment(int $commitmentId, int $frameworkId)
+    {
+        if (!isset($this->commitmentDeliverables[$commitmentId])) {
+            $this->commitmentDeliverables[$commitmentId] = Deliverable::query()
+                ->where('commitment_id', $commitmentId)
+                ->where('framework_id', $frameworkId)
+                ->get();
+        }
+
+        return $this->commitmentDeliverables[$commitmentId];
+    }
+
+    private function resolveDeliverable(Commitment $commitment, int $frameworkId, int $year, string $name): array
+    {
+        $cacheKey = $commitment->id . ':' . $this->normalizeKey($name);
+
+        if (isset($this->deliverableCache[$cacheKey])) {
+            return ['model' => $this->deliverableCache[$cacheKey], 'created' => false];
+        }
+
+        $normalized = $this->normalizeKey($name);
+
+        $existing = $this->deliverablesForCommitment($commitment->id, $frameworkId)
+            ->first(fn (Deliverable $deliverable) => $this->labelsAreEquivalent($deliverable->deliverable, $name));
+
+        if ($existing) {
+            $this->deliverableCache[$cacheKey] = $existing;
+
+            return ['model' => $existing, 'created' => false];
+        }
+
+        $deliverable = Deliverable::create([
+            'commitment_id' => $commitment->id,
+            'framework_id' => $frameworkId,
+            'deliverable' => trim($name),
+            'start_date' => sprintf('%d-01-01', $year),
+            'end_date' => sprintf('%d-12-31', $year),
+            'status' => 'In Progress',
+        ]);
+
+        $this->deliverablesForCommitment($commitment->id, $frameworkId)->push($deliverable);
+
+        $this->deliverableCache[$cacheKey] = $deliverable;
+
+        return ['model' => $deliverable, 'created' => true];
+    }
+
+    private function resolveKpi(Deliverable $deliverable, int $frameworkId, int $year, array $row): array
+    {
+        $kpiName = trim($row['kpi'] ?? '');
+        $cacheKey = $deliverable->id . ':' . $year . ':' . $this->normalizeKey($kpiName);
+
+        if (isset($this->kpiCache[$cacheKey])) {
+            return ['model' => $this->kpiCache[$cacheKey], 'created' => false];
+        }
+
+        $existing = Kpi::query()
+            ->where('deliverable_id', $deliverable->id)
+            ->where('framework_id', $frameworkId)
+            ->where('year', $year)
+            ->get()
+            ->first(fn (Kpi $kpi) => $this->labelsAreEquivalent($kpi->kpi, $kpiName));
+
+        if ($existing) {
+            $updates = [];
+            $baseline = $this->parseNumeric($row['baseline'] ?? '');
+            if ($baseline !== null && ($existing->target_value === null || $existing->target_value === '' || $existing->target_value === '0')) {
+                $updates['target_value'] = (string) $baseline;
+            }
+            if (!empty($updates)) {
+                $existing->update($updates);
+            }
+
+            $this->kpiCache[$cacheKey] = $existing;
+
+            return ['model' => $existing, 'created' => false];
+        }
+
+        $kpi = Kpi::create([
+            'deliverable_id' => $deliverable->id,
+            'framework_id' => $frameworkId,
+            'kpi' => $kpiName,
+            'target_value' => (string) ($this->parseNumeric($row['baseline'] ?? '') ?? 0),
+            'unit_of_measurement' => $this->inferUnit($kpiName, $row['baseline'] ?? '', $row['target'] ?? ''),
+            'year' => $year,
+        ]);
+
+        $this->kpiCache[$cacheKey] = $kpi;
+
+        return ['model' => $kpi, 'created' => true];
+    }
+
+    private function upsertKpiTarget(Kpi $kpi, int $year, float $target): array
+    {
+        $existing = KpiTarget::query()
+            ->where('kpi_id', $kpi->id)
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing) {
+            $existing->target = $target;
+            $existing->save();
+
+            return ['created' => false];
+        }
+
+        KpiTarget::create([
+            'kpi_id' => $kpi->id,
+            'year' => $year,
+            'target' => $target,
+        ]);
+
+        return ['created' => true];
+    }
+
+    private function upsertMilestone(Kpi $kpi, int $frameworkId, int $year, int $quarter, float $milestone): array
+    {
+        $existing = PerformanceTracking::query()
+            ->where('kpi_id', $kpi->id)
+            ->where('quarter', $quarter)
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing) {
+            if ($existing->actual_value !== null && (float) $existing->actual_value != 0) {
+                return ['stat' => 'milestones_skipped'];
+            }
+
+            $existing->milestone = $milestone;
+            $existing->framework_id = $frameworkId;
+            if (!$existing->confirmation_status) {
+                $existing->confirmation_status = 'Not Confirmed';
+            }
+            $existing->save();
+
+            return ['stat' => 'milestones_updated'];
+        }
+
+        PerformanceTracking::create([
+            'kpi_id' => $kpi->id,
+            'framework_id' => $frameworkId,
+            'quarter' => $quarter,
+            'year' => $year,
+            'milestone' => $milestone,
+            'confirmation_status' => 'Not Confirmed',
+        ]);
+
+        return ['stat' => 'milestones_created'];
+    }
+
+    private function resolveAnnualTargetValue(array $row): ?float
+    {
+        $fullYear = $this->parseNumeric($row['full_year_target'] ?? '');
+        if ($fullYear !== null) {
+            return $fullYear;
+        }
+
+        return $this->parseNumeric($row['target'] ?? '');
+    }
+
+    private function quarterMilestones(array $row): array
+    {
+        return [
+            1 => $this->parseNumeric($row['q1_target'] ?? ''),
+            2 => $this->parseNumeric($row['q2_target'] ?? ''),
+            3 => $this->parseNumeric($row['q3_target'] ?? ''),
+            4 => $this->parseNumeric($row['q4_target'] ?? ''),
+        ];
+    }
+
+    private function normalizeKey(string $value): string
+    {
+        $value = preg_replace('/^commitment\s+\d+\s*:\s*/i', '', trim($value)) ?? trim($value);
+
+        return preg_replace('/\s+/', ' ', strtolower($value)) ?? '';
+    }
+
+    private function commitmentMatchKey(string $name): string
+    {
+        return $this->normalizeKey($name);
+    }
+
+    private function labelsAreEquivalent(string $left, string $right): bool
+    {
+        $leftKey = $this->normalizeKey($left);
+        $rightKey = $this->normalizeKey($right);
+
+        if ($leftKey === '' || $rightKey === '') {
+            return false;
+        }
+
+        if ($leftKey === $rightKey) {
+            return true;
+        }
+
+        if (str_contains($leftKey, $rightKey) || str_contains($rightKey, $leftKey)) {
+            return true;
+        }
+
+        similar_text($leftKey, $rightKey, $percent);
+
+        return $percent >= 88;
+    }
+
+    private function parseNumeric(string $value): ?float
+    {
+        $normalized = str_replace([',', '%', ' '], '', trim($value));
+        if ($normalized === '' || !is_numeric($normalized)) {
+            return null;
+        }
+
+        return (float) $normalized;
+    }
+
+    private function inferUnit(string $kpi, string $baseline, string $target): string
+    {
+        $haystack = strtolower($kpi . ' ' . $baseline . ' ' . $target);
+
+        if (str_contains($haystack, '%')) {
+            return 'Percentage';
+        }
+
+        if (preg_match('/no\.?\s*of|number of|count/i', $kpi)) {
+            return 'Count';
+        }
+
+        return 'Units';
+    }
+}

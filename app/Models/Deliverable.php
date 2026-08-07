@@ -14,9 +14,10 @@ class Deliverable extends Model
         'commitment_id',
         'framework_id',
         'deliverable',
-        'description',
+        'budget',
+        'start_date',
+        'end_date',
         'status',
-        'due_date',
     ];
 
     // Define relationships or additional methods as needed

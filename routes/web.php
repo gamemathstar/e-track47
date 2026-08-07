@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthLoginController;
+use App\Http\Controllers\BulkUploadController;
 use App\Http\Controllers\ChartController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\CommitmentController;
@@ -134,6 +135,13 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('gallery', GalleryController::class);
     });
+
+    // Bulk Performance Data Upload (PDCU Coordinator and Data Admin only)
+    Route::get('bulk-upload', [BulkUploadController::class, 'index'])->name('bulk-upload.index');
+    Route::get('bulk-upload/template', [BulkUploadController::class, 'downloadTemplate'])->name('bulk-upload.template');
+    Route::post('bulk-upload/preview', [BulkUploadController::class, 'preview'])->name('bulk-upload.preview');
+    Route::post('bulk-upload/submit', [BulkUploadController::class, 'submit'])->name('bulk-upload.submit');
+    Route::get('bulk-upload/report', [BulkUploadController::class, 'report'])->name('bulk-upload.report');
 
     // Data Entry Access Management (PDCU Coordinators only)
     Route::prefix('data-entry')->name('data-entry.')->group(function () {
