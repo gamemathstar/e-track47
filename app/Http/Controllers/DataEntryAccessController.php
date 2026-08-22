@@ -217,6 +217,12 @@ class DataEntryAccessController extends Controller
         $access->granted_at = Carbon::now();
         $access->save();
 
+        try {
+            \App\Models\Notification::notifySectorParticipantsOnOverrideGranted($access->load('sector'));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Notification error in grantOverride: '.$e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Data entry access granted successfully.',
@@ -259,6 +265,12 @@ class DataEntryAccessController extends Controller
 
             $access->status = 'closed';
             $access->save();
+
+            try {
+                \App\Models\Notification::notifySectorParticipantsOnWindowLock($access->load('sector'));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Notification error in lockAll for sector '.$sectorId.': '.$e->getMessage());
+            }
         }
 
         return response()->json([
@@ -313,6 +325,12 @@ class DataEntryAccessController extends Controller
             $access->granted_by = null;
             $access->granted_at = null;
             $access->save();
+
+            try {
+                \App\Models\Notification::notifySectorParticipantsOnWindowOpen($access->load('sector'));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Notification error in unlockAll for sector '.$sectorId.': '.$e->getMessage());
+            }
         }
 
         return response()->json([

@@ -276,6 +276,7 @@ Two endpoints accept binary uploads, sent as `multipart/form-data` (Dio
 - `POST /gallery/items` — gallery media upload (see §11.13).
 - `POST /users` — create user with optional avatar (see §11.9).
 - `POST /users/me/photo` — profile photo update (see §11.9).
+- `POST /kpis/{id}/evidence` — performance-tracking evidence upload (see §11.4.8).
 
 Scalar fields are sent as form fields alongside the file part. The file part is
 attached only when the user selected a local asset; when absent, the multipart
@@ -868,7 +869,7 @@ typically populates only the required summary fields):
 | `targetLabel` | string | ✅ | pre-formatted target label (e.g. `"Target: 85%"`) |
 | `statusLabel` | string | ✅ | display label for `status` |
 | `status` | string | ✅ | enum wire string — `active` / `stable` / `lagging` / `pending` |
-| `quartersOverview` | string[] | ✅ | per-quarter state tokens; each entry — `completed` / `in_progress` / `pending` |
+| `quartersOverview` | string[] | ✅ | Always 4 entries; indices 0–3 → Q1–Q4. Each — `completed` / `in_progress` / `pending` (see Enums for the source conditions). |
 | `lastUpdatedLabel` | string | ✅ | pre-formatted "updated" label |
 | `unit` | string | ❌ | measurement unit (e.g. `"# of boreholes"`) |
 | `targetValue` | string | ❌ | (e.g. `"85% Annual"`) |
@@ -910,8 +911,9 @@ typically populates only the required summary fields):
 | --- | --- | --- | --- |
 | `id` | string | ✅ | |
 | `filename` | string | ✅ | |
-| `kind` | string | ✅ | document kind — `pdf` / `image` (see Notes) |
+| `kind` | string | ✅ | document kind — `pdf` / `image` / `word` (see Notes). Decoding is lenient: `jpg`/`jpeg`/`png`/`gif`/`webp` → image, `doc`/`docx`/`document` → word, anything else → pdf. |
 | `sizeLabel` | string | ❌ | pre-formatted file-size label |
+| `url` | string | ❌ | Absolute URL to the stored file. Required for **image** docs so the detail page can render a thumbnail and an enlarged tap-to-zoom preview; omit for pdf/word (rendered as a type icon). Should be directly fetchable by the client (signed/public GET). |
 
 **Status codes:** `200` · `401` · `404`.
 
@@ -983,7 +985,39 @@ typically populates only the required summary fields):
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
-#### 11.4.5 Add tracking entry
+#### 11.4.5 Get milestone
+
+| | |
+| --- | --- |
+| **Purpose** | Read the existing milestone value for a KPI + quarter + year, to pre-fill the "Set Milestone" sheet when it opens. |
+| **Method / Path** | `GET /kpis/{id}/milestones?quarter={q1..q4}&year={year}` |
+| **Auth** | Bearer required |
+| **Path params** | `id` — KPI identifier |
+| **Query params** | `quarter` — `QuarterIndex` wire string (`q1`–`q4`); `year` — int. Both always sent. |
+
+**Success — `200 OK`** (raw object):
+
+```json
+{ "value": "85" }
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `value` | string \| null | ❌ | The saved milestone value as a string. `null` (or omitted) when no milestone has been set for that KPI/quarter/year. |
+
+The client reads **only** `value` and treats a missing / `null` / non-string
+value as "no milestone set yet" → blank field. Return **`200` with
+`value: null`** for the not-set case — **not** `404`.
+
+⚠ **Backend note.** This `GET` shares the path with the `POST` in
+[§11.4.4](#1144-set-milestone). The backend currently registers **only** the
+`POST` route there, so a read returns **`405 Method Not Allowed`**. Add the
+`GET` handler on the same path (or expose it at a dedicated path and tell the
+mobile team so we repoint the client).
+
+**Status codes:** `200` · `401` · `404` (unknown KPI).
+
+#### 11.4.6 Add tracking entry
 
 | | |
 | --- | --- |
@@ -1020,13 +1054,154 @@ typically populates only the required summary fields):
 
 **Status codes:** `2xx`/`202` · `401` · `404` · `409`.
 
+#### 11.4.7 Tracking-entry context (read)
+
+| | |
+| --- | --- |
+| **Purpose** | The minimal slice the "Add Performance Tracking" sheet needs — a purpose-built read so the sheet doesn't pull the heavy [§11.4.2](#1142-get-kpi-detail) detail payload just to render a few labels. |
+| **Method / Path** | `GET /kpis/{id}/tracking-context` |
+| **Auth** | Bearer required |
+| **Path params** | `id` — KPI identifier |
+
+**Success — `200 OK`** (raw object):
+
+```json
+{
+  "kpiId": "ehr-coverage",
+  "kpiTitle": "Percentage of clinics with EHR",
+  "commitmentLabel": "Maternal Health Expansion",
+  "quarter": "q3",
+  "year": 2024,
+  "unit": "%",
+  "currentMilestoneValue": "85%"
+}
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `kpiId` | string | ✅ | |
+| `kpiTitle` | string | ✅ | shown as the sheet's header subtitle |
+| `commitmentLabel` | string | ✅ | parent commitment name — the first context chip |
+| `quarter` | string | ✅ | `QuarterIndex` wire token (`q1`–`q4`); the quarter chip + the submit payload's `quarter` |
+| `year` | int | ✅ | the year chip + the submit payload's `year` |
+| `unit` | string | ❌ | suffix for the actual-value field (e.g. `%`, `boreholes`); omit when none |
+| `currentMilestoneValue` | string | ❌ | milestone already set for this quarter (read-only readout); omit/null when none |
+
+The client parses `kpiId`/`kpiTitle`/`commitmentLabel`/`quarter` as strings and
+`year` as an int (strict); `unit`/`currentMilestoneValue` are optional. The
+submit still POSTs to [§11.4.6](#1146-add-tracking-entry) using the `quarter`
+and `year` from this payload.
+
+**Status codes:** `200` · `401` · `404` (unknown KPI).
+
+#### 11.4.8 Upload evidence
+
+| | |
+| --- | --- |
+| **Purpose** | Upload one evidence file for a KPI; the returned document id is then submitted in [§11.4.6](#1146-add-tracking-entry)'s `evidenceDocumentIds`. |
+| **Method / Path** | `POST /kpis/{id}/evidence` |
+| **Auth** | Bearer required |
+| **Content-Type** | `multipart/form-data` (Dio `FormData`; boundary set automatically — see §10) |
+| **Path params** | `id` — KPI identifier |
+
+**Form parts**
+
+| Part | Req. | Notes |
+| --- | --- | --- |
+| `file` | ✅ | the picked file (`MultipartFile.fromFile`); the client sends the original filename. Images are downscaled/re-encoded on-device before upload. |
+
+**Success — `200`/`201`** (raw object):
+
+```json
+{ "id": "doc-1716800000000" }
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | server document id; the **only** field the client reads. Include it in the tracking-entry submit's `evidenceDocumentIds`. |
+
+The client uploads each file as it is picked (one request per file), shows a
+per-attachment uploading / failed (retryable) state, and blocks the submit
+until every upload settles. A non-string/missing `id` is a parse error.
+
+**Status codes:** `200`/`201` · `400`/`422` (bad/oversized file) · `401` ·
+`404` (unknown KPI).
+
+#### 11.4.9 Annual targets (list + save)
+
+Backs the "Set Annual Targets" sheet
+(`ui-designs/kpi_tracking/#23 set_target_bottom_sheet.html`) — set the
+annual benchmark for each KPI under a deliverable, for a fiscal year.
+
+| | |
+| --- | --- |
+| **Purpose** | List the deliverable's KPIs (baseline + current target) and save edited targets in one batch. |
+| **List** | `GET /deliverables/{deliverableId}/annual-targets?year={year}` |
+| **Save** | `POST /deliverables/{deliverableId}/annual-targets` |
+| **Auth** | Bearer required |
+| **Path params** | `deliverableId` — deliverable identifier |
+| **Query params** | `year` (int, list only) — fiscal year scope |
+
+**List success — `200 OK`** (array of `AnnualTargetItemModel`):
+
+```json
+[
+  {
+    "kpiId": "kpi-classroom-blocks",
+    "category": "Infrastructure & Works",
+    "title": "Construction of new classroom blocks in prioritized LGAs",
+    "baselineValue": "48",
+    "baselineUnit": "blocks",
+    "targetUnit": "blocks",
+    "targetValue": "120"
+  }
+]
+```
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `kpiId` | string | ✅ | |
+| `category` | string | ✅ | grouping eyebrow — the **parent commitment's name** |
+| `title` | string | ✅ | KPI description |
+| `baselineValue` | string | ✅ | the KPI's **latest confirmed `actual_value`** ("where you stand today"), as a display-ready string (e.g. `"48"`, `"250k"`) |
+| `baselineUnit` | string | ✅ | baseline unit suffix |
+| `targetUnit` | string | ✅ | target input unit suffix |
+| `targetValue` | string | ❌ | last-saved target; omitted when none is set |
+
+**Save request body** — from `SaveAnnualTargetsParams`
+
+| Field | Type | Req. | Validation |
+| --- | --- | --- | --- |
+| `year` | int | ✅ | 2000..2100 (client-enforced) |
+| `targets` | object[] | ✅ | **only KPIs the user changed** are sent; omitted KPIs = no change. A cleared target is not sent (no clear endpoint yet). |
+| `targets[].kpiId` | string | ✅ | |
+| `targets[].value` | string | ✅ | raw input; client validates as a non-negative number (per-KPI errors keyed by `kpiId`) |
+
+```json
+{
+  "year": 2024,
+  "targets": [
+    { "kpiId": "kpi-classroom-blocks", "value": "120" },
+    { "kpiId": "kpi-textbooks", "value": "750" }
+  ]
+}
+```
+
+**Save success:** any 2xx (body ignored).
+
+**Status codes:** `200` (list) · `2xx` (save) · `401` · `404` (unknown deliverable) · `422` (target validation).
+
 **Enums in this section**
 
 - `QuarterIndex` (request `quarter`; response `activeQuarter`) → `q1` · `q2` · `q3` · `q4`
 - KPI `status` (response) → `active` · `stable` · `lagging` · `pending`
-- KPI `quartersOverview[]` entry (response) → `completed` · `in_progress` · `pending`
+- KPI `quartersOverview[]` entry (response) — fixed 4-element array, indices 0–3 = Q1–Q4:
+  - `pending` — no actual value submitted yet (no row, or `actual_value` null/empty)
+  - `in_progress` — actual value submitted but not finalised; collapses Pending SH / Pending Facilitator / Pending Coordinator / Rejected into one bucket (`confirmation_status` ≠ `Confirmed`)
+  - `completed` — coordinator finalised the quarter (`confirmation_status` = `Confirmed`)
+  - (finer-grained badges would arrive as a sibling `quartersStatusDetail` field, not new enum values here)
 - Submission `status` (response, nested) → `pending` · `confirmed`
-- Supporting-doc `kind` (response, nested) → `pdf` · `image`
+- Supporting-doc `kind` (response, nested) → `pdf` · `image` · `word` (lenient decoding — see the `supportingDocuments[].kind` note above)
 
 
 ---
@@ -1301,7 +1476,21 @@ Request params: `review_submission_params.dart` (`ReviewSubmissionParams`,
 | **Purpose** | List submissions awaiting final coordinator approval. |
 | **Method / Path** | `GET /approvals/coordinator/queue` |
 | **Auth** | Bearer required |
-| **Params** | none |
+
+**Query parameters** — all optional except `sort` (always sent):
+
+| Param | Req. | Notes |
+| --- | --- | --- |
+| `sector` | ❌ | Sector id; scopes the queue to a single sector. Omitted for "all sectors". |
+| `year` | ❌ | Reporting year (int) — the active framework's year; scopes the queue to that cycle. |
+| `quarter` | ❌ | Quarter wire token (`q1`–`q4`); scopes the queue to that quarter. Omitted for "all quarters". |
+| `sort` | ✅ | Sort order — `newest` \| `oldest` (by submission/update time). Defaults to `newest`. |
+
+**Example request**
+
+```text
+GET /approvals/coordinator/queue?sector=health&year=2024&quarter=q3&sort=newest
+```
 
 **Success — `200 OK`** (raw array of `ApprovalQueueItemModel`):
 
@@ -1339,8 +1528,8 @@ Request params: `review_submission_params.dart` (`ReviewSubmissionParams`,
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `id` | string | ✅ | Queue-row identifier (distinct from `kpiId`). |
-| `kpiId` | string | ✅ | KPI / submission key used for the detail call. |
+| `id` | string | ✅ | Submission key — the backend's `performance_trackings.id` rendered as a string. **The same value** is returned by the sector-head bulk candidates ([§11.6.3](#1163-sector-head-bulk-candidates)) and accepted by bulk-approve ([§11.6.8](#1168-bulk-approve-submissions)) for the same submission. Distinct from `kpiId`. |
+| `kpiId` | string | ✅ | KPI key used for the detail call (distinct from the submission `id`). |
 | `kpiTitle` | string | ✅ | |
 | `sectorLabel` | string | ✅ | |
 | `sectorAccent` | string | ✅ | Colour hint (`primary`/`secondary`/`tertiary`/`error`). |
@@ -1411,31 +1600,58 @@ field must be a string when present.
 | **Auth** | Bearer required |
 | **Query params** | `grouping` (**required**) — `by_commitment` \| `by_deliverable`. |
 
-**Success — `200 OK`** (raw array of `BulkApprovalGroupModel`):
+**Success — `200 OK`** (raw **object** — header metadata + `groups`):
 
 ```json
-[
-  {
-    "title": "Commitment: Reduce Maternal Mortality",
-    "items": [
-      {
-        "id": "bulk-1",
-        "title": "Antenatal coverage",
-        "value": "82%",
-        "adminName": "F. Ibrahim"
-      },
-      {
-        "id": "bulk-2",
-        "title": "Skilled birth attendance",
-        "value": "74%",
-        "adminName": "F. Ibrahim"
-      }
-    ]
-  }
-]
+{
+  "quarterLabel": "2024 Q3",
+  "sectorLabel": "Infrastructure & Transport",
+  "groups": [
+    {
+      "title": "Commitment: Reduce Maternal Mortality",
+      "items": [
+        {
+          "id": "bulk-1",
+          "title": "Antenatal coverage",
+          "value": "82%",
+          "adminName": "F. Ibrahim"
+        },
+        {
+          "id": "bulk-2",
+          "title": "Skilled birth attendance",
+          "value": "74%",
+          "adminName": "F. Ibrahim"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-**Response fields** — `BulkApprovalGroupModel`
+⚠ **Backend note — response shape changed (object, not array).** This endpoint
+now returns an **object** so the bulk page's header is fully data-driven (the
+item count is derived client-side from `groups`, but the period and sector are
+not). Populate `quarterLabel` (the active reporting period, e.g. `"2024 Q3"`)
+and `sectorLabel` (the sector head's sector name, **without** a `Sector: `
+prefix — the client adds it). The previous bare-array form is no longer parsed.
+
+ℹ **Header quarter when reached from the queue.** When the bulk page is opened
+from the sector-head queue's "Approve Selected", the client carries the queue's
+selected quarter and **overrides the quarter portion of the header**, keeping
+only the **year** from `quarterLabel` (e.g. response `"2024 Q3"` + selected `q1`
+→ header `"2024 Q1"`). So `quarterLabel`'s quarter is only authoritative when the
+page is opened standalone; its **year is always used**. Keep a 4-digit year in
+`quarterLabel` so the override can extract it.
+
+**Response fields** — top level
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `quarterLabel` | string | ✅ | Reporting-period label for the header pill (e.g. `2024 Q3`). |
+| `sectorLabel` | string | ✅ | The sector head's sector name (e.g. `Health`); the client renders `Sector: {sectorLabel}`. |
+| `groups` | array&lt;BulkApprovalGroup&gt; | ✅ | Grouped candidates (below); may be an empty array. |
+
+**`BulkApprovalGroup`** (object inside `groups[]`)
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
@@ -1454,6 +1670,18 @@ field must be a string when present.
 A group fails to parse unless `title` is a string and `items` is a list; each
 item requires all four string fields.
 
+✅ **Id alignment with the review queue — confirmed.** The sector-head approval
+queue ([§11.6.2](#1162-sector-head-review-queue)) lets the user tick rows and tap
+**"Approve Selected"**, which opens the bulk page carrying the ticked
+**`ApprovalQueueItem.id`** values. The client then pre-selects the
+**intersection** of those ids with the `BulkApprovalItem.id`s returned here.
+Backend confirms all three endpoints — `/sector-head/queue` (§11.6.2),
+`/sector-head/bulk` (this endpoint), and `/submissions/bulk-approve`
+([§11.6.8](#1168-bulk-approve-submissions)) — return/accept the **same
+`performance_trackings.id`** for a given submission, so the carry-through
+pre-selects correctly (the carried list is a strict subset of this endpoint's
+items). The coordinator path shares the same guarantee.
+
 **Status codes:** `200` · `401`.
 
 #### 11.6.4 Facilitator verification queue
@@ -1463,7 +1691,25 @@ item requires all four string fields.
 | **Purpose** | Submissions awaiting facilitator verification, grouped for the verification page. |
 | **Method / Path** | `GET /approvals/facilitator/queue` |
 | **Auth** | Bearer required |
-| **Query params** | `grouping` (**required**) — `by_sector` \| `by_kpi`. |
+
+**Query parameters**
+
+| Param | Req. | Notes |
+| --- | --- | --- |
+| `grouping` | ✅ | `by_sector` \| `by_kpi` — how rows are bucketed into groups. |
+| `quarter` | ❌ | Quarter wire token (`q1`–`q4`). Scopes the queue to that quarter; the client always sends the selected quarter chip. |
+| `sector` | ❌ | Sector id. Scopes the queue to a single sector; omitted for "all sectors". The client also omits this filter entirely (and never sends `sector`) when the facilitator is assigned only one sector. |
+
+The facilitator's assigned sectors are resolved server-side from the auth token;
+`sector` narrows within those. A scoped request returns only the matching
+groups, each carrying only its in-scope items; a group left with no items is
+omitted.
+
+**Example request**
+
+```text
+GET /approvals/facilitator/queue?grouping=by_sector&quarter=q3&sector=agriculture
+```
 
 **Success — `200 OK`** (raw array of `FacilitatorVerificationGroupModel`):
 
@@ -1481,6 +1727,7 @@ item requires all four string fields.
         "sectorLabel": "Agriculture",
         "sectorAccent": "primary",
         "state": "pending_facilitator",
+        "quarter": "q3",
         "actualValue": "120 units"
       }
     ]
@@ -1583,9 +1830,14 @@ is a list.
   "targetValue": "350 / 100k",
   "remarks": "Awaiting verification of field survey data.",
   "attachments": [
-    "field_survey_q3.pdf",
-    "lab_results.xlsx",
-    "site_photo.jpg"
+    { "name": "field_survey_q3.pdf", "url": "https://cdn.example.com/files/field_survey_q3.pdf" },
+    { "name": "site_photo.jpg", "url": "https://cdn.example.com/files/site_photo.jpg" }
+  ],
+  "deliveryDateLabel": "Oct 12, 2024",
+  "deliveryValue": "41.0%",
+  "deliveryRemarks": "Cross-checked against field reports; minor variance accepted.",
+  "deliveryAttachments": [
+    { "name": "verification_report.pdf", "url": "https://cdn.example.com/files/verification_report.pdf" }
   ]
 }
 ```
@@ -1605,9 +1857,25 @@ is a list.
 | `actualValue` | string | ✅ | |
 | `targetValue` | string | ✅ | |
 | `remarks` | string | ❌ | |
-| `attachments` | array&lt;string&gt; | ❌ | Defaults to `[]`; each entry must be a string. |
+| `attachments` | array&lt;object&gt; | ❌ | Defaults to `[]`. Each entry is `{ "name": string, "url"?: string }` (see **Attachment object** below). A bare string is still accepted for backward compatibility and treated as `name` with no `url`. |
+| `deliveryDateLabel` | string | ❌ | Prior-stage delivery-department verification date. |
+| `deliveryValue` | string | ❌ | The delivery department's verified value. |
+| `deliveryRemarks` | string | ❌ | The delivery department's verification remark. |
+| `deliveryAttachments` | array&lt;object&gt; | ❌ | Verification evidence; same **Attachment object** shape as `attachments`. Defaults to `[]`. |
+
+**Attachment object**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `name` | string | ✅ | File name shown on the row (extension drives the image/PDF icon). |
+| `url` | string | ❌ | Absolute URL to the stored file. Required for **image** files (`.jpg/.jpeg/.png/.gif/.webp`) so the review sheet can render a thumbnail and an enlarged tap-to-zoom preview; omit (or null) for non-previewable types. Should be directly fetchable by the client (signed/public GET). |
 
 The response must be a JSON object (a non-object body raises a parse error).
+
+The `delivery*` fields carry the prior **delivery-department verification**
+(the value/remark/date/attachments captured at the facilitator stage). The
+client surfaces them **only on the coordinator's review**, and only those
+present — populate them for submissions at `pending_coordinator`.
 
 **Status codes:** `200` · `401` · `404` (unknown `kpiId`).
 
@@ -1652,7 +1920,7 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | | |
 | --- | --- |
-| **Purpose** | Sector head approves multiple submissions in one call. |
+| **Purpose** | A reviewer approves multiple submissions in one call. Used by the **sector head** (from the bulk candidates) and the **coordinator** (final review queue — accepting in bulk, finalizing each to `confirmed`). |
 | **Method / Path** | `POST /approvals/submissions/bulk-approve` |
 | **Auth** | Bearer required |
 | **Params** | none |
@@ -1661,20 +1929,23 @@ coordinator → `confirmed`); on reject it moves to `rejected`.
 
 | Field | Type | Req. | Validation |
 | --- | --- | --- | --- |
-| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve (the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates)). |
-| `role` | string | ✅ | Reviewer role wire token — see Enums (used as `sector_head` here). |
+| `submissionIds` | array&lt;string&gt; | ✅ | Submission ids to approve — the `BulkApprovalItem.id` values from [11.6.3](#1163-sector-head-bulk-candidates) (sector head) or the row `id` values from the coordinator queue [11.6.1](#1161-coordinator-review-queue) (coordinator). These are the **same `performance_trackings.id`** the queues return, so the client carries a queue selection straight into the bulk action — see the (confirmed) id-alignment note in [§11.6.3](#1163-sector-head-bulk-candidates). |
+| `role` | string | ✅ | Reviewer role wire token — `sector_head` \| `coordinator` (see Enums). The server applies that role's accept transition to **every** listed submission (sector head → `pending_facilitator`; **coordinator → `confirmed`**), so the role must match the submissions' current stage. |
+
+A coordinator finalizing a multi-select from the review queue:
 
 ```json
 {
-  "submissionIds": ["bulk-1", "bulk-2", "bulk-3"],
-  "role": "sector_head"
+  "submissionIds": ["coord-mmr", "coord-electrification"],
+  "role": "coordinator"
 }
 ```
 
 **Success:** any 2xx (body ignored; the contract notes `202 Accepted`).
 
-**Status codes:** `2xx` · `401` · `409` (one or more submissions already
-decided / not approvable).
+**Status codes:** `2xx` · `401` · `403` (role not permitted for these
+submissions) · `409` (one or more submissions already decided / not
+approvable for this role's stage).
 
 ---
 
@@ -1685,7 +1956,7 @@ decided / not approvable).
 - **Review decision** (`decision`) — `accept`, `reject`.
 - **Bulk grouping** (`grouping`, [11.6.3](#1163-sector-head-bulk-candidates)) — `by_commitment`, `by_deliverable`.
 - **Verification grouping** (`grouping`, [11.6.4](#1164-facilitator-verification-queue)) — `by_sector`, `by_kpi`.
-- **My-KPIs filter** (`filter`, [11.6.5](#1165-data-admin-my-kpis)) — `all`, `pending_entry`, `pending_sh`, `confirmed`.
+- **My-KPIs filter** (`filter`, [11.6.5](#1165-data-admin-my-kpis)) — `all`, `pending_entry`, `pending_sector_head`, `pending_facilitator`, `pending_coordinator`, `confirmed`, `rejected`. Every non-`all` value equals a submission-lifecycle `overallState` token, so the server filters on `overall_state == filter`.
 - **Quarter** (`quarter`) — `q1`, `q2`, `q3`, `q4`.
 
 
@@ -1936,14 +2207,14 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 {
   "avgPerformanceFraction": 0.78,
   "avgPerformanceLabel": "78%",
-  "topSectorLabel": "Health",
+  "topSectorLabel": "Healthcare",
   "pendingCount": 12,
   "pendingCaption": "Pending review",
   "sectorBars": [
-    { "label": "Health", "fraction": 0.85, "valueLabel": "85", "accent": "primary" },
-    { "label": "Education", "fraction": 0.72, "valueLabel": "72", "accent": "secondary" },
-    { "label": "Agriculture", "fraction": 0.64, "valueLabel": "64", "accent": "tertiary" },
-    { "label": "Works", "fraction": 0.48, "valueLabel": "48", "accent": "error" }
+    { "label": "Healthcare", "short": "HLT", "fraction": 0.85, "valueLabel": "85", "accent": "#2E7D32" },
+    { "label": "Education", "short": "EDU", "fraction": 0.72, "valueLabel": "72", "accent": "#1565C0" },
+    { "label": "Agriculture", "short": "AGR", "fraction": 0.64, "valueLabel": "64", "accent": "#F9A825" },
+    { "label": "Public Works", "short": "", "fraction": 0.48, "valueLabel": "48", "accent": "#C62828" }
   ],
   "statusMix": {
     "achievedFraction": 0.6,
@@ -1963,7 +2234,7 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 | --- | --- | --- | --- |
 | `avgPerformanceFraction` | number | ✅ | 0–1 fraction (sent as number, read as double). |
 | `avgPerformanceLabel` | string | ✅ | |
-| `topSectorLabel` | string | ✅ | |
+| `topSectorLabel` | string | ✅ | Full sector name. The top-sector scorecard shows a compact form, sourced client-side from the matching `sectorBars[]` entry's `short` (no dedicated wire field). |
 | `pendingCount` | int | ✅ | Number, coerced via `toInt()`. |
 | `pendingCaption` | string | ✅ | |
 | `sectorBars` | array&lt;ReportsHubBar&gt; | ✅ | Must be a list. |
@@ -1973,10 +2244,11 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `label` | string | ✅ | |
+| `label` | string | ✅ | Full sector name. |
+| `short` | string | ✅ | Compact sector label (`sector.description`, e.g. `"HLT"`) shown in the comparison-row column. Always present; may be `""` when the sector has no description — the client then derives one (first word of `label`). |
 | `fraction` | number | ✅ | 0–1 fraction (double). |
 | `valueLabel` | string | ✅ | |
-| `accent` | string | ✅ | Colour hint. |
+| `accent` | string | ✅ | Colour hint — may be a token (`primary`…) or a hex string (`#2E7D32`). The hub bars use a primary opacity ladder regardless, so non-token values degrade to `primary`. |
 
 **`ReportsStatusMix`** (the `statusMix` object)
 
@@ -2251,9 +2523,150 @@ Request entities: `report_filter.dart` (`ReportFilter`, `ReportSetupParams`),
 
 ---
 
+#### 11.8.7 Generate comprehensive Excel / PDF report
+
+| | |
+| --- | --- |
+| **Purpose** | Mobile equivalent of the web's "Download Excel" / "Print → Save as PDF" buttons on `/reports/comprehensive`. Generates the **same** comprehensive multi-sheet workbook (Overall Summary, Grand Summary, Sector Summary Details, one sheet per sector) as Excel, **or** the same printable view as PDF — driven by `type`. Returns a `downloadUrl` to fetch the artifact. |
+| **Method / Path** | `POST /reports/comprehensive-report` |
+| **Auth** | Bearer required |
+| **Body — `ComprehensiveReportRequest`** | |
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `sectors` | string[] | optional | Sector ids to include — the **same string ids** returned by `GET /sectors` (§11.3.1) and accepted by every other sector-scoped endpoint (`/reports/hub?sectorId`, `/dashboard/governor?sector`, `/approvals/facilitator/queue?sector`, …). Empty/omitted ⇒ every sector in the framework. Ignored for Sector Head / Data Admin (they're always pinned to their own sector). Unknown id ⇒ `422` with `fieldErrors["sectors.0"]`. |
+| `year` | int | ✅ | 4-digit year (matches a `frameworks.year`). |
+| `start_quarter` | int | ✅ | 1..4. |
+| `end_quarter` | int | ✅ | 1..4, must be `>= start_quarter`. |
+| `type` | string | ✅ | One of `excel`, `pdf`. |
+
+**Sector scoping**
+
+- **Governor / Coordinator / Deputy Coordinator / System Admin** — `sectors` honoured; empty ⇒ all framework sectors.
+- **Sector Head / Data Admin** — pinned to their own sector regardless of what's sent.
+- **Other roles** — `403 forbidden`.
+
+> **Client note — quarter mapping (mobile).** The mobile client wires this to the
+> comprehensive-report **setup** form (`#31`), reusing `ReportSetupParams`:
+> - `start_quarter`/`end_quarter` — the form picks a **single** period
+>   (Annual or Q1–Q4); the client maps **Annual ⇒ `1..4`** and **Qn ⇒ `n..n`**.
+> - `type` — from the client's `ReportFormat` (`excel`/`pdf`); Word/Print are
+>   not offered for this endpoint.
+
+**Request example**
+
+```json
+{
+  "sectors": ["3", "5"],
+  "year": 2024,
+  "start_quarter": 1,
+  "end_quarter": 4,
+  "type": "excel"
+}
+```
+
+**Success — `200 OK`** (raw object `GeneratedReportModel`):
+
+```json
+{
+  "id": "comp-9k2x8h4l",
+  "format": "excel",
+  "filename": "All_Sectors_MDAs_Full_Year_Assessment_Reporting_2024.xlsx",
+  "fileSizeLabel": "248 KB",
+  "downloadUrl": "https://api.pdcu.gov.ng/storage/uploads/reports/comp-9k2x8h4l.xlsx"
+}
+```
+
+**Response fields**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | Opaque artifact id (also the filename stem on disk). |
+| `format` | string | ✅ | Echoes the requested `type`: `excel` or `pdf`. |
+| `filename` | string | ✅ | Suggested filename for the client to save as (extension matches `format`). |
+| `fileSizeLabel` | string | ✅ | Human-readable file size, e.g. `"248 KB"`. |
+| `downloadUrl` | string | ✅ | Public URL — client fetches the file separately. May be cached by the CDN; treat as opaque. |
+
+**Status codes:** `200` · `401` · `403` · `422` (year has no framework, `end_quarter < start_quarter`, `type` not `excel`/`pdf`, etc.).
+
+> ⚠ Generation is synchronous: large frameworks may take several seconds. Show a spinner; don't time out the request below 30s. The `downloadUrl` is a static file — no auth header required to fetch it.
+
+---
+
+#### 11.8.8 Generate single-sector Word document
+
+| | |
+| --- | --- |
+| **Purpose** | Mobile equivalent of the web's "Generate Word Document" form on `/reports/word`. Generates the **single-sector PDCU Performance Assessment Report** as a `.docx` — header + Section A (Summary Overview), the colour-coded rating legend, Section B (per-commitment performance table), Section C (observations + recommendations), and the signatures block. Document content is byte-identical to the web stream-download for the same inputs. |
+| **Method / Path** | `POST /reports/word-document` |
+| **Auth** | Bearer required |
+| **Body — `WordDocumentRequest`** | |
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `sector_id` | string | ✅ | The same string id `GET /sectors` returns (§11.3.1). Exactly one sector per request. |
+| `year` | int | ✅ | 4-digit year; must match a `frameworks.year`. |
+| `observations` | string | optional | Free-form narrative, max 10 000 chars. Rendered in Section C, "Observations:" cell. Newlines preserved. |
+| `recommendations` | string | optional | Free-form narrative, max 10 000 chars. Rendered in Section C, "Recommendations…" cell. Newlines preserved. |
+| `pdcu_coordinator_signature` | string | optional | Printed inline above the "PDCU Coordinator" signature line. Max 255 chars. |
+| `pdcu_coordinator_date` | date | optional | ISO `YYYY-MM-DD`. Printed inline next to the PDCU Coordinator signature. |
+| `sector_facilitator_signature` | string | optional | Printed above the "Sector / MDA Facilitator" line. Max 255 chars. |
+| `sector_facilitator_date` | date | optional | ISO `YYYY-MM-DD`. |
+
+**Sector scoping**
+
+- **Governor / Coordinator / Deputy Coordinator / System Admin** — `sector_id` honoured.
+- **Sector Head / Data Admin** — pinned to their own sector regardless of `sector_id`. Sending a different `sector_id` is **silently overridden** (no error) so the form can be left enabled for them; the document is always for their sector.
+- A non-pinned user requesting a sector they have no access to ⇒ `403 forbidden`.
+- Unknown `sector_id` ⇒ `422` `fieldErrors.sector_id`.
+
+**Request example**
+
+```json
+{
+  "sector_id": "3",
+  "year": 2024,
+  "observations": "Overall performance was rated good at 66%. This was slightly below the mid-year score of 43% rated Very Good…",
+  "recommendations": "Attention needs to be focused on the five areas assessed with unsatisfactory performance…",
+  "pdcu_coordinator_signature": "Eng. A. M. Yusuf",
+  "pdcu_coordinator_date": "2025-01-12",
+  "sector_facilitator_signature": "Mrs. F. K. Bello",
+  "sector_facilitator_date": "2025-01-14"
+}
+```
+
+**Success — `200 OK`** (raw object `GeneratedReportModel`):
+
+```json
+{
+  "id": "word-7f3a8c9d",
+  "format": "word",
+  "filename": "Performance_Report_State_Investment_Promotion_Agency_2024.docx",
+  "fileSizeLabel": "62 KB",
+  "downloadUrl": "https://api.pdcu.gov.ng/storage/uploads/reports/word-7f3a8c9d.docx"
+}
+```
+
+**Response fields**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | Opaque artifact id. |
+| `format` | string | ✅ | Always `"word"` for this endpoint. |
+| `filename` | string | ✅ | Suggested save filename, shape `Performance_Report_<Sector>_<Year>.docx`. Special chars in the sector name are collapsed to `_`. |
+| `fileSizeLabel` | string | ✅ | Human-readable file size, e.g. `"62 KB"`. |
+| `downloadUrl` | string | ✅ | Public URL — fetch the file separately. No auth header required. |
+
+**Status codes:** `200` · `401` · `403` · `422`.
+
+> ⚠ Generation is synchronous (typically 1–4 s). The `downloadUrl` is a static file — safe to hand to the OS share sheet / Linking.openURL / a download manager.
+
+---
+
 **Enums in this section**
 
 - **Report format** (`format`, request body / `GeneratedReportModel.format`) — `excel`, `word`, `pdf`, `print`.
+- **Report type** (`type`, comprehensive-report request) — `excel`, `pdf`.
 - **Quarter** (`quarter`) — `q1`, `q2`, `q3`, `q4`.
 - **Accent** (colour hint on `accent`/`currentAccent`/`percentAccent`/`perfAccent` fields; client-side `ReportAccent`) — `primary`, `secondary`, `tertiary`, `error`, `on_surface`.
 
@@ -2351,6 +2764,8 @@ error).
   "role": "sector_head",
   "roleLabel": "Administrator",
   "sectorLabel": "Public Sector",
+  "email": "amina.egbe@pdcu.gov.ng",
+  "phone": "+2348030000001",
   "fullLegalName": "Amina Yusuf Egbe",
   "staffId": "PDCU-2023-441",
   "joinDate": "Oct 12, 2023",
@@ -2371,6 +2786,8 @@ error).
 | `role` | string | ✅ | wire enum (snake_case) |
 | `roleLabel` | string | ✅ | human label |
 | `sectorLabel` | string | ✅ | human label |
+| `email` | string | ❌ | powers the Email quick action (`mailto:`); button disabled when absent |
+| `phone` | string | ❌ | powers the Call/SMS quick actions (`tel:`/`sms:`); buttons disabled when absent |
 | `fullLegalName` | string | ✅ | |
 | `staffId` | string | ✅ | |
 | `joinDate` | string | ✅ | display string (not necessarily ISO — e.g. `"Oct 12, 2023"`) |
@@ -2378,7 +2795,9 @@ error).
 | `twoFactorStatus` | string | ✅ | display string, e.g. `"Enabled (SMS/Email)"` |
 | `isVerified` | bool | ✅ | |
 
-All fields required; any wrong-typed field raises a parse error.
+All required fields must be present and correctly typed or the payload
+raises a parse error. The optional `email`/`phone` degrade to empty
+strings when absent or wrong-typed.
 
 **Status codes:** `200` · `401` · `404` unknown `id`.
 
@@ -2826,7 +3245,17 @@ referenced from each role's response table.
 | **Purpose** | State-wide performance snapshot for the Governor home. |
 | **Method / Path** | `GET /dashboard/governor` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `sector` (optional) — sector id; omitted = all sectors. `year` (optional int) — fiscal year. `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`); omitted = **Annual** (whole year). All omitted on the initial load. |
+
+The dashboard renders a filter row (sector dropdown · fiscal-year dropdown ·
+Annual/Q1–Q4 segmented control); changing any of them re-fetches with the
+params above. ⚠ **Backend note:** the endpoint must **scope every aggregate**
+(hero scorecard, tiles, sector comparison, portfolio donut, insights) to the
+supplied `sector`/`year`/`quarter` — they are whole-state server aggregations
+the client can't re-derive. The fiscal-year options come from the frameworks'
+`reportingYear`s ([§11.5.1](#1151-list-frameworks)); the client defaults the
+selected year to the active framework's. Until the endpoint honors these
+params, the filters change the selection but the data stays whole-state.
 
 **Response fields** (raw object)
 
@@ -2974,13 +3403,22 @@ referenced from each role's response table.
 | **Purpose** | Single-sector overview and commitment breakdown for the Sector-Head home. |
 | **Method / Path** | `GET /dashboard/sector-head` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`). Scopes the **`commitments[]`** rows' `actualPercent`/`planPercent` to that quarter. **Omitted** on the initial load. |
+
+The Sector-Head dashboard renders quarter chips above the commitment-tracking
+list; tapping one re-fetches with `?quarter=`. ⚠ **Backend note:** the
+client currently defaults the selected chip to **Q1** because the response
+carries no active-quarter field — please add a `quarterLabel` (or
+`activeQuarter`) to the response (echoing the requested/active quarter, e.g.
+request `?quarter=q3` → respond `"quarterLabel": "Q3"`) so the chip can seed
+correctly, mirroring [§11.11.5](#11115-data-admin-dashboard). Until then the
+`quarter` param is accepted but the chip seeds to Q1.
 
 **Response fields** (raw object)
 
 | Field | Type | Req. | Notes |
 | --- | --- | --- | --- |
-| `sectorName` | string | ✅ | e.g. `My Sector — Health` |
+| `sectorName` | string | ✅ | e.g. `My Sector — Health`. The client strips a leading `My Sector — ` prefix before display. |
 | `overallPercent` | number | ✅ | double |
 | `activeKpis` | int | ✅ | |
 | `totalCommitments` | int | ✅ | |
@@ -2988,7 +3426,8 @@ referenced from each role's response table.
 | `inProgressCommitments` | int | ✅ | |
 | `atRiskCommitments` | int | ✅ | |
 | `pendingApprovals` | int | ✅ | |
-| `commitments` | array | ✅ | list of [`SectorPerformanceRowModel`](#dash-sector-row) |
+| `commitments` | array | ✅ | list of [`SectorPerformanceRowModel`](#dash-sector-row); when `?quarter=` is sent, scope each row's `actualPercent`/`planPercent` to that quarter. |
+| `quarterLabel` | string | ❌ | *(recommended — not yet sent)* the active/requested quarter, e.g. `"Q3"`; seeds the chip selection. |
 
 ```json
 {
@@ -3017,7 +3456,12 @@ referenced from each role's response table.
 | **Purpose** | Quarter completion, upcoming deadlines, and recent activity for the Data-Admin home. |
 | **Method / Path** | `GET /dashboard/data-admin` |
 | **Auth** | Bearer required |
-| **Params** | none |
+| **Query params** | `quarter` (optional) — `QuarterIndex` wire token (`q1`–`q4`). Re-scopes the snapshot (hero metrics + deadlines + activity) to that quarter. **Omitted** on the initial load, where the server resolves the active quarter and echoes it in `quarterLabel`. |
+
+The client renders quarter chips between the hero card and the deadlines;
+tapping one re-fetches with `?quarter=`. It seeds the selected chip from the
+returned `quarterLabel`, so keep that field consistent with the requested
+quarter (e.g. request `?quarter=q4` → respond with `quarterLabel: "Q4"`).
 
 **Response fields** (raw object)
 
@@ -3037,9 +3481,10 @@ referenced from each role's response table.
 | --- | --- | --- | --- |
 | `id` | string | ✅ | |
 | `title` | string | ✅ | |
-| `dueLabel` | string | ✅ | pre-formatted (e.g. `Due 15 Nov`) |
+| `dueLabel` | string | ✅ | pre-formatted window-state label — one of `Due {M j}` / `Extended to {M j}` / `Deadline passed` / `Due this period` (fallback). Display text only; don't parse a date out of it. |
+| `periodLabel` | string | ❌ | quarter + framework year the deadline refers to (e.g. `"Q2 2024"`). Rendered next to `dueLabel`. The client treats it as optional (older/fallback rows omit it). |
 | `ctaLabel` | string | ✅ | call-to-action label (e.g. `Enter Actual`, `Draft`) |
-| `accent` | string | ✅ | accent slot |
+| `accent` | string | ✅ | window-state colour: `primary` (in-window/fallback) · `tertiary` (extension granted) · `error` (deadline passed) |
 
 ```json
 {
@@ -3049,8 +3494,8 @@ referenced from each role's response table.
   "totalKpis": 12,
   "completionPercent": 25,
   "deadlines": [
-    { "id": "kpi-irrigation", "title": "Irrigation Coverage", "dueLabel": "Due 15 Nov", "ctaLabel": "Enter Actual", "accent": "primary" },
-    { "id": "kpi-crop-yield", "title": "Crop Yield Metrics", "dueLabel": "Due 18 Nov", "ctaLabel": "Draft", "accent": "secondary" }
+    { "id": "kpi-irrigation", "title": "Irrigation Coverage", "dueLabel": "Due 30 Jun", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "primary" },
+    { "id": "kpi-crop-yield", "title": "Crop Yield Metrics", "dueLabel": "Deadline passed", "periodLabel": "Q2 2024", "ctaLabel": "Enter Actual", "accent": "error" }
   ],
   "recentActivity": [
     { "id": "act-fertilizer", "title": "Fertilizer Dist.", "subtitle": "Pending Sector Head", "timeLabel": "Today 10:45 AM", "accent": "primary" },
@@ -3434,7 +3879,7 @@ The client filters by `tab` server-side; an empty array is valid.
 | --- | --- |
 | **Purpose** | Read-only public gallery tiles, scoped by filter chip. |
 | **Method / Path** | `GET /gallery/public` |
-| **Auth** | Bearer required |
+| **Auth** | **Optional** — sent **with or without** an `Authorization: Bearer` header. Signed-out callers are accepted (no `401`); signed-in callers are accepted too. Server response is identical either way — only items where `status = 'active'` and `is_public = true` are returned. |
 | **Path params** | none |
 | **Query params** | `filter` — required; one of `all` \| `roads` \| `healthcare` \| `education` (the [`PublicGalleryFilter`](#gallery-enums) wire value; always sent) |
 
@@ -3448,7 +3893,7 @@ The client filters by `tab` server-side; an empty array is valid.
 ]
 ```
 
-**Status codes:** `200` · `401` · `403`.
+**Status codes:** `200`.
 
 <a name="gallery-item"></a>**`GalleryItemModel`** (shared by both list endpoints)
 
@@ -3474,7 +3919,7 @@ and correctly typed, or the whole list item fails to parse.
 | --- | --- |
 | **Purpose** | Full detail page for one gallery item (hero + stat grid + read-only comments). |
 | **Method / Path** | `GET /gallery/items/{id}` |
-| **Auth** | Bearer required |
+| **Auth** | **Optional** — same rules as §11.13.2. Anonymous callers receive `200` for items where `status = 'active'` and `is_public = true`. Items that don't match (private, archived, or non-existent) return **`404 not_found`** — uniform response so the existence of private items isn't leaked. System Admins receive `200` for any item regardless of public/active flags (so the management list's detail links keep working for archived/unpublished entries). |
 | **Path params** | `id` — gallery item id |
 | **Query params** | none |
 
@@ -3537,7 +3982,7 @@ and correctly typed, or the whole list item fails to parse.
 | `timeLabel` | string | ✅ | pre-formatted |
 | `body` | string | ✅ | |
 
-**Status codes:** `200` · `401` · `404` (unknown id).
+**Status codes:** `200` · `404` (unknown id, OR private/archived for anonymous callers — see Auth row above).
 
 #### 11.13.4 Upload item (multipart)
 
@@ -3804,6 +4249,69 @@ semantics). Nested `quietFrom`/`quietTo` are sent as `{ "hour", "minute" }`.
 
 **Status codes:** `204` success · `401` · `404` (unknown id).
 
+#### 11.14.6 Register a device for push
+
+| | |
+| --- | --- |
+| **Purpose** | Register the device's current FCM token so the server can target push notifications at this handset. Call **after a successful login** and on **every FCM token rotation** (FCM rotates the token periodically; the SDK exposes a callback). Multiple devices per user are supported — each handset has its own token row. |
+| **Method / Path** | `POST /notifications/device-token` |
+| **Auth** | Bearer required |
+| **Content-Type** | `application/json` |
+
+**Request body**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `token` | string | ✅ | The FCM registration token. 32–512 chars. |
+| `platform` | string | ❌ | One of `ios`, `android`, `web`. Defaults server-side to `android`. |
+| `appVersion` | string | ❌ | Free-form display version, e.g. `"v2.4.0 (Build 2024.11.08)"`. Max 32 chars. |
+
+```json
+{
+  "token": "f9pZ_x…the-FCM-token…",
+  "platform": "android",
+  "appVersion": "v2.4.0 (Build 2024.11.08)"
+}
+```
+
+**Success:** `204 No Content` (body ignored). Idempotent — re-registering the same token is a no-op (just refreshes `last_seen_at`). If the handset was re-paired with a different user, ownership transfers to the calling user.
+
+**Status codes:** `204` · `400`/`422` (missing/short token) · `401`.
+
+#### 11.14.7 Unregister this device
+
+| | |
+| --- | --- |
+| **Purpose** | Remove the device's FCM token so push notifications stop. Call on **explicit logout**. (On uninstall, FCM eventually surfaces `UNREGISTERED` to the server and the row is pruned automatically.) |
+| **Method / Path** | `DELETE /notifications/device-token` |
+| **Auth** | Bearer required |
+| **Content-Type** | `application/json` |
+
+**Request body**
+
+| Field | Type | Req. | Notes |
+| --- | --- | --- | --- |
+| `token` | string | ✅ | The FCM registration token. |
+
+```json
+{ "token": "f9pZ_x…the-FCM-token…" }
+```
+
+**Success:** `204 No Content`. Silent no-op if the token isn't registered or belongs to a different user.
+
+**Status codes:** `204` · `400`/`422` · `401`.
+
+---
+
+> **Lifecycle hooks (server-side, for reference).** Push + in-app inbox notifications are dispatched on these v2 transitions, gated by `NotificationPreference` and quiet hours:
+> - **Data Admin submits performance** (§11.4.3) → Sector Head(s) — kind `submission`
+> - **Sector Head accepts** (§11.6.7) → Facilitators of the sector — kind `approval`
+> - **Facilitator accepts** (§11.6.7) → Coordinators — kind `approval`
+> - **Coordinator accepts → Confirmed** (§11.6.7 / §11.6.8 bulk) → Original Data Admin(s) — kind `approval`
+> - **Any reject** (§11.6.7) → Data Admin(s) of the sector — kind `rejection`
+>
+> The push payload's `data` block carries `notificationId`, `kind`, `deepLinkRoute`, `deepLinkParams` (JSON-stringified) so the client can route a tap into the right screen.
+
 **Enums in this section**
 
 <a name="notif-enums"></a>
@@ -3813,6 +4321,7 @@ semantics). Nested `quietFrom`/`quietTo` are sent as `{ "hour", "minute" }`.
 | `NotificationTab` (`?tab=`, 11.14.1) | `all`, `unread`, `mentions` |
 | `NotificationKind` (`kind`) | `submission`, `approval`, `rejection`, `discussion`, `deadline`, `mention`, `system` |
 | `NotificationAccent` (`accent`) | `primary`, `secondary`, `tertiary`, `error` |
+| `DevicePlatform` (`platform`, 11.14.6) | `ios`, `android`, `web` |
 
 Unknown `kind`/`tab`/`accent` wire values fall back to `system`/`all`/`primary`
 respectively (the client never throws on an unrecognized enum string). `iconKey`

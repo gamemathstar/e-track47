@@ -2,7 +2,9 @@
 
 namespace App\Exceptions;
 
+use App\Support\V2\ApiResponse;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -25,6 +27,17 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        // v2-only error contract. Scoped strictly to `api/v2/*` (GR3): returning
+        // null for any other request leaves web HTML error pages and the v1 API
+        // response path completely untouched.
+        $this->renderable(function (Throwable $e, Request $request) {
+            if (! $request->is('api/v2/*')) {
+                return null;
+            }
+
+            return ApiResponse::exception($e);
         });
     }
 }

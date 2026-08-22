@@ -11,10 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Remove date fields from commitments table (if they exist)
-        if (Schema::hasColumn('commitments', 'start_date')) {
-            Schema::table('commitments', function (Blueprint $table) {
-                $table->dropColumn(['start_date', 'end_date', 'duration_in_days']);
+        // Remove date fields from commitments table (only those that exist).
+        // Guarded per-column so a fresh migrate (where some legacy columns such as
+        // `duration_in_days` were never created) does not fail. Already-run on the
+        // live DB, so this only affects fresh/test builds.
+        $commitmentDateCols = array_values(array_filter(
+            ['start_date', 'end_date', 'duration_in_days'],
+            fn ($col) => Schema::hasColumn('commitments', $col)
+        ));
+        if ($commitmentDateCols) {
+            Schema::table('commitments', function (Blueprint $table) use ($commitmentDateCols) {
+                $table->dropColumn($commitmentDateCols);
             });
         }
 

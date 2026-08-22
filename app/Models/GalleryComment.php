@@ -16,6 +16,7 @@ class GalleryComment extends Model
         'phone_number',
         'email',
         'comment',
+        'status',
     ];
 
     /**
