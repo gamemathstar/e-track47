@@ -148,6 +148,7 @@ class FrameworkController extends Controller
             'source_framework_id' => 'required_if:creation_method,inherit|exists:frameworks,id',
             'selected_sector_ids' => 'required_if:creation_method,inherit|array',
             'selected_sector_ids.*' => 'exists:sectors,id',
+            'inherit_scope' => 'required_if:creation_method,inherit|in:full,sectors_only',
         ]);
 
         // If inheriting, validate source framework exists and is not draft
@@ -196,15 +197,19 @@ class FrameworkController extends Controller
                 'created_by' => $user->id,
             ]);
 
-            // If inheriting, copy selected sectors and their data from source framework
+            // If inheriting, copy selected sectors (and optionally their structure) from source framework
             if ($creationMethod === 'inherit' && isset($sourceFramework)) {
                 $selectedSectorIds = $request->input('selected_sector_ids', []);
                 if (empty($selectedSectorIds)) {
+                    DB::rollBack();
+
                     return redirect()->back()
                         ->with('failure', 'Please select at least one sector to inherit.')
                         ->withInput();
                 }
-                $this->copyFrameworkData($sourceFramework, $framework, $selectedSectorIds);
+
+                $inheritScope = $validated['inherit_scope'] ?? 'full';
+                $this->copyFrameworkData($sourceFramework, $framework, $selectedSectorIds, $inheritScope);
             }
 
             DB::commit();
@@ -233,32 +238,36 @@ class FrameworkController extends Controller
     }
 
     /**
-     * Copy annual configuration (sectors, commitments, deliverables, KPIs, etc.)
-     * from a source framework into a newly created target framework.
-     * Only copies the selected sectors and their related data.
+     * Copy annual configuration from a source framework into a newly created target framework.
+     * When $inheritScope is "sectors_only", only sector records are copied.
+     * When $inheritScope is "full", selected sectors and their commitments, deliverables, and KPIs are copied.
      */
-    protected function copyFrameworkData(Framework $sourceFramework, Framework $targetFramework, array $selectedSectorIds): void
-    {
-        // Get selected sectors from source framework
+    protected function copyFrameworkData(
+        Framework $sourceFramework,
+        Framework $targetFramework,
+        array $selectedSectorIds,
+        string $inheritScope = 'full',
+    ): void {
         $sourceSectors = Sector::where('framework_id', $sourceFramework->id)
             ->whereIn('id', $selectedSectorIds)
             ->get();
 
         foreach ($sourceSectors as $sourceSector) {
-            // Copy sector
             $newSector = Sector::create([
                 'sector_name' => $sourceSector->sector_name,
                 'description' => $sourceSector->description,
                 'framework_id' => $targetFramework->id,
             ]);
 
-            // Get commitments for this sector
+            if ($inheritScope === 'sectors_only') {
+                continue;
+            }
+
             $sourceCommitments = Commitment::where('framework_id', $sourceFramework->id)
                 ->where('sector_id', $sourceSector->id)
                 ->get();
 
             foreach ($sourceCommitments as $sourceCommitment) {
-                // Copy commitment
                 $newCommitment = Commitment::create([
                     'name' => $sourceCommitment->name,
                     'type' => $sourceCommitment->type,
@@ -269,13 +278,11 @@ class FrameworkController extends Controller
                     'framework_id' => $targetFramework->id,
                 ]);
 
-                // Get deliverables for this commitment
                 $sourceDeliverables = Deliverable::where('framework_id', $sourceFramework->id)
                     ->where('commitment_id', $sourceCommitment->id)
                     ->get();
 
                 foreach ($sourceDeliverables as $sourceDeliverable) {
-                    // Copy deliverable
                     $newDeliverable = Deliverable::create([
                         'deliverable' => $sourceDeliverable->deliverable,
                         'status' => $sourceDeliverable->status,
@@ -283,14 +290,12 @@ class FrameworkController extends Controller
                         'framework_id' => $targetFramework->id,
                     ]);
 
-                    // Get KPIs for this deliverable
                     $sourceKpis = Kpi::where('framework_id', $sourceFramework->id)
                         ->where('deliverable_id', $sourceDeliverable->id)
                         ->get();
 
                     foreach ($sourceKpis as $sourceKpi) {
-                        // Copy KPI (but NOT performance tracking data)
-                        // Note: target_value and year are copied as they are structural definitions, not performance data
+                        // Copy KPI structure only — not performance tracking / targets
                         Kpi::create([
                             'kpi' => $sourceKpi->kpi,
                             'unit_of_measurement' => $sourceKpi->unit_of_measurement,

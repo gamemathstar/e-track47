@@ -271,7 +271,7 @@
                         </label>
                         <div class="tip-box">
                             <p style="font-size: 0.875rem; color: #475569; line-height: 1.625; margin: 0;">
-                                <span style="font-weight: bold; color: #008550;">Pro tip:</span> Inheriting will copy all sectors, commitments, deliverables, and KPIs. You can edit them in the next step.
+                                <span style="font-weight: bold; color: #008550;">Pro tip:</span> On the next step you can choose full structure or sectors only, and pick which sectors to carry over.
                             </p>
                         </div>
                         <div style="margin-top: auto; padding-top: 2rem;">

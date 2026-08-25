@@ -390,6 +390,44 @@
                         <input type="hidden" name="source_framework_id" value="{{ $sourceFramework->id }}">
                         <input type="hidden" name="status" value="Draft">
 
+                        <!-- Inherit Scope -->
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="font-size: 0.875rem; font-weight: bold; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <span class="material-symbols-outlined"
+                                      style="font-size: 1.125rem; color: #008550;">tune</span>
+                                Inheritance Mode
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                                <label for="inherit-scope-full"
+                                       style="display: flex; gap: 0.75rem; align-items: flex-start; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; cursor: pointer; background: #fff;">
+                                    <input type="radio" name="inherit_scope" id="inherit-scope-full" value="full"
+                                           {{ old('inherit_scope', 'full') === 'full' ? 'checked' : '' }}
+                                           style="margin-top: 0.2rem;">
+                                    <span>
+                                        <strong style="display: block; color: #0f172a; margin-bottom: 0.25rem;">Full structure</strong>
+                                        <span style="font-size: 0.875rem; color: #64748b; line-height: 1.4;">
+                                            Copy selected sectors with their commitments, deliverables, and KPIs.
+                                        </span>
+                                    </span>
+                                </label>
+                                <label for="inherit-scope-sectors"
+                                       style="display: flex; gap: 0.75rem; align-items: flex-start; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; cursor: pointer; background: #fff;">
+                                    <input type="radio" name="inherit_scope" id="inherit-scope-sectors" value="sectors_only"
+                                           {{ old('inherit_scope') === 'sectors_only' ? 'checked' : '' }}
+                                           style="margin-top: 0.2rem;">
+                                    <span>
+                                        <strong style="display: block; color: #0f172a; margin-bottom: 0.25rem;">Sectors only</strong>
+                                        <span style="font-size: 0.875rem; color: #64748b; line-height: 1.4;">
+                                            Copy selected sector names only. Commitments, deliverables, and KPIs are not inherited.
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                            @error('inherit_scope')
+                                <span style="color: #ef4444; font-size: 0.75rem; display: block; margin-top: 0.5rem;">{{ $message }}</span>
+                            @enderror
+                        </div>
+
                         <!-- Structure Preview -->
                         @if(isset($sectors) && $sectors->count() > 0)
                             <div style="margin-bottom: 2.5rem;">
@@ -443,9 +481,8 @@
                                         </details>
                                     @endforeach
                                 </div>
-                                <p style="margin-top: 0.75rem; font-size: 0.75rem; color: #94a3b8; text-align: center;">
-                                    Select which sectors and their associated commitments, deliverables, and KPIs to
-                                    inherit.
+                                <p id="inherit-scope-help" style="margin-top: 0.75rem; font-size: 0.75rem; color: #94a3b8; text-align: center;">
+                                    Select which sectors and their associated commitments, deliverables, and KPIs to inherit.
                                 </p>
                             </div>
                         @endif
@@ -457,7 +494,7 @@
                             <div>
                                 <h4 style="color: #92400e; font-weight: bold; font-size: 0.875rem; margin: 0 0 0.25rem 0;">
                                     Action Warning</h4>
-                                <p style="color: #b45309; font-size: 0.875rem; margin: 0.25rem 0 0 0; line-height: 1.5;">
+                                <p id="inherit-scope-warning" style="color: #b45309; font-size: 0.875rem; margin: 0.25rem 0 0 0; line-height: 1.5;">
                                     KPI targets and performance data will <span
                                         style="font-weight: bold; text-decoration: underline;">not</span> be
                                     copied. Only the structural hierarchy, definitions, and associations will be
@@ -516,6 +553,48 @@
         document.addEventListener('DOMContentLoaded', function () {
             const checkAllCheckbox = document.getElementById('check-all-sectors');
             const sectorCheckboxes = document.querySelectorAll('.sector-checkbox-item');
+            const scopeRadios = document.querySelectorAll('input[name="inherit_scope"]');
+            const helpText = document.getElementById('inherit-scope-help');
+            const warningText = document.getElementById('inherit-scope-warning');
+            const structureBadges = document.querySelectorAll('.structure-badge');
+            const structureDetails = document.querySelectorAll('.structure-details');
+
+            const copyByScope = {
+                full: {
+                    help: 'Select which sectors and their associated commitments, deliverables, and KPIs to inherit.',
+                    warning: 'KPI targets and performance data will <span style="font-weight: bold; text-decoration: underline;">not</span> be copied. Only the structural hierarchy, definitions, and associations will be inherited.',
+                },
+                sectors_only: {
+                    help: 'Select which sectors to inherit. Commitments, deliverables, and KPIs will not be copied.',
+                    warning: 'Only sector names and descriptions will be copied. You will need to add commitments, deliverables, and KPIs separately for the new framework.',
+                },
+            };
+
+            function updateScopeUi() {
+                const selected = document.querySelector('input[name="inherit_scope"]:checked');
+                const scope = selected ? selected.value : 'full';
+                const copy = copyByScope[scope] || copyByScope.full;
+
+                if (helpText) {
+                    helpText.textContent = copy.help;
+                }
+                if (warningText) {
+                    warningText.innerHTML = copy.warning;
+                }
+
+                const hideNestedPreview = scope === 'sectors_only';
+                structureBadges.forEach(function (badge) {
+                    badge.style.display = hideNestedPreview ? 'none' : '';
+                });
+                structureDetails.forEach(function (details) {
+                    details.style.display = hideNestedPreview ? 'none' : '';
+                });
+            }
+
+            scopeRadios.forEach(function (radio) {
+                radio.addEventListener('change', updateScopeUi);
+            });
+            updateScopeUi();
 
             // Check all functionality
             if (checkAllCheckbox) {
