@@ -36,87 +36,139 @@ class BulkUploadImporter
      */
     public function import(array $preview, array $meta): array
     {
+        return DB::transaction(function () use ($preview, $meta) {
+            $framework = Framework::query()->findOrFail($meta['framework_id']);
+            $year = (int) $framework->year;
+
+            $totals = $this->emptyStats();
+            $sectorBundles = $this->sectorBundlesFromPreview($preview, $meta);
+
+            foreach ($sectorBundles as $bundle) {
+                $sectorStats = $this->importSectorRows(
+                    (int) $bundle['sector_id'],
+                    (int) $framework->id,
+                    $year,
+                    $bundle['rows'] ?? []
+                );
+
+                foreach ($sectorStats as $key => $value) {
+                    $totals[$key] = ($totals[$key] ?? 0) + $value;
+                }
+            }
+
+            $totals['sectors_processed'] = count($sectorBundles);
+
+            return $totals;
+        });
+    }
+
+    /**
+     * @return array{sector_id:int, rows:array<int, array>}[]
+     */
+    private function sectorBundlesFromPreview(array $preview, array $meta): array
+    {
+        if (!empty($preview['sectors'])) {
+            return collect($preview['sectors'])
+                ->map(fn (array $sectorPreview) => [
+                    'sector_id' => (int) ($sectorPreview['sector_id'] ?? 0),
+                    'rows' => $sectorPreview['rows'] ?? [],
+                ])
+                ->filter(fn (array $bundle) => $bundle['sector_id'] > 0)
+                ->values()
+                ->all();
+        }
+
+        return [[
+            'sector_id' => (int) $meta['sector_id'],
+            'rows' => $preview['rows'] ?? [],
+        ]];
+    }
+
+    private function emptyStats(): array
+    {
+        return [
+            'commitments_created' => 0,
+            'commitments_matched' => 0,
+            'deliverables_created' => 0,
+            'deliverables_matched' => 0,
+            'kpis_created' => 0,
+            'kpis_matched' => 0,
+            'targets_created' => 0,
+            'targets_updated' => 0,
+            'milestones_created' => 0,
+            'milestones_updated' => 0,
+            'milestones_skipped' => 0,
+            'rows_processed' => 0,
+            'sectors_processed' => 0,
+        ];
+    }
+
+    private function importSectorRows(int $sectorId, int $frameworkId, int $year, array $rows): array
+    {
         $this->commitmentCache = [];
         $this->deliverableCache = [];
         $this->kpiCache = [];
         $this->sectorCommitments = null;
         $this->commitmentDeliverables = [];
 
-        return DB::transaction(function () use ($preview, $meta) {
-            $sector = Sector::query()->lockForUpdate()->findOrFail($meta['sector_id']);
-            $framework = Framework::query()->findOrFail($meta['framework_id']);
-            $year = (int) $framework->year;
+        Sector::query()->lockForUpdate()->findOrFail($sectorId);
 
-            $stats = [
-                'commitments_created' => 0,
-                'commitments_matched' => 0,
-                'deliverables_created' => 0,
-                'deliverables_matched' => 0,
-                'kpis_created' => 0,
-                'kpis_matched' => 0,
-                'targets_created' => 0,
-                'targets_updated' => 0,
-                'milestones_created' => 0,
-                'milestones_updated' => 0,
-                'milestones_skipped' => 0,
-                'rows_processed' => 0,
-            ];
+        $stats = $this->emptyStats();
 
-            foreach ($preview['rows'] ?? [] as $row) {
-                if (trim($row['deliverable'] ?? '') === '' && trim($row['kpi'] ?? '') === '') {
+        foreach ($rows as $row) {
+            if (trim($row['deliverable'] ?? '') === '' && trim($row['kpi'] ?? '') === '') {
+                continue;
+            }
+
+            $stats['rows_processed']++;
+
+            $commitmentResult = $this->resolveCommitment(
+                $sectorId,
+                $frameworkId,
+                $row['commitment'] ?? ''
+            );
+            $stats[$commitmentResult['created'] ? 'commitments_created' : 'commitments_matched']++;
+
+            $deliverableResult = $this->resolveDeliverable(
+                $commitmentResult['model'],
+                $frameworkId,
+                $year,
+                $row['deliverable'] ?? ''
+            );
+            $stats[$deliverableResult['created'] ? 'deliverables_created' : 'deliverables_matched']++;
+
+            $kpiResult = $this->resolveKpi(
+                $deliverableResult['model'],
+                $frameworkId,
+                $year,
+                $row
+            );
+            $stats[$kpiResult['created'] ? 'kpis_created' : 'kpis_matched']++;
+
+            $annualTarget = $this->resolveAnnualTargetValue($row);
+            if ($annualTarget !== null) {
+                $targetResult = $this->upsertKpiTarget($kpiResult['model'], $year, $annualTarget);
+                $stats[$targetResult['created'] ? 'targets_created' : 'targets_updated']++;
+            }
+
+            foreach ($this->quarterMilestones($row) as $quarter => $milestone) {
+                if ($milestone === null) {
                     continue;
                 }
 
-                $stats['rows_processed']++;
-
-                $commitmentResult = $this->resolveCommitment(
-                    $sector->id,
-                    $framework->id,
-                    $row['commitment'] ?? ''
-                );
-                $stats[$commitmentResult['created'] ? 'commitments_created' : 'commitments_matched']++;
-
-                $deliverableResult = $this->resolveDeliverable(
-                    $commitmentResult['model'],
-                    $framework->id,
+                $milestoneResult = $this->upsertMilestone(
+                    $kpiResult['model'],
+                    $frameworkId,
                     $year,
-                    $row['deliverable'] ?? ''
+                    $quarter,
+                    $milestone
                 );
-                $stats[$deliverableResult['created'] ? 'deliverables_created' : 'deliverables_matched']++;
 
-                $kpiResult = $this->resolveKpi(
-                    $deliverableResult['model'],
-                    $framework->id,
-                    $year,
-                    $row
-                );
-                $stats[$kpiResult['created'] ? 'kpis_created' : 'kpis_matched']++;
-
-                $annualTarget = $this->resolveAnnualTargetValue($row);
-                if ($annualTarget !== null) {
-                    $targetResult = $this->upsertKpiTarget($kpiResult['model'], $year, $annualTarget);
-                    $stats[$targetResult['created'] ? 'targets_created' : 'targets_updated']++;
-                }
-
-                foreach ($this->quarterMilestones($row) as $quarter => $milestone) {
-                    if ($milestone === null) {
-                        continue;
-                    }
-
-                    $milestoneResult = $this->upsertMilestone(
-                        $kpiResult['model'],
-                        $framework->id,
-                        $year,
-                        $quarter,
-                        $milestone
-                    );
-
-                    $stats[$milestoneResult['stat']]++;
-                }
+                $stats[$milestoneResult['stat']]++;
             }
+        }
 
-            return $stats;
-        });
+        return $stats;
     }
 
     private function resolveCommitment(int $sectorId, int $frameworkId, string $name): array

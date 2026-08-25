@@ -80,7 +80,13 @@
                     <div class="flex flex-wrap items-center gap-3 text-on-surface-variant">
                         <div class="flex items-center gap-1.5">
                             <span class="material-symbols-outlined text-[18px]">domain</span>
-                            <span>Sector: <strong class="text-on-background">{{ $meta['sector_name'] }}</strong></span>
+                            <span>
+                                @if(!empty($meta['multi_sector']))
+                                    Sectors: <strong class="text-on-background">{{ $meta['sector_name'] }}</strong>
+                                @else
+                                    Sector: <strong class="text-on-background">{{ $meta['sector_name'] }}</strong>
+                                @endif
+                            </span>
                         </div>
                         <span class="w-1 h-1 rounded-full bg-primary/30"></span>
                         <div class="flex items-center gap-1.5">
@@ -98,6 +104,11 @@
                                 <span class="material-symbols-outlined text-[18px]">event</span>
                                 <span>Quarter: <strong class="text-on-background">Q{{ $meta['reporting_quarter'] }}</strong></span>
                             </div>
+                        @endif
+                        @if(!empty($meta['multi_sector']) && !empty($meta['sector_names']))
+                            <p class="text-sm text-on-surface-variant mt-2">
+                                {{ implode(' · ', $meta['sector_names']) }}
+                            </p>
                         @endif
                     </div>
                 </div>
@@ -132,13 +143,23 @@
                         <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
                     </div>
                 @else
-                    <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
-                        <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
-                            <span class="material-symbols-outlined">handshake</span>
+                    @if(!empty($meta['multi_sector']) || ($summary['sectors'] ?? 0) > 1)
+                        <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
+                                <span class="material-symbols-outlined">domain</span>
+                            </div>
+                            <p class="text-on-surface-variant text-sm mb-1">Sectors</p>
+                            <p class="text-2xl font-semibold text-on-background">{{ $summary['sectors'] ?? count($preview['sectors'] ?? []) }}</p>
                         </div>
-                        <p class="text-on-surface-variant text-sm mb-1">Commitments</p>
-                        <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
-                    </div>
+                    @else
+                        <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(65,102,78,0.1); color: var(--bu-secondary);">
+                                <span class="material-symbols-outlined">handshake</span>
+                            </div>
+                            <p class="text-on-surface-variant text-sm mb-1">Commitments</p>
+                            <p class="text-2xl font-semibold text-on-background">{{ $summary['commitments'] }}</p>
+                        </div>
+                    @endif
                     <div class="bu-card border border-primary/10 rounded-xl p-5 shadow-sm relative overflow-hidden">
                         <div class="p-2 rounded-lg inline-flex mb-4" style="background: rgba(16,185,129,0.1); color: var(--bu-success);">
                             <span class="material-symbols-outlined">inventory_2</span>

@@ -173,6 +173,9 @@
                 <p class="text-on-surface-variant mt-2 max-w-3xl">
                     @if(($uploadMode ?? 'structure') === 'actuals')
                         Download your sector template, enter quarterly actual values and remarks, then upload to submit performance data for Sector Head approval.
+                    @elseif(!empty($supportsMultiSector))
+                        Upload commitments, deliverables, KPIs, annual targets, and quarterly milestones for one sector or multiple sectors (one sheet per sector).
+                        Quarterly actual values are entered later by Data Admins through the standard performance tracking workflow.
                     @else
                         Upload commitments, deliverables, KPIs, annual targets, and quarterly milestones for a sector in bulk.
                         Quarterly actual values are entered later by Data Admins through the standard performance tracking workflow.
@@ -204,7 +207,32 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div>
+                            @if(!empty($supportsMultiSector))
+                                <div>
+                                    <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-2">
+                                        Upload Scope <span class="text-error">*</span>
+                                    </label>
+                                    <div class="space-y-2">
+                                        <label class="flex items-start gap-2 text-sm cursor-pointer">
+                                            <input type="radio" name="sector_scope" value="single" id="sectorScopeSingle"
+                                                   class="mt-1" {{ old('sector_scope', 'single') === 'single' ? 'checked' : '' }}>
+                                            <span>
+                                                <strong class="text-on-background">Single sector</strong>
+                                                <span class="block text-on-surface-variant text-xs">One sheet template for one sector.</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-start gap-2 text-sm cursor-pointer">
+                                            <input type="radio" name="sector_scope" value="multiple" id="sectorScopeMultiple"
+                                                   class="mt-1" {{ old('sector_scope') === 'multiple' ? 'checked' : '' }}>
+                                            <span>
+                                                <strong class="text-on-background">Multiple sectors</strong>
+                                                <span class="block text-on-surface-variant text-xs">One sheet per selected sector in the same workbook.</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            @endif
+                            <div id="singleSectorPicker">
                                 <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-1"
                                        for="sector">
                                     Sector <span class="text-error">*</span>
@@ -218,6 +246,23 @@
                                     <input type="hidden" name="sector_id" value="{{ $defaultSectorId }}">
                                 @endif
                             </div>
+                            @if(!empty($supportsMultiSector))
+                                <div id="multiSectorPicker" class="hidden">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80">
+                                            Sectors <span class="text-error">*</span>
+                                        </label>
+                                        <button type="button" id="selectAllSectorsBtn"
+                                                class="text-xs font-semibold text-primary hover:underline">
+                                            Select all
+                                        </button>
+                                    </div>
+                                    <div id="multiSectorList"
+                                         class="bulk-upload-field border border-primary/20 rounded-lg max-h-48 overflow-y-auto p-2 space-y-1 text-sm">
+                                    </div>
+                                    <p id="multiSectorCount" class="text-xs text-on-surface-variant mt-2">0 sectors selected</p>
+                                </div>
+                            @endif
                             @if(($uploadMode ?? 'structure') === 'actuals')
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-1"
@@ -261,6 +306,9 @@
                                         <li>Targets and milestones are pre-filled by PDCU and must not be changed.</li>
                                     @else
                                         <li>Ensure all mandatory target and milestone fields are complete.</li>
+                                        @if(!empty($supportsMultiSector))
+                                            <li>For multi-sector uploads, keep one sector per sheet and do not rename sheet markers.</li>
+                                        @endif
                                     @endif
                                     <li>Maximum file size is 50MB.</li>
                                 </ul>
@@ -359,6 +407,7 @@
             const sectorSelect = document.getElementById('sector');
             const sectorSelectionLocked = @json($sectorSelectionLocked);
             const uploadMode = @json($uploadMode ?? 'structure');
+            const supportsMultiSector = @json(!empty($supportsMultiSector));
             const templateBaseUrl = @json(route('bulk-upload.template'));
             const sectorEntryAccess = @json($sectorEntryAccess);
             const sectorQuarterEntryAccess = @json($sectorQuarterEntryAccess ?? []);
@@ -366,6 +415,8 @@
             const reportingQuarterSelect = document.getElementById('reportingQuarter');
             const closedQuarterLabel = document.getElementById('bulkUploadClosedQuarterLabel');
             const initialSectorId = @json(old('sector_id', $defaultSectorId));
+            const initialSectorIds = @json(old('sector_ids', []));
+            const initialSectorScope = @json(old('sector_scope', 'single'));
             const closedMessage = document.getElementById('bulkUploadClosedMessage');
             const activeArea = document.getElementById('bulkUploadActiveArea');
             const templateBtn = document.getElementById('bulkUploadTemplateBtn');
@@ -375,10 +426,16 @@
             const browseBtn = document.getElementById('bulkUploadBrowseBtn');
             const removeBtn = document.getElementById('bulkUploadRemoveBtn');
             const cancelBtn = document.getElementById('bulkUploadCancelBtn');
-            const validateBtn = document.getElementById('bulkUploadValidateBtn');
             const uploadForm = document.getElementById('bulkUploadForm');
             const fileNameEl = document.getElementById('bulkUploadFileName');
             const fileMetaEl = document.getElementById('bulkUploadFileMeta');
+            const singleSectorPicker = document.getElementById('singleSectorPicker');
+            const multiSectorPicker = document.getElementById('multiSectorPicker');
+            const multiSectorList = document.getElementById('multiSectorList');
+            const multiSectorCount = document.getElementById('multiSectorCount');
+            const selectAllSectorsBtn = document.getElementById('selectAllSectorsBtn');
+            const sectorScopeSingle = document.getElementById('sectorScopeSingle');
+            const sectorScopeMultiple = document.getElementById('sectorScopeMultiple');
 
             function getFrameworkYear() {
                 const frameworkId = fiscalYearSelect.value;
@@ -391,6 +448,24 @@
                 }
 
                 return parseInt(reportingQuarterSelect.value, 10) || null;
+            }
+
+            function getSectorScope() {
+                if (!supportsMultiSector) {
+                    return 'single';
+                }
+
+                const selected = document.querySelector('input[name="sector_scope"]:checked');
+                return selected ? selected.value : 'single';
+            }
+
+            function getSelectedMultiSectorIds() {
+                if (!multiSectorList) {
+                    return [];
+                }
+
+                return Array.from(multiSectorList.querySelectorAll('input[type="checkbox"]:checked'))
+                    .map(function (input) { return input.value; });
             }
 
             function isUploadAllowedForSector(sectorId) {
@@ -429,26 +504,64 @@
             }
 
             function updateTemplateUrl() {
-                if (!templateBtn || uploadMode !== 'actuals') {
+                if (!templateBtn) {
                     return;
                 }
 
                 const frameworkId = fiscalYearSelect.value;
-                const sectorId = sectorSelect.value || initialSectorId;
-                if (!frameworkId || !sectorId) {
+                if (!frameworkId) {
                     templateBtn.href = templateBaseUrl;
                     return;
                 }
 
-                const params = new URLSearchParams({
-                    framework_id: frameworkId,
-                    sector_id: sectorId,
-                });
+                const params = new URLSearchParams({ framework_id: frameworkId });
+
+                if (uploadMode === 'actuals') {
+                    const sectorId = sectorSelect.value || initialSectorId;
+                    if (!sectorId) {
+                        templateBtn.href = templateBaseUrl;
+                        return;
+                    }
+                    params.set('sector_id', sectorId);
+                    templateBtn.href = templateBaseUrl + '?' + params.toString();
+                    return;
+                }
+
+                const scope = getSectorScope();
+                params.set('sector_scope', scope);
+
+                if (scope === 'multiple') {
+                    const sectorIds = getSelectedMultiSectorIds();
+                    sectorIds.forEach(function (id) {
+                        params.append('sector_ids[]', id);
+                    });
+                    templateBtn.href = sectorIds.length
+                        ? templateBaseUrl + '?' + params.toString()
+                        : templateBaseUrl;
+                    return;
+                }
+
+                const sectorId = sectorSelect.value || initialSectorId;
+                if (!sectorId) {
+                    templateBtn.href = templateBaseUrl;
+                    return;
+                }
+                params.set('sector_id', sectorId);
                 templateBtn.href = templateBaseUrl + '?' + params.toString();
             }
 
             function updateUploadAvailability(sectorId) {
-                const allowed = isUploadAllowedForSector(sectorId);
+                let allowed = false;
+
+                if (uploadMode === 'structure' && getSectorScope() === 'multiple') {
+                    const selected = getSelectedMultiSectorIds();
+                    allowed = selected.length > 0 && selected.every(function (id) {
+                        return isUploadAllowedForSector(id);
+                    });
+                } else {
+                    allowed = isUploadAllowedForSector(sectorId);
+                }
+
                 updateClosedQuarterLabel();
 
                 if (closedMessage && activeArea) {
@@ -464,6 +577,72 @@
                 if (!allowed && typeof clearSelectedFile === 'function') {
                     clearSelectedFile();
                 }
+            }
+
+            function updateMultiSectorCount() {
+                if (!multiSectorCount) {
+                    return;
+                }
+
+                const count = getSelectedMultiSectorIds().length;
+                multiSectorCount.textContent = count + ' sector' + (count === 1 ? '' : 's') + ' selected';
+            }
+
+            function populateMultiSectors(frameworkId, selectedIds) {
+                if (!multiSectorList) {
+                    return;
+                }
+
+                const selected = (selectedIds || []).map(String);
+                const sectors = sectorsByFramework[String(frameworkId)] || [];
+                multiSectorList.innerHTML = '';
+
+                sectors.forEach(function (sector) {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-primary/5 cursor-pointer';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'sector_ids[]';
+                    checkbox.value = String(sector.id);
+                    checkbox.checked = selected.includes(String(sector.id));
+                    checkbox.addEventListener('change', function () {
+                        updateMultiSectorCount();
+                        updateUploadAvailability(sectorSelect.value || initialSectorId);
+                        updateTemplateUrl();
+                    });
+                    const text = document.createElement('span');
+                    text.textContent = sector.name;
+                    label.appendChild(checkbox);
+                    label.appendChild(text);
+                    multiSectorList.appendChild(label);
+                });
+
+                updateMultiSectorCount();
+            }
+
+            function updateSectorScopeUi() {
+                const scope = getSectorScope();
+                const isMultiple = scope === 'multiple';
+
+                if (singleSectorPicker) {
+                    singleSectorPicker.classList.toggle('hidden', isMultiple);
+                }
+                if (multiSectorPicker) {
+                    multiSectorPicker.classList.toggle('hidden', !isMultiple);
+                }
+
+                if (sectorSelect) {
+                    if (isMultiple) {
+                        sectorSelect.removeAttribute('required');
+                        sectorSelect.removeAttribute('name');
+                    } else if (!sectorSelectionLocked) {
+                        sectorSelect.setAttribute('required', 'required');
+                        sectorSelect.setAttribute('name', 'sector_id');
+                    }
+                }
+
+                updateUploadAvailability(sectorSelect.value || initialSectorId);
+                updateTemplateUrl();
             }
 
             function populateSectors(frameworkId, selectedSectorId) {
@@ -490,19 +669,45 @@
                     sectorSelect.value = String(sectors[0].id);
                 }
 
-                updateUploadAvailability(sectorSelect.value || selectedSectorId);
-                updateTemplateUrl();
+                populateMultiSectors(frameworkId, initialSectorIds.length ? initialSectorIds : []);
+                updateSectorScopeUi();
             }
 
             fiscalYearSelect.addEventListener('change', function () {
                 populateSectors(this.value);
-                updateTemplateUrl();
             });
 
             if (fiscalYearSelect.value) {
                 populateSectors(fiscalYearSelect.value, initialSectorId);
             } else {
                 updateUploadAvailability(initialSectorId);
+            }
+
+            if (supportsMultiSector) {
+                if (initialSectorScope === 'multiple' && sectorScopeMultiple) {
+                    sectorScopeMultiple.checked = true;
+                }
+                [sectorScopeSingle, sectorScopeMultiple].forEach(function (radio) {
+                    if (radio) {
+                        radio.addEventListener('change', updateSectorScopeUi);
+                    }
+                });
+                if (selectAllSectorsBtn) {
+                    selectAllSectorsBtn.addEventListener('click', function () {
+                        const checkboxes = multiSectorList
+                            ? multiSectorList.querySelectorAll('input[type="checkbox"]')
+                            : [];
+                        const allChecked = Array.from(checkboxes).every(function (cb) { return cb.checked; });
+                        checkboxes.forEach(function (cb) {
+                            cb.checked = !allChecked;
+                        });
+                        selectAllSectorsBtn.textContent = allChecked ? 'Select all' : 'Clear all';
+                        updateMultiSectorCount();
+                        updateUploadAvailability(sectorSelect.value || initialSectorId);
+                        updateTemplateUrl();
+                    });
+                }
+                updateSectorScopeUi();
             }
 
             updateTemplateUrl();
@@ -533,6 +738,10 @@
                 const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
                 if (!allowed.includes(ext)) {
                     alert('Only .xlsx and .csv files are supported.');
+                    return;
+                }
+                if (getSectorScope() === 'multiple' && ext === '.csv') {
+                    alert('Multi-sector upload requires an Excel workbook (.xlsx) with one sheet per sector.');
                     return;
                 }
                 showSelectedFile(file);
@@ -588,21 +797,36 @@
                         return;
                     }
 
-                    const sectorId = sectorSelect.value || initialSectorId;
-                    if (!sectorId) {
-                        event.preventDefault();
-                        alert('Please select a sector.');
-                        return;
-                    }
-
-                    if (!isUploadAllowedForSector(sectorId)) {
-                        event.preventDefault();
-                        if (uploadMode === 'actuals') {
-                            alert('Upload is not available while the selected reporting quarter entry window is closed.');
-                        } else {
-                            alert('Upload is not available while the data entry window is closed.');
+                    const scope = getSectorScope();
+                    if (scope === 'multiple') {
+                        const sectorIds = getSelectedMultiSectorIds();
+                        if (!sectorIds.length) {
+                            event.preventDefault();
+                            alert('Please select at least one sector.');
+                            return;
                         }
-                        return;
+                        if (!sectorIds.every(function (id) { return isUploadAllowedForSector(id); })) {
+                            event.preventDefault();
+                            alert('Upload is not available while the data entry window is closed for one or more selected sectors.');
+                            return;
+                        }
+                    } else {
+                        const sectorId = sectorSelect.value || initialSectorId;
+                        if (!sectorId) {
+                            event.preventDefault();
+                            alert('Please select a sector.');
+                            return;
+                        }
+
+                        if (!isUploadAllowedForSector(sectorId)) {
+                            event.preventDefault();
+                            if (uploadMode === 'actuals') {
+                                alert('Upload is not available while the selected reporting quarter entry window is closed.');
+                            } else {
+                                alert('Upload is not available while the data entry window is closed.');
+                            }
+                            return;
+                        }
                     }
 
                     if (uploadMode === 'actuals' && reportingQuarterSelect && !reportingQuarterSelect.value) {

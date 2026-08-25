@@ -116,8 +116,13 @@
                         </h2>
                         <div class="grid grid-cols-2 gap-y-6 gap-x-4">
                             <div class="flex flex-col gap-1">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Sector</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                                    @if(!empty($meta['multi_sector'])) Sectors @else Sector @endif
+                                </span>
                                 <span class="text-base font-medium text-on-background">{{ $meta['sector_name'] }}</span>
+                                @if(!empty($meta['multi_sector']) && !empty($meta['sector_names']))
+                                    <span class="text-xs text-on-surface-variant">{{ implode(', ', $meta['sector_names']) }}</span>
+                                @endif
                             </div>
                             <div class="flex flex-col gap-1">
                                 <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Reporting Year</span>
@@ -203,6 +208,12 @@
                         @endif
                     @else
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            @if(($stats['sectors_processed'] ?? 0) > 1)
+                                <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                    <p class="text-on-surface-variant mb-1">Sectors</p>
+                                    <p class="font-semibold text-on-background">{{ $stats['sectors_processed'] }} processed</p>
+                                </div>
+                            @endif
                             <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
                                 <p class="text-on-surface-variant mb-1">Commitments</p>
                                 <p class="font-semibold text-on-background">{{ $stats['commitments_created'] }} new / {{ $stats['commitments_matched'] }} matched</p>

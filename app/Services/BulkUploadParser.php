@@ -2,26 +2,221 @@
 
 namespace App\Services;
 
+use App\Models\Sector;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class BulkUploadParser
 {
     private const LAST_COLUMN = 'Q';
 
-    public function parse(UploadedFile $file, bool $forPdcu = true): array
+    /**
+     * @param  Collection<int, Sector>|array<int, Sector>|null  $expectedSectors
+     */
+    public function parse(UploadedFile $file, bool $forPdcu = true, Collection|array|null $expectedSectors = null): array
     {
+        $expectedSectors = collect($expectedSectors ?? []);
         $extension = strtolower($file->getClientOriginalExtension());
 
         if ($extension === 'csv') {
-            return $this->parseCsv($file, $forPdcu);
+            $preview = $this->parseCsv($file, $forPdcu);
+
+            return $this->wrapSingleSectorPreview($preview, $expectedSectors->first());
         }
 
-        return $this->parseSpreadsheet(
-            IOFactory::load($file->getPathname())->getActiveSheet(),
-            $forPdcu
-        );
+        $spreadsheet = IOFactory::load($file->getPathname());
+
+        if ($expectedSectors->count() > 1 || $spreadsheet->getSheetCount() > 1) {
+            return $this->parseMultiSheetWorkbook($spreadsheet, $forPdcu, $expectedSectors);
+        }
+
+        $preview = $this->parseSpreadsheet($spreadsheet->getActiveSheet(), $forPdcu);
+        $sector = $expectedSectors->first()
+            ?? $this->resolveSectorFromSheet($spreadsheet->getActiveSheet(), $expectedSectors);
+
+        return $this->wrapSingleSectorPreview($preview, $sector);
+    }
+
+    /**
+     * @param  Collection<int, Sector>  $expectedSectors
+     */
+    private function parseMultiSheetWorkbook(Spreadsheet $spreadsheet, bool $forPdcu, Collection $expectedSectors): array
+    {
+        $sectorPreviews = [];
+        $unmatchedSheets = [];
+        $matchedSectorIds = [];
+
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $sector = $this->resolveSectorFromSheet($sheet, $expectedSectors);
+            if (!$sector) {
+                $unmatchedSheets[] = $sheet->getTitle();
+                continue;
+            }
+
+            if (isset($matchedSectorIds[$sector->id])) {
+                continue;
+            }
+
+            $sheetPreview = $this->parseSpreadsheet($sheet, $forPdcu);
+            if (($sheetPreview['summary']['total_records'] ?? 0) === 0) {
+                continue;
+            }
+
+            $matchedSectorIds[$sector->id] = true;
+            $sectorPreviews[] = $this->attachSectorContext($sheetPreview, $sector, $sheet->getTitle());
+        }
+
+        if ($sectorPreviews === []) {
+            throw new \RuntimeException('No matching sector sheets with performance records were found in the uploaded workbook.');
+        }
+
+        return $this->aggregateSectorPreviews($sectorPreviews, $unmatchedSheets);
+    }
+
+    /**
+     * @param  Collection<int, Sector>  $expectedSectors
+     */
+    private function resolveSectorFromSheet(Worksheet $sheet, Collection $expectedSectors): ?Sector
+    {
+        $marker = trim((string) $sheet->getCell(BulkUploadStructureTemplateExporter::SECTOR_ID_CELL)->getValue());
+        if (preg_match('/^SECTOR_ID:(\d+)$/i', $marker, $matches)) {
+            $sectorId = (int) $matches[1];
+            $fromExpected = $expectedSectors->first(fn (Sector $sector) => (int) $sector->id === $sectorId);
+            if ($fromExpected) {
+                return $fromExpected;
+            }
+
+            return Sector::query()->find($sectorId);
+        }
+
+        if ($expectedSectors->isEmpty()) {
+            return null;
+        }
+
+        $candidates = array_filter([
+            $sheet->getTitle(),
+            trim((string) $sheet->getCell('A1')->getFormattedValue()),
+        ]);
+
+        foreach ($expectedSectors as $sector) {
+            foreach ($candidates as $candidate) {
+                if (BulkUploadLabelMatcher::labelsAreEquivalent($sector->sector_name, $candidate)) {
+                    return $sector;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function wrapSingleSectorPreview(array $preview, ?Sector $sector): array
+    {
+        if (!$sector) {
+            $preview['multi_sector'] = false;
+            $preview['sectors'] = [];
+
+            return $preview;
+        }
+
+        $sectorPreview = $this->attachSectorContext($preview, $sector, $sector->sector_name);
+
+        return $this->aggregateSectorPreviews([$sectorPreview], []);
+    }
+
+    private function attachSectorContext(array $preview, Sector $sector, string $sheetName): array
+    {
+        $sectorId = (int) $sector->id;
+        $sectorName = $sector->sector_name;
+
+        $decorate = function (array $row) use ($sectorId, $sectorName): array {
+            $row['sector_id'] = $sectorId;
+            $row['sector_name'] = $sectorName;
+
+            return $row;
+        };
+
+        $preview['sector_id'] = $sectorId;
+        $preview['sector_name'] = $sectorName;
+        $preview['sheet_name'] = $sheetName;
+        $preview['rows'] = array_map($decorate, $preview['rows'] ?? []);
+        $preview['deliverables'] = array_map($decorate, $preview['deliverables'] ?? []);
+        $preview['kpis'] = array_map($decorate, $preview['kpis'] ?? []);
+        $preview['commitments'] = array_map(function (array $commitment) use ($decorate) {
+            $commitment['rows'] = array_map($decorate, $commitment['rows'] ?? []);
+
+            return $commitment;
+        }, $preview['commitments'] ?? []);
+
+        return $preview;
+    }
+
+    /**
+     * @param  array<int, array>  $sectorPreviews
+     * @param  array<int, string>  $unmatchedSheets
+     */
+    private function aggregateSectorPreviews(array $sectorPreviews, array $unmatchedSheets): array
+    {
+        $rows = [];
+        $commitments = [];
+        $deliverables = [];
+        $kpis = [];
+        $warnings = [];
+        $sn = 0;
+
+        foreach ($sectorPreviews as $sectorPreview) {
+            foreach ($sectorPreview['warnings'] ?? [] as $warning) {
+                $warnings[] = [
+                    'row' => $warning['row'] ?? 0,
+                    'message' => ($sectorPreview['sector_name'] ?? 'Sector') . ': ' . ($warning['message'] ?? ''),
+                    'sector_id' => $sectorPreview['sector_id'] ?? null,
+                ];
+            }
+
+            foreach ($sectorPreview['rows'] ?? [] as $row) {
+                $sn++;
+                $row['sn'] = $sn;
+                $rows[] = $row;
+            }
+
+            foreach ($sectorPreview['commitments'] ?? [] as $commitment) {
+                $commitments[] = $commitment;
+            }
+            foreach ($sectorPreview['deliverables'] ?? [] as $deliverable) {
+                $deliverables[] = $deliverable;
+            }
+            foreach ($sectorPreview['kpis'] ?? [] as $kpi) {
+                $kpis[] = $kpi;
+            }
+        }
+
+        foreach ($unmatchedSheets as $sheetName) {
+            $warnings[] = [
+                'row' => 0,
+                'message' => "Sheet \"{$sheetName}\" could not be matched to a selected sector and was skipped.",
+            ];
+        }
+
+        return [
+            'multi_sector' => count($sectorPreviews) > 1,
+            'sectors' => $sectorPreviews,
+            'summary' => [
+                'total_records' => count($rows),
+                'sectors' => count($sectorPreviews),
+                'commitments' => count($commitments),
+                'deliverables' => count($deliverables),
+                'kpis' => count($kpis),
+                'warnings' => count($warnings),
+            ],
+            'commitments' => $commitments,
+            'deliverables' => $deliverables,
+            'kpis' => $kpis,
+            'warnings' => $warnings,
+            'rows' => $rows,
+            'unmatched_sheets' => $unmatchedSheets,
+        ];
     }
 
     private function parseCsv(UploadedFile $file, bool $forPdcu): array
