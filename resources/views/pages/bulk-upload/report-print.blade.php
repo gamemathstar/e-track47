@@ -206,6 +206,9 @@
                 <div class="meta-row"><span class="meta-label">Rows Processed</span><span>{{ $stats['rows_processed'] ?? 0 }}</span></div>
                 <div class="meta-row"><span class="meta-label">Actuals Updated</span><span>{{ $stats['actuals_updated'] ?? 0 }}</span></div>
                 <div class="meta-row"><span class="meta-label">New Submissions</span><span>{{ $stats['actuals_submitted'] ?? 0 }}</span></div>
+                @if(!empty($meta['pdcu_confirm_override']))
+                    <div class="meta-row"><span class="meta-label">PDCU Confirmed Override</span><span>{{ $stats['actuals_confirmed_override'] ?? 0 }}</span></div>
+                @endif
                 <div class="meta-row"><span class="meta-label">Skipped (Locked)</span><span>{{ $stats['skipped_locked'] ?? 0 }}</span></div>
             @else
                 <div class="meta-row"><span class="meta-label">Commitments</span><span>{{ $stats['commitments_created'] ?? 0 }} new / {{ $stats['commitments_matched'] ?? 0 }} matched</span></div>

@@ -264,7 +264,7 @@
                                 </div>
                             @endif
                             @if(($uploadMode ?? 'structure') === 'structure')
-                                <div class="pt-1">
+                                <div class="pt-1 space-y-3">
                                     <label class="flex items-start gap-2 text-sm cursor-pointer">
                                         <input type="checkbox" name="include_actuals" value="1" id="includeActuals"
                                                class="mt-1"
@@ -276,6 +276,22 @@
                                             </span>
                                         </span>
                                     </label>
+                                    @if(!empty($canAccessAllSectors))
+                                        <div id="pdcuConfirmOverrideWrap" class="{{ old('include_actuals') ? '' : 'hidden' }}">
+                                            <label class="flex items-start gap-2 text-sm cursor-pointer">
+                                                <input type="checkbox" name="pdcu_confirm_override" value="1" id="pdcuConfirmOverride"
+                                                       class="mt-1"
+                                                       {{ old('pdcu_confirm_override') && old('include_actuals') ? 'checked' : '' }}>
+                                                <span>
+                                                    <strong class="text-on-background">Mark uploaded actuals as PDCU-confirmed</strong>
+                                                    <span class="block text-on-surface-variant text-xs">
+                                                        Bypass Sector Head / Facilitator review and stamp full approval for imported actuals.
+                                                        Confirmed values are locked and treated as official for reporting.
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    @endif
                                 </div>
                             @endif
                             @if(($uploadMode ?? 'structure') === 'actuals')
@@ -324,6 +340,7 @@
                                         <li>Ensure all mandatory target and milestone fields are complete.</li>
                                         <li>Re-uploads merge into existing data: unlocked fields are updated; blank cells are ignored; coordinator-confirmed milestones are skipped.</li>
                                         <li>Optional: enable “Include actual values” to also import Actual columns (unlocked only).</li>
+                                        <li>Optional (PDCU Coordinators): enable “Mark uploaded actuals as PDCU-confirmed” to stamp full approval and lock imported actuals.</li>
                                         @if(!empty($supportsMultiSector))
                                             <li>For multi-sector uploads, keep one sector per sheet and do not rename sheet markers.</li>
                                         @endif
@@ -858,6 +875,26 @@
                         alert('Please select a file to validate.');
                     }
                 });
+            }
+
+            const includeActualsCheckbox = document.getElementById('includeActuals');
+            const pdcuConfirmOverrideWrap = document.getElementById('pdcuConfirmOverrideWrap');
+            const pdcuConfirmOverrideCheckbox = document.getElementById('pdcuConfirmOverride');
+
+            function syncPdcuConfirmOverrideVisibility() {
+                if (!pdcuConfirmOverrideWrap || !includeActualsCheckbox) {
+                    return;
+                }
+                const show = includeActualsCheckbox.checked;
+                pdcuConfirmOverrideWrap.classList.toggle('hidden', !show);
+                if (!show && pdcuConfirmOverrideCheckbox) {
+                    pdcuConfirmOverrideCheckbox.checked = false;
+                }
+            }
+
+            if (includeActualsCheckbox) {
+                includeActualsCheckbox.addEventListener('change', syncPdcuConfirmOverrideVisibility);
+                syncPdcuConfirmOverrideVisibility();
             }
         })();
     </script>

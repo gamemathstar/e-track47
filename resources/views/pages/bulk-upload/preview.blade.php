@@ -116,6 +116,16 @@
                                     </strong>
                                 </span>
                             </div>
+                            @if(!empty($meta['pdcu_confirm_override']))
+                                <span class="w-1 h-1 rounded-full bg-primary/30"></span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[18px]">verified</span>
+                                    <span>
+                                        Approval:
+                                        <strong class="text-on-background">PDCU confirmed override</strong>
+                                    </span>
+                                </div>
+                            @endif
                         @endif
                         @if(!empty($meta['multi_sector']) && !empty($meta['sector_names']))
                             <p class="text-sm text-on-surface-variant mt-2">
@@ -370,6 +380,11 @@
                         Re-uploads will merge into existing structure and overwrite unlocked fields only.
                         @if(!empty($meta['include_actuals']))
                             Quarterly actual values from the file will also be imported for unlocked records.
+                        @endif
+                        @if(!empty($meta['pdcu_confirm_override']))
+                            <strong class="block mt-3 text-on-background">
+                                PDCU confirm override is on: imported actuals will be fully approved and locked (Sector Head, Facilitator, and Coordinator stamps applied).
+                            </strong>
                         @endif
                     @endif
                 </p>

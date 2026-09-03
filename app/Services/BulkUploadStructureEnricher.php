@@ -29,6 +29,7 @@ class BulkUploadStructureEnricher
         $lockedActuals = 0;
         $actualValuesFound = 0;
         $includeActuals = (bool) ($meta['include_actuals'] ?? false);
+        $pdcuConfirmOverride = $includeActuals && (bool) ($meta['pdcu_confirm_override'] ?? false);
 
         $sectorBundles = !empty($preview['sectors'])
             ? $preview['sectors']
@@ -109,10 +110,21 @@ class BulkUploadStructureEnricher
 
                         if (
                             $tracking
-                            && (
-                                $tracking->isLockedFromSectorModification()
-                                || ($tracking->sector_head_approved_by && $tracking->facilitator_decision !== 'Reject')
-                            )
+                            && $tracking->isLockedFromSectorModification()
+                        ) {
+                            $lockedActuals++;
+                            $warnings[] = [
+                                'row' => $row['sn'] ?? 0,
+                                'message' => ($bundle['sector_name'] ?? 'Sector') . ': '
+                                    . ($row['kpi'] ?? 'KPI')
+                                    . " (Q{$quarter} actual) is coordinator-confirmed and will not be overwritten.",
+                                'sector_id' => $sectorId,
+                            ];
+                        } elseif (
+                            !$pdcuConfirmOverride
+                            && $tracking
+                            && $tracking->sector_head_approved_by
+                            && $tracking->facilitator_decision !== 'Reject'
                         ) {
                             $lockedActuals++;
                             $warnings[] = [
@@ -141,6 +153,13 @@ class BulkUploadStructureEnricher
             ];
         }
 
+        if ($pdcuConfirmOverride && $actualValuesFound > 0) {
+            $warnings[] = [
+                'row' => 0,
+                'message' => 'PDCU confirm override is enabled: imported actuals will be stamped Sector Head → Facilitator → Coordinator approved and locked. Already coordinator-confirmed rows remain skipped.',
+            ];
+        }
+
         $preview['warnings'] = $warnings;
         $preview['summary']['warnings'] = count($warnings);
         $preview['summary']['matched_kpis'] = $matched;
@@ -149,6 +168,7 @@ class BulkUploadStructureEnricher
         $preview['summary']['locked_actuals'] = $lockedActuals;
         $preview['summary']['actual_values_found'] = $actualValuesFound;
         $preview['summary']['include_actuals'] = $includeActuals;
+        $preview['summary']['pdcu_confirm_override'] = $pdcuConfirmOverride;
         $preview['summary']['reupload_policy'] = 'overwrite_unlocked';
 
         return $preview;

@@ -188,6 +188,10 @@ class BulkUploadController extends Controller
             'reporting_quarter' => [$uploadMode === 'actuals' ? 'required' : 'nullable', 'integer', 'in:1,2,3,4'],
             'sector_scope' => [$supportsMultiSector ? 'required' : 'nullable', 'in:single,multiple'],
             'include_actuals' => [$uploadMode === 'structure' ? 'nullable' : 'prohibited', 'boolean'],
+            'pdcu_confirm_override' => [
+                $uploadMode === 'structure' && $canAccessAllSectors ? 'nullable' : 'prohibited',
+                'boolean',
+            ],
         ];
 
         if ($sectorScope === 'multiple') {
@@ -266,6 +270,11 @@ class BulkUploadController extends Controller
             'upload_mode' => $uploadMode,
             'reporting_quarter' => $validated['reporting_quarter'] ?? null,
             'include_actuals' => $uploadMode === 'structure' && $request->boolean('include_actuals'),
+            'pdcu_confirm_override' => $uploadMode === 'structure'
+                && $canAccessAllSectors
+                && $request->boolean('include_actuals')
+                && $request->boolean('pdcu_confirm_override'),
+            'confirmed_by_user_id' => (int) $user->id,
         ];
 
         if ($uploadMode === 'actuals') {

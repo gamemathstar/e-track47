@@ -245,6 +245,12 @@
                                     </p>
                                 </div>
                             @endif
+                            @if(!empty($meta['pdcu_confirm_override']) && ($stats['actuals_confirmed_override'] ?? 0) > 0)
+                                <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                    <p class="text-on-surface-variant mb-1">PDCU Confirmed</p>
+                                    <p class="font-semibold text-on-background">{{ $stats['actuals_confirmed_override'] }} actual(s)</p>
+                                </div>
+                            @endif
                         </div>
                         @if(($stats['milestones_skipped'] ?? 0) > 0)
                             <p class="text-sm text-on-surface-variant mt-4">
@@ -388,10 +394,40 @@
                     </a>
                     <a href="{{ route('bulk-upload.report.print', ['print' => 1]) }}"
                        target="_blank" rel="noopener"
-                       class="bu-btn-primary w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm">
+                       class="bu-btn-outline w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
                         <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
                         Download Report
                     </a>
+                    @php
+                        $comprehensiveQuery = [
+                            'year' => $meta['framework_year'] ?? date('Y'),
+                            'start_quarter' => 1,
+                            'end_quarter' => 4,
+                        ];
+                        $uploadedSectorIds = $meta['sector_ids'] ?? (isset($meta['sector_id']) ? [$meta['sector_id']] : []);
+                        foreach ($uploadedSectorIds as $sectorId) {
+                            $comprehensiveQuery['sectors'][] = $sectorId;
+                        }
+                    @endphp
+                    <a href="{{ route('reports.comprehensive', $comprehensiveQuery) }}"
+                       class="bu-btn-outline w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-sm">analytics</span>
+                        Comprehensive KPI Report
+                    </a>
+                    <form method="POST" action="{{ route('reports.comprehensive.download') }}" class="w-full sm:w-auto">
+                        @csrf
+                        <input type="hidden" name="year" value="{{ $meta['framework_year'] ?? date('Y') }}">
+                        <input type="hidden" name="start_quarter" value="1">
+                        <input type="hidden" name="end_quarter" value="4">
+                        @foreach($uploadedSectorIds as $sectorId)
+                            <input type="hidden" name="sectors[]" value="{{ $sectorId }}">
+                        @endforeach
+                        <button type="submit"
+                                class="bu-btn-primary w-full sm:w-auto px-6 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm">
+                            <span class="material-symbols-outlined text-sm">download</span>
+                            Export Comprehensive Excel
+                        </button>
+                    </form>
                 </div>
             </footer>
         </main>

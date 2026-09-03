@@ -51,6 +51,8 @@ class BulkUploadImporter
                     $year,
                     $bundle['rows'] ?? [],
                     (bool) ($meta['include_actuals'] ?? false),
+                    (bool) ($meta['pdcu_confirm_override'] ?? false),
+                    (int) ($meta['confirmed_by_user_id'] ?? 0),
                 );
 
                 foreach ($sectorStats as $key => $value) {
@@ -106,6 +108,7 @@ class BulkUploadImporter
             'actuals_submitted' => 0,
             'actuals_unchanged' => 0,
             'actuals_skipped_locked' => 0,
+            'actuals_confirmed_override' => 0,
             'rows_processed' => 0,
             'sectors_processed' => 0,
         ];
@@ -117,6 +120,8 @@ class BulkUploadImporter
         int $year,
         array $rows,
         bool $includeActuals = false,
+        bool $pdcuConfirmOverride = false,
+        int $confirmedByUserId = 0,
     ): array {
         $this->commitmentCache = [];
         $this->deliverableCache = [];
@@ -200,8 +205,13 @@ class BulkUploadImporter
                         $quarter,
                         $actual,
                         trim($row['remarks'] ?? ''),
+                        $pdcuConfirmOverride,
+                        $confirmedByUserId,
                     );
                     $stats[$actualResult['stat']]++;
+                    if (!empty($actualResult['confirmed_override'])) {
+                        $stats['actuals_confirmed_override']++;
+                    }
                 }
             }
         }
@@ -418,6 +428,8 @@ class BulkUploadImporter
         int $quarter,
         float $actual,
         string $remarks = '',
+        bool $pdcuConfirmOverride = false,
+        int $confirmedByUserId = 0,
     ): array {
         $existing = PerformanceTracking::query()
             ->where('kpi_id', $kpi->id)
@@ -431,15 +443,22 @@ class BulkUploadImporter
                 return ['stat' => 'actuals_skipped_locked'];
             }
 
-            if ($existing->sector_head_approved_by && $existing->facilitator_decision !== 'Reject') {
+            // Without override, Sector Head approval (unless rejected) still blocks edits.
+            if (
+                !$pdcuConfirmOverride
+                && $existing->sector_head_approved_by
+                && $existing->facilitator_decision !== 'Reject'
+            ) {
                 return ['stat' => 'actuals_skipped_locked'];
             }
 
             $hadActual = $existing->actual_value !== null && (float) $existing->actual_value != 0;
             $sameActual = $existing->actual_value !== null && (float) $existing->actual_value === $actual;
             $sameRemarks = $remarks === '' || $remarks === trim((string) ($existing->remarks ?? ''));
+            $alreadyConfirmed = $existing->confirmation_status === 'Confirmed'
+                && $existing->coordinator_confirmed_at !== null;
 
-            if ($sameActual && $sameRemarks) {
+            if ($sameActual && $sameRemarks && (!$pdcuConfirmOverride || $alreadyConfirmed)) {
                 return ['stat' => 'actuals_unchanged'];
             }
 
@@ -450,20 +469,27 @@ class BulkUploadImporter
                 $existing->remarks = $remarks;
             }
 
-            if (!$existing->sector_head_approved_at) {
+            $confirmedOverride = false;
+            if ($pdcuConfirmOverride && $confirmedByUserId > 0) {
+                $existing->applyPdcuBulkConfirmOverride($confirmedByUserId);
+                $confirmedOverride = true;
+            } elseif (!$existing->sector_head_approved_at) {
                 $existing->confirmation_status = 'Pending Sector Head Approval';
             }
 
             $existing->save();
 
-            if (!$existing->sector_head_approved_at) {
+            if (!$pdcuConfirmOverride && !$existing->sector_head_approved_at) {
                 Notification::notifySectorHeadForApproval($existing);
             }
 
-            return ['stat' => $hadActual ? 'actuals_updated' : 'actuals_submitted'];
+            return [
+                'stat' => $hadActual ? 'actuals_updated' : 'actuals_submitted',
+                'confirmed_override' => $confirmedOverride,
+            ];
         }
 
-        $tracking = PerformanceTracking::create([
+        $tracking = new PerformanceTracking([
             'kpi_id' => $kpi->id,
             'framework_id' => $frameworkId,
             'quarter' => $quarter,
@@ -474,9 +500,22 @@ class BulkUploadImporter
             'confirmation_status' => 'Pending Sector Head Approval',
         ]);
 
-        Notification::notifySectorHeadForApproval($tracking);
+        $confirmedOverride = false;
+        if ($pdcuConfirmOverride && $confirmedByUserId > 0) {
+            $tracking->applyPdcuBulkConfirmOverride($confirmedByUserId);
+            $confirmedOverride = true;
+        }
 
-        return ['stat' => 'actuals_submitted'];
+        $tracking->save();
+
+        if (!$pdcuConfirmOverride) {
+            Notification::notifySectorHeadForApproval($tracking);
+        }
+
+        return [
+            'stat' => 'actuals_submitted',
+            'confirmed_override' => $confirmedOverride,
+        ];
     }
 
     private function resolveAnnualTargetValue(array $row): ?float

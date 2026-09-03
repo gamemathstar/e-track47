@@ -20,6 +20,37 @@ class BulkUploadReportBuilder
             ? self::quarterlyActualAverages($rows)
             : self::quarterlyTargetAverages($rows);
 
+        $auditTrail = [
+            [
+                'title' => 'Submission Confirmed',
+                'timestamp' => $submittedAt,
+                'description' => 'Final payload encrypted and stored in registry.',
+                'active' => true,
+            ],
+            [
+                'title' => 'Validation Passed',
+                'timestamp' => $validatedAt,
+                'description' => 'Automated checks completed without errors.',
+                'active' => false,
+            ],
+            [
+                'title' => 'File Uploaded',
+                'timestamp' => $uploadedAt,
+                'description' => 'Initial dataset received from user session.',
+                'active' => false,
+            ],
+        ];
+
+        if (!empty($meta['pdcu_confirm_override'])) {
+            array_unshift($auditTrail, [
+                'title' => 'PDCU Confirm Override Applied',
+                'timestamp' => $submittedAt,
+                'description' => 'Imported actuals stamped with Sector Head, Facilitator, and Coordinator approval.',
+                'active' => true,
+            ]);
+            $auditTrail[1]['active'] = false;
+        }
+
         return [
             'reference' => $reference,
             'meta' => $meta,
@@ -33,26 +64,7 @@ class BulkUploadReportBuilder
             'kpis' => $preview['kpis'] ?? [],
             'deliverables' => $preview['deliverables'] ?? [],
             'commitments' => $preview['commitments'] ?? [],
-            'audit_trail' => [
-                [
-                    'title' => 'Submission Confirmed',
-                    'timestamp' => $submittedAt,
-                    'description' => 'Final payload encrypted and stored in registry.',
-                    'active' => true,
-                ],
-                [
-                    'title' => 'Validation Passed',
-                    'timestamp' => $validatedAt,
-                    'description' => 'Automated checks completed without errors.',
-                    'active' => false,
-                ],
-                [
-                    'title' => 'File Uploaded',
-                    'timestamp' => $uploadedAt,
-                    'description' => 'Initial dataset received from user session.',
-                    'active' => false,
-                ],
-            ],
+            'audit_trail' => $auditTrail,
         ];
     }
 

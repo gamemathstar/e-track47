@@ -102,11 +102,13 @@
                             <i class="w-4 h-4 mr-2" data-lucide="info"></i>
                             <strong>Sector Head Access:</strong> This report will show data for your sector
                             ({{ $userSector->sector_name }}) only.
+                            Only PDCU-confirmed actuals are included.
                         </div>
                     @else
                         <div class="alert alert-info mt-3">
                             <i class="w-4 h-4 mr-2" data-lucide="info"></i>
                             <strong>Full Access:</strong> Select one or more sectors to filter the report, or leave empty to view all sectors.
+                            Only PDCU-confirmed actuals are included in performance results.
                         </div>
                     @endif
                     <form method="POST" action="{{ route('reports.comprehensive.download') }}">
@@ -117,7 +119,7 @@
                                 <label for="sectors" class="form-label">Select Sector(s) <span class="text-gray-500 text-xs">(Leave empty for all sectors)</span></label>
                                 <select name="sectors[]" id="sectors" class="form-control tom-select" multiple>
                                     @foreach($sectors as $sector)
-                                        <option value="{{ $sector->id }}" {{ (is_array(request('sectors')) && in_array($sector->id, request('sectors'))) ? 'selected' : '' }}>
+                                        <option value="{{ $sector->id }}" {{ in_array($sector->id, $selectedSectorIds ?? []) ? 'selected' : '' }}>
                                             {{ $sector->sector_name }}
                                         </option>
                                     @endforeach
@@ -127,19 +129,19 @@
                             <div class="col-span-3 sm:col-span-3">
                                 <label for="start_quarter" class="form-label">Start Quarter</label>
                                 <select name="start_quarter" id="start_quarter" class="form-control">
-                                    <option value="1" {{ (request('start_quarter', 1) == 1) ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
-                                    <option value="2" {{ (request('start_quarter', 1) == 2) ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
-                                    <option value="3" {{ (request('start_quarter', 1) == 3) ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
-                                    <option value="4" {{ (request('start_quarter', 1) == 4) ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
+                                    <option value="1" {{ (int) $startQuarter === 1 ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
+                                    <option value="2" {{ (int) $startQuarter === 2 ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
+                                    <option value="3" {{ (int) $startQuarter === 3 ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
+                                    <option value="4" {{ (int) $startQuarter === 4 ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
                                 </select>
                             </div>
                             <div class="col-span-3 sm:col-span-3">
                                 <label for="end_quarter" class="form-label">End Quarter</label>
                                 <select name="end_quarter" id="end_quarter" class="form-control">
-                                    <option value="1" {{ (request('end_quarter', 4) == 1) ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
-                                    <option value="2" {{ (request('end_quarter', 4) == 2) ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
-                                    <option value="3" {{ (request('end_quarter', 4) == 3) ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
-                                    <option value="4" {{ (request('end_quarter', 4) == 4) ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
+                                    <option value="1" {{ (int) $endQuarter === 1 ? 'selected' : '' }}>Q1 (Jan - Mar)</option>
+                                    <option value="2" {{ (int) $endQuarter === 2 ? 'selected' : '' }}>Q2 (Apr - Jun)</option>
+                                    <option value="3" {{ (int) $endQuarter === 3 ? 'selected' : '' }}>Q3 (Jul - Sep)</option>
+                                    <option value="4" {{ (int) $endQuarter === 4 ? 'selected' : '' }}>Q4 (Oct - Dec)</option>
                                 </select>
                             </div>
                             <div class="col-span-3 sm:col-span-3">

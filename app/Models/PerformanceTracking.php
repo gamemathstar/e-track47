@@ -159,4 +159,37 @@ class PerformanceTracking extends Model
             && (bool) $this->facilitator_confirmed_by
             && !$this->coordinator_confirmed_by;
     }
+
+    /**
+     * Stamp Sector Head → Facilitator → Coordinator acceptance in one step
+     * (PDCU bulk-upload override). Locks the record like a normal confirm.
+     */
+    public function applyPdcuBulkConfirmOverride(int $userId): void
+    {
+        $now = now();
+
+        $this->sector_head_approved_at = $now;
+        $this->sector_head_approved_by = $userId;
+        $this->facilitator_confirmed_at = $now;
+        $this->facilitator_confirmed_by = $userId;
+        $this->facilitator_decision = 'Accept';
+        $this->facilitator_rejection_reason = null;
+        $this->coordinator_confirmed_at = $now;
+        $this->coordinator_confirmed_by = $userId;
+        $this->confirmation_status = 'Confirmed';
+
+        // Optional columns from later migrations — set only when present.
+        static $hasCoordinatorDecision = null;
+        static $hasCoordinatorRejectionReason = null;
+        if ($hasCoordinatorDecision === null) {
+            $hasCoordinatorDecision = \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'coordinator_decision');
+            $hasCoordinatorRejectionReason = \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'coordinator_rejection_reason');
+        }
+        if ($hasCoordinatorDecision) {
+            $this->coordinator_decision = 'Accept';
+        }
+        if ($hasCoordinatorRejectionReason) {
+            $this->coordinator_rejection_reason = null;
+        }
+    }
 }

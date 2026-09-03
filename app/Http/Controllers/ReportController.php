@@ -648,6 +648,11 @@ class ReportController extends Controller
         $year = $request->input('year', date('Y'));
         $startQuarter = $request->input('start_quarter', 1);
         $endQuarter = $request->input('end_quarter', 4);
+        $selectedSectorIds = collect($request->input('sectors', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
 
         // Check if user is a sector head or sector admin
         $user = auth()->user();
@@ -668,7 +673,15 @@ class ReportController extends Controller
             session()->flash('error', 'Database tables not found. Please run database migrations first.');
         }
 
-        return view('pages.reports.comprehensive', compact('reportData', 'year', 'startQuarter', 'endQuarter', 'userSector', 'sectors'));
+        return view('pages.reports.comprehensive', compact(
+            'reportData',
+            'year',
+            'startQuarter',
+            'endQuarter',
+            'userSector',
+            'sectors',
+            'selectedSectorIds',
+        ));
     }
 
     /**
@@ -726,6 +739,16 @@ class ReportController extends Controller
             'start' => $startRange['start'],
             'end' => $endRange['end']
         ];
+    }
+
+    /**
+     * Comprehensive reports only count PDCU-confirmed performance trackings.
+     * Apply on the JOIN (not WHERE) so KPIs without confirmed actuals still appear as not assessed.
+     */
+    private function applyConfirmedPerformanceJoinConstraint($join): void
+    {
+        $join->where('pt.confirmation_status', '=', 'Confirmed')
+            ->whereNotNull('pt.coordinator_confirmed_at');
     }
 
     public function printComprehensiveReport(Request $request)
@@ -1040,6 +1063,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
@@ -1169,6 +1193,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
@@ -1226,6 +1251,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('s.sector_name', $sectorName)
             ->when($framework, function ($query) use ($framework) {
@@ -1497,6 +1523,7 @@ class ReportController extends Controller
                             $query->where('pt.year', '=', $year)
                                 ->orWhere('pt.year', '=', 0); // Include records with year = 0
                         });
+                    $this->applyConfirmedPerformanceJoinConstraint($join);
                 })
                 ->where('c.sector_id', $sector->id)
                 ->whereNotNull('kt.target')
@@ -1932,6 +1959,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->when($framework, function ($query) use ($framework) {
                 return $query->where('s.framework_id', $framework->id)
@@ -1987,6 +2015,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->select([
                 's.sector_name',
@@ -2120,6 +2149,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
@@ -2190,6 +2220,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('c.id', $commitmentId)
             ->whereNotNull('kt.target')
@@ -2258,6 +2289,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('s.id', '=', $sector->id)
             ->whereNotNull('d.end_date')
@@ -2421,6 +2453,7 @@ class ReportController extends Controller
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->whereNotNull('d.end_date')
             ->whereYear('d.end_date', $year)
@@ -2670,6 +2703,7 @@ class ReportController extends Controller
                 ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                     $join->on('pt.kpi_id', '=', 'k.id')
                         ->where('pt.year', '=', $year);
+                    $this->applyConfirmedPerformanceJoinConstraint($join);
                 })
                 ->select([
                     'c.id as commitment_id',
@@ -3472,6 +3506,7 @@ class ReportController extends Controller
             ->join('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('c.sector_id', $sector->id)
             ->whereNotNull('kt.target')
@@ -3497,6 +3532,7 @@ class ReportController extends Controller
                 $join->on('pt.kpi_id', '=', 'k.id')
                     ->where('pt.year', '=', $year)
                     ->whereIn('pt.quarter', [1, 2]);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('c.sector_id', $sector->id)
             ->whereNotNull('kt.target')
@@ -3873,6 +3909,7 @@ class ReportController extends Controller
             })
             ->leftJoin('performance_trackings as pt', function ($join) use ($year) {
                 $join->on('pt.kpi_id', '=', 'k.id')->where('pt.year', '=', $year);
+                $this->applyConfirmedPerformanceJoinConstraint($join);
             })
             ->where('c.sector_id', $sector->id)
             ->select([
