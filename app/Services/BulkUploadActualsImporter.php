@@ -35,6 +35,7 @@ class BulkUploadActualsImporter
             'rows_processed' => 0,
             'actuals_updated' => 0,
             'actuals_submitted' => 0,
+            'actuals_unchanged' => 0,
             'skipped_no_kpi' => 0,
             'skipped_no_milestone' => 0,
             'skipped_locked' => 0,
@@ -99,10 +100,21 @@ class BulkUploadActualsImporter
                     }
 
                     $hadActual = $tracking->actual_value !== null && (float) $tracking->actual_value != 0;
+                    $incomingRemarks = trim($row['remarks'] ?? '');
+                    $sameActual = $tracking->actual_value !== null && (float) $tracking->actual_value === $actual;
+                    $sameRemarks = $incomingRemarks === '' || $incomingRemarks === trim((string) ($tracking->remarks ?? ''));
+
+                    // Re-upload policy: blank cells are ignored; unlocked values are overwritten.
+                    if ($sameActual && $sameRemarks) {
+                        $stats['actuals_unchanged']++;
+                        continue;
+                    }
 
                     $tracking->tracking_date = $trackingDate;
                     $tracking->actual_value = $actual;
-                    $tracking->remarks = trim($row['remarks'] ?? '') ?: $tracking->remarks;
+                    if ($incomingRemarks !== '') {
+                        $tracking->remarks = $incomingRemarks;
+                    }
 
                     if ($tracking->facilitator_decision === 'Reject') {
                         $tracking->facilitator_decision = null;

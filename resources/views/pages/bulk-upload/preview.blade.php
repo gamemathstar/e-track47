@@ -339,7 +339,7 @@
                                 @if(($uploadMode ?? 'structure') === 'actuals')
                                     These include unmatched KPIs, missing milestones, or locked records that cannot be updated.
                                 @else
-                                    These include missing KPI descriptions and incomplete target or milestone values.
+                                    These include missing KPI descriptions, incomplete targets/milestones, or coordinator-confirmed milestones that will be skipped on re-upload.
                                 @endif
                             </p>
                         </div>
@@ -352,8 +352,10 @@
                 <p class="text-on-surface-variant max-w-2xl mb-6">
                     @if(($uploadMode ?? 'structure') === 'actuals')
                         By submitting, you confirm the quarterly actual values are accurate and ready for Sector Head approval.
+                        Re-uploads will overwrite unlocked actuals only.
                     @else
                         By submitting this data, you confirm that all commitments, deliverables, KPIs, annual targets, and quarterly milestones have been reviewed for this sector and fiscal year.
+                        Re-uploads will merge into existing structure and overwrite unlocked fields only.
                     @endif
                 </p>
                 @if(($uploadMode ?? 'structure') === 'actuals' && ($summary['actual_updates'] ?? 0) === 0)

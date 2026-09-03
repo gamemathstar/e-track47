@@ -304,8 +304,10 @@
                                     @if(($uploadMode ?? 'structure') === 'actuals')
                                         <li>Only edit quarterly Actual columns and Remarks.</li>
                                         <li>Targets and milestones are pre-filled by PDCU and must not be changed.</li>
+                                        <li>Re-uploads update unlocked actuals; blank cells keep existing values; locked/approved rows are skipped.</li>
                                     @else
                                         <li>Ensure all mandatory target and milestone fields are complete.</li>
+                                        <li>Re-uploads merge into existing data: unlocked fields are updated; blank cells are ignored; coordinator-confirmed milestones are skipped.</li>
                                         @if(!empty($supportsMultiSector))
                                             <li>For multi-sector uploads, keep one sector per sheet and do not rename sheet markers.</li>
                                         @endif

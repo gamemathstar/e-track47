@@ -14,6 +14,7 @@ use App\Services\BulkUploadImporter;
 use App\Services\BulkUploadParser;
 use App\Services\BulkUploadReportBuilder;
 use App\Services\BulkUploadReportExporter;
+use App\Services\BulkUploadStructureEnricher;
 use App\Services\BulkUploadStructureTemplateExporter;
 use App\Traits\ChecksDataEntryAccess;
 use Carbon\Carbon;
@@ -287,6 +288,8 @@ class BulkUploadController extends Controller
                     ->route('bulk-upload.index')
                     ->with('failure', 'No quarterly actual values are ready to submit. Review validation warnings and confirm the selected reporting quarter.');
             }
+        } else {
+            $preview = app(BulkUploadStructureEnricher::class)->enrich($preview, $meta);
         }
 
         session([

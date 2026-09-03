@@ -97,7 +97,9 @@ class BulkUploadImporter
             'targets_updated' => 0,
             'milestones_created' => 0,
             'milestones_updated' => 0,
+            'milestones_unchanged' => 0,
             'milestones_skipped' => 0,
+            'targets_unchanged' => 0,
             'rows_processed' => 0,
             'sectors_processed' => 0,
         ];
@@ -148,7 +150,13 @@ class BulkUploadImporter
             $annualTarget = $this->resolveAnnualTargetValue($row);
             if ($annualTarget !== null) {
                 $targetResult = $this->upsertKpiTarget($kpiResult['model'], $year, $annualTarget);
-                $stats[$targetResult['created'] ? 'targets_created' : 'targets_updated']++;
+                if ($targetResult['created']) {
+                    $stats['targets_created']++;
+                } elseif ($targetResult['updated']) {
+                    $stats['targets_updated']++;
+                } else {
+                    $stats['targets_unchanged']++;
+                }
             }
 
             foreach ($this->quarterMilestones($row) as $quarter => $milestone) {
@@ -281,7 +289,8 @@ class BulkUploadImporter
         if ($existing) {
             $updates = [];
             $baseline = $this->parseNumeric($row['baseline'] ?? '');
-            if ($baseline !== null && ($existing->target_value === null || $existing->target_value === '' || $existing->target_value === '0')) {
+            // Re-upload policy: overwrite unlocked structural fields when the sheet supplies a value.
+            if ($baseline !== null) {
                 $updates['target_value'] = (string) $baseline;
             }
             if (!empty($updates)) {
@@ -316,10 +325,11 @@ class BulkUploadImporter
             ->first();
 
         if ($existing) {
+            $changed = (float) $existing->target !== $target;
             $existing->target = $target;
             $existing->save();
 
-            return ['created' => false];
+            return ['created' => false, 'updated' => $changed];
         }
 
         KpiTarget::create([
@@ -328,7 +338,7 @@ class BulkUploadImporter
             'target' => $target,
         ]);
 
-        return ['created' => true];
+        return ['created' => true, 'updated' => false];
     }
 
     private function upsertMilestone(Kpi $kpi, int $frameworkId, int $year, int $quarter, float $milestone): array
@@ -341,9 +351,13 @@ class BulkUploadImporter
             ->first();
 
         if ($existing) {
-            if ($existing->actual_value !== null && (float) $existing->actual_value != 0) {
+            // Re-upload policy: overwrite only when unlocked. Never modify actuals from structure import.
+            if ($existing->isLockedFromSectorModification()) {
                 return ['stat' => 'milestones_skipped'];
             }
+
+            $changed = (float) ($existing->milestone ?? 0) !== $milestone
+                || (int) ($existing->framework_id ?? 0) !== $frameworkId;
 
             $existing->milestone = $milestone;
             $existing->framework_id = $frameworkId;
@@ -352,7 +366,7 @@ class BulkUploadImporter
             }
             $existing->save();
 
-            return ['stat' => 'milestones_updated'];
+            return ['stat' => $changed ? 'milestones_updated' : 'milestones_unchanged'];
         }
 
         PerformanceTracking::create([

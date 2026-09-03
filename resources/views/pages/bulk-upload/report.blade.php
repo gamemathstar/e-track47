@@ -196,6 +196,10 @@
                                 <p class="font-semibold text-on-background">{{ $stats['actuals_submitted'] ?? 0 }}</p>
                             </div>
                             <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                <p class="text-on-surface-variant mb-1">Unchanged</p>
+                                <p class="font-semibold text-on-background">{{ $stats['actuals_unchanged'] ?? 0 }}</p>
+                            </div>
+                            <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
                                 <p class="text-on-surface-variant mb-1">Skipped (Locked)</p>
                                 <p class="font-semibold text-on-background">{{ $stats['skipped_locked'] ?? 0 }}</p>
                             </div>
@@ -233,7 +237,7 @@
                         </div>
                         @if(($stats['milestones_skipped'] ?? 0) > 0)
                             <p class="text-sm text-on-surface-variant mt-4">
-                                {{ $stats['milestones_skipped'] }} quarterly milestone(s) were skipped because Data Admins have already entered actual values.
+                                {{ $stats['milestones_skipped'] }} quarterly milestone(s) were skipped because they are coordinator-confirmed (locked).
                             </p>
                         @endif
                     @endif
