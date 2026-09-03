@@ -417,9 +417,12 @@
             const confirmCheckbox = document.getElementById('bulkUploadConfirmCheckbox');
             const submitBtn = document.getElementById('bulkUploadSubmitBtn');
             const submitForm = document.getElementById('bulkUploadSubmitForm');
+            const submitPermanentlyDisabled = @json(
+                ($uploadMode ?? 'structure') === 'actuals' && ($summary['actual_updates'] ?? 0) === 0
+            );
 
             function updateSubmitState() {
-                if (!submitBtn || submitBtn.disabled) {
+                if (!submitBtn || submitPermanentlyDisabled) {
                     return;
                 }
 
@@ -433,7 +436,7 @@
 
             if (submitForm) {
                 submitForm.addEventListener('submit', function (event) {
-                    if (!confirmCheckbox || !confirmCheckbox.checked) {
+                    if (submitPermanentlyDisabled || !confirmCheckbox || !confirmCheckbox.checked) {
                         event.preventDefault();
                         alert('Please confirm the reviewed data before submitting.');
                     }
