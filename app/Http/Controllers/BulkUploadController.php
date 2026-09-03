@@ -187,6 +187,7 @@ class BulkUploadController extends Controller
             'upload_file' => ['required', 'file', 'mimes:xlsx,csv', 'max:51200'],
             'reporting_quarter' => [$uploadMode === 'actuals' ? 'required' : 'nullable', 'integer', 'in:1,2,3,4'],
             'sector_scope' => [$supportsMultiSector ? 'required' : 'nullable', 'in:single,multiple'],
+            'include_actuals' => [$uploadMode === 'structure' ? 'nullable' : 'prohibited', 'boolean'],
         ];
 
         if ($sectorScope === 'multiple') {
@@ -264,6 +265,7 @@ class BulkUploadController extends Controller
             'file_name' => $request->file('upload_file')->getClientOriginalName(),
             'upload_mode' => $uploadMode,
             'reporting_quarter' => $validated['reporting_quarter'] ?? null,
+            'include_actuals' => $uploadMode === 'structure' && $request->boolean('include_actuals'),
         ];
 
         if ($uploadMode === 'actuals') {

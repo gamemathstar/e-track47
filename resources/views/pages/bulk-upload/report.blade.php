@@ -234,10 +234,26 @@
                                 <p class="text-on-surface-variant mb-1">Milestones</p>
                                 <p class="font-semibold text-on-background">{{ $stats['milestones_created'] }} new / {{ $stats['milestones_updated'] }} updated</p>
                             </div>
+                            @if(($stats['actuals_updated'] ?? 0) > 0 || ($stats['actuals_submitted'] ?? 0) > 0 || ($stats['actuals_skipped_locked'] ?? 0) > 0)
+                                <div class="p-4 rounded-lg border border-primary/10" style="background: var(--bu-background-light);">
+                                    <p class="text-on-surface-variant mb-1">Actuals</p>
+                                    <p class="font-semibold text-on-background">
+                                        {{ ($stats['actuals_submitted'] ?? 0) + ($stats['actuals_updated'] ?? 0) }} saved
+                                        @if(($stats['actuals_skipped_locked'] ?? 0) > 0)
+                                            / {{ $stats['actuals_skipped_locked'] }} locked
+                                        @endif
+                                    </p>
+                                </div>
+                            @endif
                         </div>
                         @if(($stats['milestones_skipped'] ?? 0) > 0)
                             <p class="text-sm text-on-surface-variant mt-4">
                                 {{ $stats['milestones_skipped'] }} quarterly milestone(s) were skipped because they are coordinator-confirmed (locked).
+                            </p>
+                        @endif
+                        @if(($stats['actuals_skipped_locked'] ?? 0) > 0)
+                            <p class="text-sm text-on-surface-variant mt-4">
+                                {{ $stats['actuals_skipped_locked'] }} actual value(s) were skipped because the records are locked or already approved.
                             </p>
                         @endif
                     @endif

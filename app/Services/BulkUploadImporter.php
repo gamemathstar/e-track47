@@ -7,6 +7,7 @@ use App\Models\Deliverable;
 use App\Models\Framework;
 use App\Models\Kpi;
 use App\Models\KpiTarget;
+use App\Models\Notification;
 use App\Models\PerformanceTracking;
 use App\Models\Sector;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +49,8 @@ class BulkUploadImporter
                     (int) $bundle['sector_id'],
                     (int) $framework->id,
                     $year,
-                    $bundle['rows'] ?? []
+                    $bundle['rows'] ?? [],
+                    (bool) ($meta['include_actuals'] ?? false),
                 );
 
                 foreach ($sectorStats as $key => $value) {
@@ -100,13 +102,22 @@ class BulkUploadImporter
             'milestones_unchanged' => 0,
             'milestones_skipped' => 0,
             'targets_unchanged' => 0,
+            'actuals_updated' => 0,
+            'actuals_submitted' => 0,
+            'actuals_unchanged' => 0,
+            'actuals_skipped_locked' => 0,
             'rows_processed' => 0,
             'sectors_processed' => 0,
         ];
     }
 
-    private function importSectorRows(int $sectorId, int $frameworkId, int $year, array $rows): array
-    {
+    private function importSectorRows(
+        int $sectorId,
+        int $frameworkId,
+        int $year,
+        array $rows,
+        bool $includeActuals = false,
+    ): array {
         $this->commitmentCache = [];
         $this->deliverableCache = [];
         $this->kpiCache = [];
@@ -159,20 +170,39 @@ class BulkUploadImporter
                 }
             }
 
-            foreach ($this->quarterMilestones($row) as $quarter => $milestone) {
-                if ($milestone === null) {
+            $milestones = $this->quarterMilestones($row);
+            $actuals = $includeActuals ? $this->quarterActuals($row) : [];
+
+            foreach ([1, 2, 3, 4] as $quarter) {
+                $milestone = $milestones[$quarter] ?? null;
+                $actual = $actuals[$quarter] ?? null;
+
+                if ($milestone === null && $actual === null) {
                     continue;
                 }
 
-                $milestoneResult = $this->upsertMilestone(
-                    $kpiResult['model'],
-                    $frameworkId,
-                    $year,
-                    $quarter,
-                    $milestone
-                );
+                if ($milestone !== null) {
+                    $milestoneResult = $this->upsertMilestone(
+                        $kpiResult['model'],
+                        $frameworkId,
+                        $year,
+                        $quarter,
+                        $milestone
+                    );
+                    $stats[$milestoneResult['stat']]++;
+                }
 
-                $stats[$milestoneResult['stat']]++;
+                if ($includeActuals && $actual !== null) {
+                    $actualResult = $this->upsertActual(
+                        $kpiResult['model'],
+                        $frameworkId,
+                        $year,
+                        $quarter,
+                        $actual,
+                        trim($row['remarks'] ?? ''),
+                    );
+                    $stats[$actualResult['stat']]++;
+                }
             }
         }
 
@@ -381,6 +411,74 @@ class BulkUploadImporter
         return ['stat' => 'milestones_created'];
     }
 
+    private function upsertActual(
+        Kpi $kpi,
+        int $frameworkId,
+        int $year,
+        int $quarter,
+        float $actual,
+        string $remarks = '',
+    ): array {
+        $existing = PerformanceTracking::query()
+            ->where('kpi_id', $kpi->id)
+            ->where('quarter', $quarter)
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing) {
+            if ($existing->isLockedFromSectorModification()) {
+                return ['stat' => 'actuals_skipped_locked'];
+            }
+
+            if ($existing->sector_head_approved_by && $existing->facilitator_decision !== 'Reject') {
+                return ['stat' => 'actuals_skipped_locked'];
+            }
+
+            $hadActual = $existing->actual_value !== null && (float) $existing->actual_value != 0;
+            $sameActual = $existing->actual_value !== null && (float) $existing->actual_value === $actual;
+            $sameRemarks = $remarks === '' || $remarks === trim((string) ($existing->remarks ?? ''));
+
+            if ($sameActual && $sameRemarks) {
+                return ['stat' => 'actuals_unchanged'];
+            }
+
+            $existing->tracking_date = now()->toDateString();
+            $existing->actual_value = $actual;
+            $existing->framework_id = $frameworkId;
+            if ($remarks !== '') {
+                $existing->remarks = $remarks;
+            }
+
+            if (!$existing->sector_head_approved_at) {
+                $existing->confirmation_status = 'Pending Sector Head Approval';
+            }
+
+            $existing->save();
+
+            if (!$existing->sector_head_approved_at) {
+                Notification::notifySectorHeadForApproval($existing);
+            }
+
+            return ['stat' => $hadActual ? 'actuals_updated' : 'actuals_submitted'];
+        }
+
+        $tracking = PerformanceTracking::create([
+            'kpi_id' => $kpi->id,
+            'framework_id' => $frameworkId,
+            'quarter' => $quarter,
+            'year' => $year,
+            'actual_value' => $actual,
+            'remarks' => $remarks !== '' ? $remarks : null,
+            'tracking_date' => now()->toDateString(),
+            'confirmation_status' => 'Pending Sector Head Approval',
+        ]);
+
+        Notification::notifySectorHeadForApproval($tracking);
+
+        return ['stat' => 'actuals_submitted'];
+    }
+
     private function resolveAnnualTargetValue(array $row): ?float
     {
         $fullYear = $this->parseNumeric($row['full_year_target'] ?? '');
@@ -398,6 +496,16 @@ class BulkUploadImporter
             2 => $this->parseNumeric($row['q2_target'] ?? ''),
             3 => $this->parseNumeric($row['q3_target'] ?? ''),
             4 => $this->parseNumeric($row['q4_target'] ?? ''),
+        ];
+    }
+
+    private function quarterActuals(array $row): array
+    {
+        return [
+            1 => $this->parseNumeric($row['q1_actual'] ?? ''),
+            2 => $this->parseNumeric($row['q2_actual'] ?? ''),
+            3 => $this->parseNumeric($row['q3_actual'] ?? ''),
+            4 => $this->parseNumeric($row['q4_actual'] ?? ''),
         ];
     }
 

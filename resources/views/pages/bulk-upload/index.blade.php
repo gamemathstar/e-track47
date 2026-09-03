@@ -263,6 +263,21 @@
                                     <p id="multiSectorCount" class="text-xs text-on-surface-variant mt-2">0 sectors selected</p>
                                 </div>
                             @endif
+                            @if(($uploadMode ?? 'structure') === 'structure')
+                                <div class="pt-1">
+                                    <label class="flex items-start gap-2 text-sm cursor-pointer">
+                                        <input type="checkbox" name="include_actuals" value="1" id="includeActuals"
+                                               class="mt-1"
+                                               {{ old('include_actuals') ? 'checked' : '' }}>
+                                        <span>
+                                            <strong class="text-on-background">Include actual values</strong>
+                                            <span class="block text-on-surface-variant text-xs">
+                                                Also import quarterly Actual columns from the template. Unlocked values will be saved; locked rows are skipped.
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+                            @endif
                             @if(($uploadMode ?? 'structure') === 'actuals')
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 mb-1"
@@ -308,6 +323,7 @@
                                     @else
                                         <li>Ensure all mandatory target and milestone fields are complete.</li>
                                         <li>Re-uploads merge into existing data: unlocked fields are updated; blank cells are ignored; coordinator-confirmed milestones are skipped.</li>
+                                        <li>Optional: enable “Include actual values” to also import Actual columns (unlocked only).</li>
                                         @if(!empty($supportsMultiSector))
                                             <li>For multi-sector uploads, keep one sector per sheet and do not rename sheet markers.</li>
                                         @endif

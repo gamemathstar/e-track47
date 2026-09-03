@@ -105,6 +105,18 @@
                                 <span>Quarter: <strong class="text-on-background">Q{{ $meta['reporting_quarter'] }}</strong></span>
                             </div>
                         @endif
+                        @if(($uploadMode ?? 'structure') === 'structure')
+                            <span class="w-1 h-1 rounded-full bg-primary/30"></span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[18px]">tune</span>
+                                <span>
+                                    Actuals:
+                                    <strong class="text-on-background">
+                                        {{ !empty($meta['include_actuals']) ? 'Included' : 'Not included' }}
+                                    </strong>
+                                </span>
+                            </div>
+                        @endif
                         @if(!empty($meta['multi_sector']) && !empty($meta['sector_names']))
                             <p class="text-sm text-on-surface-variant mt-2">
                                 {{ implode(' · ', $meta['sector_names']) }}
@@ -356,6 +368,9 @@
                     @else
                         By submitting this data, you confirm that all commitments, deliverables, KPIs, annual targets, and quarterly milestones have been reviewed for this sector and fiscal year.
                         Re-uploads will merge into existing structure and overwrite unlocked fields only.
+                        @if(!empty($meta['include_actuals']))
+                            Quarterly actual values from the file will also be imported for unlocked records.
+                        @endif
                     @endif
                 </p>
                 @if(($uploadMode ?? 'structure') === 'actuals' && ($summary['actual_updates'] ?? 0) === 0)
